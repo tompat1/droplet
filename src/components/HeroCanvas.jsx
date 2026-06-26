@@ -188,11 +188,8 @@ export default function HeroCanvas() {
             <span className="text-gradient">Droplet</span> Brand Space
           </h1>
           <div style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', maxWidth: '500px', pointerEvents: 'auto', lineHeight: '1.6' }}>
-            <p style={{ marginBottom: '16px' }}>
-              Through these nodes we showcase how the origin logo branches out by branding- and color-guides with the creation of new assets like images, videos and ad mocks.
-            </p>
             <p>
-              This is how powerful the branding experience can be. Let us help you add beautiful branding-variation and together we’ll push the branding-experience forward!
+              Through these nodes we showcase how the origin logo branches out by branding- and color-guides with the creation of new assets like images, videos and ad mocks.
             </p>
           </div>
         </div>

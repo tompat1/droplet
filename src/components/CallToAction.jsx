@@ -2,7 +2,19 @@ import React from 'react';
 
 export default function CallToAction() {
   return (
-    <div style={{ padding: '120px 20px', textAlign: 'center', position: 'relative', zIndex: 10 }}>
+    <div style={{ padding: '80px 20px 120px 20px', textAlign: 'center', position: 'relative', zIndex: 10 }}>
+      <div style={{ 
+        maxWidth: '700px', 
+        margin: '0 auto 80px auto', 
+        color: 'rgba(255,255,255,0.9)', 
+        fontSize: '1.5rem', 
+        lineHeight: '1.7',
+        fontWeight: '300',
+        textShadow: '0 2px 10px rgba(0,0,0,0.5)'
+      }}>
+        "This is how powerful the branding experience can be. Let us help you add beautiful branding-variation and together we’ll push the branding-experience forward!"
+      </div>
+
       <div className="glass-panel" style={{ maxWidth: '600px', margin: '0 auto', padding: '60px 40px' }}>
         <h2 style={{ fontSize: '2.5rem', marginBottom: '20px' }}>Ready to Dive In?</h2>
         <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '1.2rem', marginBottom: '40px' }}>
