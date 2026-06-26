@@ -1,7 +1,17 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 
 export default function MediaModal({ media, onClose }) {
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    setIsZoomed(false);
+    setPan({ x: 0, y: 0 });
+  }, [media]);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
@@ -11,6 +21,34 @@ export default function MediaModal({ media, onClose }) {
   }, [onClose]);
 
   if (!media) return null;
+
+  const handlePointerDown = (e) => {
+    if (!isZoomed || media.type !== 'image') return;
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    e.target.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e) => {
+    if (!isDragging || !isZoomed || media.type !== 'image') return;
+    setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+  };
+
+  const handlePointerUp = (e) => {
+    if (!isDragging || media.type !== 'image') return;
+    setIsDragging(false);
+    e.target.releasePointerCapture(e.pointerId);
+  };
+
+  const toggleZoom = () => {
+    if (media.type !== 'image') return;
+    if (isZoomed) {
+      setIsZoomed(false);
+      setPan({ x: 0, y: 0 });
+    } else {
+      setIsZoomed(true);
+    }
+  };
 
   return (
     <div 
@@ -63,22 +101,40 @@ export default function MediaModal({ media, onClose }) {
       </button>
 
       <div 
-        onClick={e => e.stopPropagation()} // Prevent clicks on the media from closing the modal
+        onClick={e => e.stopPropagation()} 
         style={{
           position: 'relative',
           maxWidth: '90%',
           maxHeight: '90%',
           borderRadius: '16px',
-          overflow: 'hidden',
+          overflow: isZoomed ? 'visible' : 'hidden',
           boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-          border: '1px solid rgba(255, 255, 255, 0.1)'
+          border: isZoomed ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center'
         }}
       >
         {media.type === 'image' ? (
           <img 
             src={media.src} 
             alt={media.title} 
-            style={{ width: '100%', height: '100%', objectFit: 'contain', maxHeight: '90vh' }} 
+            onClick={toggleZoom}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            draggable={false}
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              maxHeight: '90vh',
+              objectFit: 'contain',
+              cursor: isZoomed ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in',
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${isZoomed ? 2.5 : 1})`,
+              transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1)',
+              willChange: 'transform'
+            }} 
           />
         ) : (
           <video 
@@ -89,6 +145,26 @@ export default function MediaModal({ media, onClose }) {
           />
         )}
       </div>
+
+      {media.type === 'image' && !isZoomed && (
+        <div style={{
+          position: 'absolute',
+          bottom: '40px',
+          padding: '12px 24px',
+          background: 'rgba(5, 5, 5, 0.6)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '30px',
+          color: 'rgba(255, 255, 255, 0.8)',
+          fontSize: '0.9rem',
+          pointerEvents: 'none',
+          zIndex: 10002,
+          boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
+          animation: 'fadeIn 0.5s ease-out'
+        }}>
+          Click to zoom, drag to pan
+        </div>
+      )}
     </div>
   );
 }

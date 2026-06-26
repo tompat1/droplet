@@ -34,7 +34,7 @@ export default function InteractiveGallery() {
   }));
 
   return (
-    <div ref={galleryRef} style={{ padding: '80px 5%', maxWidth: '1600px', margin: '0 auto', position: 'relative', zIndex: 5 }}>
+    <div id="asset-gallery" ref={galleryRef} style={{ padding: '80px 5%', maxWidth: '1600px', margin: '0 auto', position: 'relative', zIndex: 5 }}>
       {/* Background Neon Thread */}
       <div style={{
         position: 'absolute',
