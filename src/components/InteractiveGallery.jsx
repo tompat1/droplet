@@ -26,12 +26,10 @@ export default function InteractiveGallery() {
     return () => ctx.revert();
   }, []);
 
-  const third = Math.ceil(assetFiles.length / 3);
-  const categories = [
-    { title: 'Personas', assets: assetFiles.slice(0, third) },
-    { title: 'Ads', assets: assetFiles.slice(third, third * 2) },
-    { title: 'Merch', assets: assetFiles.slice(third * 2) }
-  ];
+  const categories = Object.keys(assetFiles).map(key => ({
+    title: key,
+    assets: assetFiles[key]
+  }));
 
   return (
     <div ref={galleryRef} style={{ padding: '80px 5%', maxWidth: '1600px', margin: '0 auto', position: 'relative', zIndex: 5 }}>
@@ -55,7 +53,8 @@ export default function InteractiveGallery() {
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
             {category.assets.map((filename, index) => {
-              const title = filename.replace('.webp', '').replace('.png', '').replace('.jpg', '');
+              const basename = filename.split('/').pop();
+              const title = basename.replace(/\.(webp|png|jpg)$/i, '');
               return (
                 <div key={`${catIndex}-${index}`} className="gallery-item glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ width: '100%', height: '220px', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px', position: 'relative' }}>

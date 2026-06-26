@@ -115,3 +115,38 @@ h1, h2, h3, h4, h5, h6 {
     background-image: url('/assets/loading/drop_loadingpage_landscape-style1.webp');
   }
 }
+
+/* React Flow Controls Override */
+.custom-flow-controls {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
+  overflow: hidden;
+}
+
+.custom-flow-controls .react-flow__controls-button {
+  background-color: transparent !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  width: 36px !important;
+  height: 36px !important;
+  transition: all 0.2s ease !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
+.custom-flow-controls .react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.custom-flow-controls .react-flow__controls-button:hover {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.custom-flow-controls .react-flow__controls-button svg {
+  fill: #ffffff !important;
+  width: 16px !important;
+  height: 16px !important;
+}
