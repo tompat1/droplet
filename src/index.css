@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg-color: #050505;
+  --text-color: #f0f0f0;
+  --accent-blue: #4B5EFA; /* Droplet Blue */
+  --accent-purple: #7928ca;
+  --accent-neon: #4B5EFA; /* Using Droplet Blue for glowing accents */
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  min-height: 100vh;
+  overflow-x: hidden;
+  /* Smooth scroll behavior */
+  scroll-behavior: smooth;
+}
+
+/* Background animated glow */
+.app-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  background: radial-gradient(circle at 15% 50%, rgba(121, 40, 202, 0.15), transparent 25%),
+              radial-gradient(circle at 85% 30%, rgba(0, 112, 243, 0.15), transparent 25%);
+  animation: bg-pulse 10s ease-in-out infinite alternate;
+}
+
+@keyframes bg-pulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.1); opacity: 1; }
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s ease;
+}
+
+.glass-panel:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 40px rgba(0, 255, 204, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--accent-neon), #0070f3);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* React Flow Customizations */
+.react-flow__node {
+  border-radius: 16px;
+}
+
+.react-flow__edge-path {
+  stroke: var(--glass-border) !important;
+  stroke-width: 2 !important;
+}
+
+.react-flow__handle {
+  width: 12px;
+  height: 12px;
+  background: var(--bg-color);
+  border: 2px solid var(--accent-neon);
+}

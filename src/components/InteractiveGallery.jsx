@@ -1,0 +1,62 @@
+import React, { useEffect, useRef } from 'react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import assetFiles from '../assetsData.json';
+
+gsap.registerPlugin(ScrollTrigger);
+
+export default function InteractiveGallery() {
+  const galleryRef = useRef(null);
+
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      gsap.from('.gallery-item', {
+        y: 60,
+        opacity: 0,
+        duration: 0.6,
+        stagger: 0.03, // Faster stagger since there are ~60 images
+        ease: 'power3.out',
+        scrollTrigger: {
+          trigger: galleryRef.current,
+          start: 'top 85%',
+        }
+      });
+    }, galleryRef);
+
+    return () => ctx.revert();
+  }, []);
+
+  return (
+    <div ref={galleryRef} style={{ padding: '80px 5%', maxWidth: '1600px', margin: '0 auto', position: 'relative', zIndex: 5 }}>
+      <div style={{ marginBottom: '60px', textAlign: 'center' }}>
+        <h2 style={{ fontSize: '3rem', marginBottom: '16px' }}>Asset <span className="text-gradient">Gallery</span></h2>
+        <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '1.2rem', maxWidth: '600px', margin: '0 auto' }}>
+          A consolidated view of all your branding materials in their raw, highest-quality format.
+        </p>
+      </div>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
+        {assetFiles.map((filename, index) => {
+          const title = filename.replace('.webp', '').replace('.png', '').replace('.jpg', '');
+          return (
+            <div key={index} className="gallery-item glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ width: '100%', height: '220px', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px', position: 'relative' }}>
+                <img 
+                  src={`/assets/branding/${filename}`} 
+                  alt={title} 
+                  loading="lazy"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease' }} 
+                  onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'} 
+                  onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'} 
+                />
+              </div>
+              <h3 style={{ fontSize: '1rem', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {title}
+              </h3>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
