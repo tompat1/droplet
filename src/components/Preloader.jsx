@@ -88,37 +88,50 @@ export default function Preloader() {
         }}
       ></div>
 
-      <div style={{ zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <h1 style={{ fontSize: '3.5rem', marginBottom: '30px', letterSpacing: '4px', textTransform: 'uppercase' }}>
-          <span className="text-gradient">Droplet</span>
-        </h1>
-        
-        <div style={{ width: '250px', height: '3px', background: 'rgba(255,255,255,0.1)', overflow: 'hidden', borderRadius: '3px' }}>
+      <div style={{ zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'absolute', bottom: '25%' }}>
+        <div style={{ 
+          width: '500px', 
+          maxWidth: '90vw',
+          height: '6px', 
+          background: 'rgba(0,0,0,0.6)', 
+          border: '1px solid rgba(255,255,255,0.1)',
+          overflow: 'hidden', 
+          borderRadius: '6px',
+          boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
+        }}>
           <div 
             style={{ 
               width: `${progress}%`, 
               height: '100%', 
-              background: 'linear-gradient(90deg, var(--accent-blue), var(--accent-purple))',
+              background: 'linear-gradient(90deg, #FF5B24, #FFB347)',
               transition: 'width 0.1s linear',
-              boxShadow: '0 0 10px var(--accent-blue)'
+              boxShadow: '0 0 15px #FF5B24, 0 0 30px #FFB347'
             }} 
           />
         </div>
         
-        <div style={{ marginTop: '15px', fontSize: '1rem', color: 'rgba(255,255,255,0.8)', fontVariantNumeric: 'tabular-nums', fontWeight: '500' }}>
+        <div style={{ 
+          marginTop: '15px', 
+          fontSize: '1.5rem', 
+          color: '#fff', 
+          fontVariantNumeric: 'tabular-nums', 
+          fontWeight: '700',
+          textShadow: '0 2px 10px rgba(0,0,0,0.8), 0 0 10px #FF5B24'
+        }}>
           {Math.round(progress)}%
         </div>
 
         <div style={{ 
-          marginTop: '20px', 
-          fontSize: '0.8rem', 
-          color: 'rgba(255,255,255,0.4)', 
+          marginTop: '12px', 
+          fontSize: '1rem', 
+          color: 'rgba(255,255,255,0.9)', 
           fontFamily: 'monospace',
-          height: '20px',
+          height: '24px',
           overflow: 'hidden',
           whiteSpace: 'nowrap',
-          maxWidth: '80vw',
-          textOverflow: 'ellipsis'
+          maxWidth: '90vw',
+          textOverflow: 'ellipsis',
+          textShadow: '0 2px 5px rgba(0,0,0,0.8)'
         }}>
           {currentFile}
         </div>
