@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 
-export default function MediaModal({ media, onClose }) {
+export default function MediaModal({ media, onClose, onNext, onPrev }) {
   const [isZoomed, setIsZoomed] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -16,10 +16,12 @@ export default function MediaModal({ media, onClose }) {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowRight' && onNext && !isZoomed) onNext();
+      if (e.key === 'ArrowLeft' && onPrev && !isZoomed) onPrev();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, onNext, onPrev, isZoomed]);
 
   if (!media) return null;
 
@@ -115,6 +117,76 @@ export default function MediaModal({ media, onClose }) {
       >
         <X size={24} />
       </button>
+
+      {!isZoomed && onPrev && (
+        <button 
+          onClick={(e) => { e.stopPropagation(); onPrev(); }}
+          style={{
+            position: 'absolute',
+            left: '30px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            background: 'rgba(255, 255, 255, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            borderRadius: '50%',
+            width: '60px',
+            height: '60px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            color: '#fff',
+            cursor: 'pointer',
+            zIndex: 10000,
+            transition: 'all 0.2s ease',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+          }}
+          onMouseOver={e => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
+          }}
+          onMouseOut={e => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+          }}
+        >
+          <ChevronLeft size={32} />
+        </button>
+      )}
+
+      {!isZoomed && onNext && (
+        <button 
+          onClick={(e) => { e.stopPropagation(); onNext(); }}
+          style={{
+            position: 'absolute',
+            right: '30px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            background: 'rgba(255, 255, 255, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            borderRadius: '50%',
+            width: '60px',
+            height: '60px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            color: '#fff',
+            cursor: 'pointer',
+            zIndex: 10000,
+            transition: 'all 0.2s ease',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+          }}
+          onMouseOver={e => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1.05)';
+          }}
+          onMouseOut={e => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+          }}
+        >
+          <ChevronRight size={32} />
+        </button>
+      )}
 
       <div 
         onClick={e => e.stopPropagation()} 

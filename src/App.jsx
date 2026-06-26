@@ -32,8 +32,8 @@ function App() {
         <source src="/assets/videos/videomp_.mp4" type="video/mp4" />
       </video>
       
-      {/* 3D WebGL Layer */}
-      <ThreeScene />
+      {/* 3D WebGL Layer (Temporarily Hidden) */}
+      {/* <ThreeScene /> */}
 
       <main style={{ position: 'relative', zIndex: 1 }}>
         <HeroCanvas />

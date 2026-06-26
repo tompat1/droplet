@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import assetFiles from '../assetsData.json';
@@ -8,7 +8,26 @@ gsap.registerPlugin(ScrollTrigger);
 
 export default function InteractiveGallery() {
   const galleryRef = useRef(null);
-  const [activeMedia, setActiveMedia] = useState(null);
+
+  const allAssets = useMemo(() => {
+    const list = [];
+    Object.keys(assetFiles).forEach(key => {
+      assetFiles[key].forEach(filename => {
+        const isVideo = key === 'Videos' || filename.match(/\.(mp4|webm|mov)$/i);
+        const basename = filename.split('/').pop();
+        const title = basename.replace(/\.(webp|png|jpg|mp4|webm|mov)$/i, '');
+        const mediaSrc = isVideo ? `/assets/videos/${filename}` : `/assets/branding/${filename}`;
+        list.push({ type: isVideo ? 'video' : 'image', src: mediaSrc, title });
+      });
+    });
+    return list;
+  }, []);
+
+  const [activeIndex, setActiveIndex] = useState(null);
+  const activeMedia = activeIndex !== null ? allAssets[activeIndex] : null;
+
+  const handleNext = () => setActiveIndex(prev => (prev + 1) % allAssets.length);
+  const handlePrev = () => setActiveIndex(prev => (prev - 1 + allAssets.length) % allAssets.length);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -82,7 +101,10 @@ export default function InteractiveGallery() {
                   key={`${catIndex}-${index}`} 
                   className="gallery-item glass-panel" 
                   style={{ padding: '16px', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
-                  onClick={() => setActiveMedia({ type: isVideo ? 'video' : 'image', src: mediaSrc, title })}
+                  onClick={() => {
+                    const globalIndex = allAssets.findIndex(a => a.src === mediaSrc);
+                    setActiveIndex(globalIndex);
+                  }}
                 >
                   <div style={{ width: '100%', height: '220px', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px', position: 'relative' }}>
                     {isVideo ? (
@@ -117,7 +139,7 @@ export default function InteractiveGallery() {
         </div>
       ))}
       
-      <MediaModal media={activeMedia} onClose={() => setActiveMedia(null)} />
+      <MediaModal media={activeMedia} onClose={() => setActiveIndex(null)} onNext={handleNext} onPrev={handlePrev} />
     </div>
   );
 }
