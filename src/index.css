@@ -97,6 +97,15 @@ h1, h2, h3, h4, h5, h6 {
   to { stroke-dashoffset: 0; }
 }
 
+@keyframes pulse-glow {
+  0%, 100% { stroke-opacity: 0.1; filter: blur(3px); }
+  50% { stroke-opacity: 0.6; filter: blur(8px); }
+}
+
+.pulsating-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
 /* Preloader Backgrounds */
 .preloader-bg {
   background-size: cover;
