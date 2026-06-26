@@ -79,11 +79,6 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 16px;
 }
 
-.react-flow__edge-path {
-  stroke: var(--glass-border) !important;
-  stroke-width: 2 !important;
-}
-
 .react-flow__handle {
   width: 12px;
   height: 12px;

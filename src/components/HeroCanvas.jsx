@@ -91,22 +91,12 @@ const initialNodes = [
   },
 ];
 
-const edgeOptions = {
-  animated: true,
-  style: { strokeWidth: 2 },
-  markerEnd: {
-    type: MarkerType.ArrowClosed,
-    width: 20,
-    height: 20,
-  },
-};
-
 const initialEdges = [
-  { id: 'e1-2', source: '1', target: '2', ...edgeOptions, style: { stroke: 'var(--accent-neon)', strokeWidth: 2 } },
-  { id: 'e1-3', source: '1', target: '3', ...edgeOptions, style: { stroke: 'var(--accent-purple)', strokeWidth: 2 } },
-  { id: 'e3-4', source: '3', target: '4', ...edgeOptions, style: { stroke: 'var(--accent-blue)', strokeWidth: 2 } },
-  { id: 'e3-5', source: '3', target: '5', ...edgeOptions, style: { stroke: 'rgba(255,255,255,0.4)', strokeWidth: 2 } },
-  { id: 'e2-6', source: '2', target: '6', ...edgeOptions, style: { stroke: 'var(--accent-neon)', strokeWidth: 2 } },
+  { id: 'e1-2', source: '1', target: '2', type: 'smoothstep', animated: true, style: { stroke: '#4B5EFA', strokeWidth: 4 } },
+  { id: 'e1-3', source: '1', target: '3', type: 'smoothstep', animated: true, style: { stroke: '#7928ca', strokeWidth: 4 } },
+  { id: 'e3-4', source: '3', target: '4', type: 'smoothstep', animated: true, style: { stroke: '#00ffcc', strokeWidth: 4 } },
+  { id: 'e3-5', source: '3', target: '5', type: 'smoothstep', animated: true, style: { stroke: '#ffffff', strokeWidth: 4 } },
+  { id: 'e2-6', source: '2', target: '6', type: 'smoothstep', animated: true, style: { stroke: '#4B5EFA', strokeWidth: 4 } },
 ];
 
 export default function HeroCanvas() {
