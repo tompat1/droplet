@@ -11,15 +11,15 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import BrandCard from './BrandCard';
+import assetFiles from '../assetsData.json';
 
 const nodeTypes = {
   brandCard: BrandCard,
 };
 
-// Use the placeholder images we generated and moved to the public folder
-const abstractGlass = '/assets/branding/abstract_glass_shape_1782457471807.png';
-const neonGradient = '/assets/branding/neon_fluid_gradient_1782457482474.png';
-const premiumMetal = '/assets/branding/premium_metallic_texture_1782457491692.png';
+// Pull the first two images dynamically from our generated list
+const abstractGlass = assetFiles.length > 0 ? `/assets/branding/${assetFiles[0]}` : '';
+const neonGradient = assetFiles.length > 1 ? `/assets/branding/${assetFiles[1]}` : '';
 
 const initialNodes = [
   {
