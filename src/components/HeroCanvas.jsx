@@ -7,13 +7,24 @@ import {
   Background,
   Controls,
   ControlButton,
-  MarkerType
+  MarkerType,
+  Panel,
+  useViewport
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import BrandCard from './BrandCard';
 import MediaModal from './MediaModal';
 import assetFiles from '../assetsData.json';
+
+const ZoomIndicator = () => {
+  const { zoom } = useViewport();
+  return (
+    <Panel position="bottom-left" style={{ margin: '0 0 15px 55px', color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace', fontSize: '0.85rem', pointerEvents: 'none', display: 'flex', alignItems: 'flex-end', height: '36px' }}>
+      {Math.round(zoom * 100)}%
+    </Panel>
+  );
+};
 
 const FullscreenIcon = () => (
   <svg viewBox="2 2 20 20">
@@ -203,12 +214,14 @@ export default function HeroCanvas() {
         <Background color="#ffffff" gap={24} size={1} opacity={0.05} />
         <Controls 
           showInteractive={false} 
+          showFitView={false}
           className="custom-flow-controls"
         >
           <ControlButton onClick={toggleFullscreen} title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}>
             {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
           </ControlButton>
         </Controls>
+        <ZoomIndicator />
       </ReactFlow>
       
       <MediaModal media={activeMedia} onClose={() => setActiveMedia(null)} />
