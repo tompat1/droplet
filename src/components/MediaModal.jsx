@@ -192,15 +192,18 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
         onClick={e => e.stopPropagation()} 
         style={{
           position: 'relative',
-          maxWidth: '90%',
-          maxHeight: '90%',
-          borderRadius: '16px',
+          width: media.type === 'video' ? '100vw' : 'auto',
+          height: media.type === 'video' ? '100vh' : 'auto',
+          maxWidth: media.type === 'video' ? '100vw' : '90%',
+          maxHeight: media.type === 'video' ? '100vh' : '90%',
+          borderRadius: media.type === 'video' ? '0' : '16px',
           overflow: isZoomed ? 'visible' : 'hidden',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-          border: isZoomed ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: media.type === 'video' ? 'none' : '0 20px 60px rgba(0,0,0,0.6)',
+          border: (isZoomed || media.type === 'video') ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
           display: 'flex',
           justifyContent: 'center',
-          alignItems: 'center'
+          alignItems: 'center',
+          background: 'transparent'
         }}
       >
         {media.type === 'image' ? (
@@ -228,7 +231,7 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
             src={media.src} 
             controls 
             autoPlay 
-            style={{ width: '100%', height: '100%', objectFit: 'contain', maxHeight: '90vh' }} 
+            style={{ width: '100%', height: '100%', objectFit: 'contain', maxHeight: '100vh' }} 
           />
         )}
       </div>

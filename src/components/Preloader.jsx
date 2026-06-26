@@ -1,26 +1,35 @@
 import React, { useEffect, useState, useRef } from 'react';
 import gsap from 'gsap';
-import { useProgress } from '@react-three/drei';
 
 export default function Preloader() {
-  const { progress } = useProgress();
+  const [progress, setProgress] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
   const containerRef = useRef(null);
 
   useEffect(() => {
-    // When progress hits 100, fade out after a brief delay
-    if (progress === 100) {
-      const timer = setTimeout(() => {
-        gsap.to(containerRef.current, {
-          opacity: 0,
-          duration: 1,
-          ease: 'power2.inOut',
-          onComplete: () => setIsVisible(false)
-        });
-      }, 800); // 800ms minimum visibility delay
-      return () => clearTimeout(timer);
-    }
-  }, [progress]);
+    let current = 0;
+    const interval = setInterval(() => {
+      current += Math.random() * 15 + 5;
+      if (current >= 100) {
+        current = 100;
+        clearInterval(interval);
+        
+        const timer = setTimeout(() => {
+          if (containerRef.current) {
+            gsap.to(containerRef.current, {
+              opacity: 0,
+              duration: 1,
+              ease: 'power2.inOut',
+              onComplete: () => setIsVisible(false)
+            });
+          }
+        }, 500);
+      }
+      setProgress(Math.min(current, 100));
+    }, 80);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   if (!isVisible) return null;
 

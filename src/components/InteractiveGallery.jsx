@@ -79,12 +79,12 @@ export default function InteractiveGallery() {
       </div>
       
       {categories.map((category, catIndex) => (
-        <div key={catIndex} style={{ position: 'relative', zIndex: 2, marginBottom: '80px' }}>
+        <div key={catIndex} style={{ position: 'relative', zIndex: 2, marginTop: catIndex === 0 ? '0' : '120px', marginBottom: '20px' }}>
           <h3 style={{ 
             fontSize: '2rem', 
-            marginBottom: '32px', 
+            marginBottom: '20px', 
             borderBottom: '1px solid rgba(255,255,255,0.1)', 
-            paddingBottom: '16px',
+            paddingBottom: '12px',
             color: 'var(--text-color)' 
           }}>
             {category.title}
