@@ -19,7 +19,8 @@ const nodeTypes = {
 
 // Pull the specific logo image and one dynamic image
 const primaryLogoImage = '/assets/branding/droplet_logo.png';
-const brandingGuideImage = '/assets/branding/droplet_branding_guide_drop_25_ads.webp';
+const brandingGuideImage = '/assets/branding/droplet_branding_guide_drop.webp';
+const adsMockupsImage = '/assets/branding/droplet_branding_guide_drop_25_ads.webp';
 
 const initialNodes = [
   {
@@ -84,7 +85,7 @@ const initialNodes = [
     data: {
       title: 'Ads Mockups',
       subtitle: 'Campaign Previews',
-      image: brandingGuideImage,
+      image: adsMockupsImage,
       description: 'Preview of Droplet ad placements across various media.'
     },
   },
