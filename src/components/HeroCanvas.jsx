@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ReactFlow,
   useNodesState,
@@ -11,6 +11,7 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import BrandCard from './BrandCard';
+import MediaModal from './MediaModal';
 import assetFiles from '../assetsData.json';
 
 const nodeTypes = {
@@ -102,11 +103,20 @@ const initialEdges = [
 export default function HeroCanvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [activeMedia, setActiveMedia] = useState(null);
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge({ ...params, animated: true, style: { stroke: 'rgba(255,255,255,0.5)', strokeWidth: 2 } }, eds)),
     [setEdges]
   );
+
+  const onNodeClick = useCallback((event, node) => {
+    if (node.data.image) {
+      setActiveMedia({ type: 'image', src: node.data.image, title: node.data.title });
+    } else if (node.data.video) {
+      setActiveMedia({ type: 'video', src: node.data.video, title: node.data.title });
+    }
+  }, []);
 
   return (
     <div style={{ width: '100%', height: '85vh', position: 'relative' }}>
@@ -114,9 +124,14 @@ export default function HeroCanvas() {
         <h1 style={{ fontSize: '4.5rem', marginBottom: '10px' }}>
           <span className="text-gradient">Droplet</span> Brand Space
         </h1>
-        <p style={{ fontSize: '1.2rem', color: 'rgba(255,255,255,0.7)', maxWidth: '500px', pointerEvents: 'auto' }}>
-          Explore the interconnected assets of your digital identity. Drag to move the cards, scroll to zoom in/out.
-        </p>
+        <div style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', maxWidth: '500px', pointerEvents: 'auto', lineHeight: '1.6' }}>
+          <p style={{ marginBottom: '16px' }}>
+            Through these nodes we showcase how the origin logo branches out by branding- and color-guides with the creation of new assets like images, videos and ad mocks.
+          </p>
+          <p>
+            This is how powerful the branding experience can be. Let us help you add beautiful branding-variation and together we’ll push the branding-experience forward!
+          </p>
+        </div>
       </div>
       
       <ReactFlow
@@ -125,6 +140,7 @@ export default function HeroCanvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}
@@ -145,6 +161,8 @@ export default function HeroCanvas() {
           }} 
         />
       </ReactFlow>
+      
+      <MediaModal media={activeMedia} onClose={() => setActiveMedia(null)} />
     </div>
   );
 }

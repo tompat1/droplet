@@ -1,12 +1,15 @@
 import React from 'react';
 import HeroCanvas from './components/HeroCanvas';
+import ConnectorLine from './components/ConnectorLine';
 import InteractiveGallery from './components/InteractiveGallery';
 import ThreeScene from './components/ThreeScene';
 import CallToAction from './components/CallToAction';
+import Preloader from './components/Preloader';
 
 function App() {
   return (
     <>
+      <Preloader />
       <div className="app-background" style={{ zIndex: -4 }}></div>
       {/* Background Video */}
       <video
@@ -34,6 +37,7 @@ function App() {
 
       <main style={{ position: 'relative', zIndex: 1 }}>
         <HeroCanvas />
+        <ConnectorLine />
         <InteractiveGallery />
         <CallToAction />
       </main>

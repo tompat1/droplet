@@ -85,3 +85,33 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--bg-color);
   border: 2px solid var(--accent-neon);
 }
+
+/* Animated Connector Line */
+.animated-connector {
+  stroke-dasharray: 12;
+  animation: flow-down 1s linear infinite;
+}
+
+@keyframes flow-down {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* Preloader Backgrounds */
+.preloader-bg {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+@media (orientation: portrait) {
+  .preloader-bg {
+    background-image: url('/assets/loading/drop_loadingpage_portrait-style1.webp');
+  }
+}
+
+@media (orientation: landscape) {
+  .preloader-bg {
+    background-image: url('/assets/loading/drop_loadingpage_landscape-style1.webp');
+  }
+}

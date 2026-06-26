@@ -26,37 +26,57 @@ export default function InteractiveGallery() {
     return () => ctx.revert();
   }, []);
 
+  const third = Math.ceil(assetFiles.length / 3);
+  const categories = [
+    { title: 'Personas', assets: assetFiles.slice(0, third) },
+    { title: 'Ads', assets: assetFiles.slice(third, third * 2) },
+    { title: 'Merch', assets: assetFiles.slice(third * 2) }
+  ];
+
   return (
     <div ref={galleryRef} style={{ padding: '80px 5%', maxWidth: '1600px', margin: '0 auto', position: 'relative', zIndex: 5 }}>
       <div style={{ marginBottom: '60px', textAlign: 'center' }}>
         <h2 style={{ fontSize: '3rem', marginBottom: '16px' }}>Asset <span className="text-gradient">Gallery</span></h2>
-        <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '1.2rem', maxWidth: '600px', margin: '0 auto' }}>
-          A consolidated view of all your branding materials in their raw, highest-quality format.
+        <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '1.2rem', maxWidth: '700px', margin: '0 auto', lineHeight: '1.6' }}>
+          Here's the perfect example of the variety and power of all the different branding materials in their raw, highest-quality format. This is how you build the Droplet brand.
         </p>
       </div>
       
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
-        {assetFiles.map((filename, index) => {
-          const title = filename.replace('.webp', '').replace('.png', '').replace('.jpg', '');
-          return (
-            <div key={index} className="gallery-item glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ width: '100%', height: '220px', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px', position: 'relative' }}>
-                <img 
-                  src={`/assets/branding/${filename}`} 
-                  alt={title} 
-                  loading="lazy"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease' }} 
-                  onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'} 
-                  onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'} 
-                />
-              </div>
-              <h3 style={{ fontSize: '1rem', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {title}
-              </h3>
-            </div>
-          );
-        })}
-      </div>
+      {categories.map((category, catIndex) => (
+        <div key={catIndex} style={{ marginBottom: '80px' }}>
+          <h3 style={{ 
+            fontSize: '2rem', 
+            marginBottom: '32px', 
+            borderBottom: '1px solid rgba(255,255,255,0.1)', 
+            paddingBottom: '16px',
+            color: 'var(--text-color)' 
+          }}>
+            {category.title}
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
+            {category.assets.map((filename, index) => {
+              const title = filename.replace('.webp', '').replace('.png', '').replace('.jpg', '');
+              return (
+                <div key={`${catIndex}-${index}`} className="gallery-item glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ width: '100%', height: '220px', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px', position: 'relative' }}>
+                    <img 
+                      src={`/assets/branding/${filename}`} 
+                      alt={title} 
+                      loading="lazy"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease' }} 
+                      onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'} 
+                      onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'} 
+                    />
+                  </div>
+                  <h3 style={{ fontSize: '1rem', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {title}
+                  </h3>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
