@@ -6,6 +6,7 @@ export default function MediaModal({ media, onClose }) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     setIsZoomed(false);
@@ -23,9 +24,12 @@ export default function MediaModal({ media, onClose }) {
   if (!media) return null;
 
   const handlePointerDown = (e) => {
-    if (!isZoomed || media.type !== 'image') return;
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    if (media.type !== 'image') return;
+    if (isZoomed) {
+      setIsDragging(true);
+      setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    }
+    setDragStartPos({ x: e.clientX, y: e.clientY });
     e.target.setPointerCapture(e.pointerId);
   };
 
@@ -35,8 +39,20 @@ export default function MediaModal({ media, onClose }) {
   };
 
   const handlePointerUp = (e) => {
-    if (!isDragging || media.type !== 'image') return;
-    setIsDragging(false);
+    if (media.type !== 'image') return;
+    
+    // Distinguish click from drag
+    const dx = e.clientX - dragStartPos.x;
+    const dy = e.clientY - dragStartPos.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance < 5) {
+      toggleZoom();
+    }
+
+    if (isDragging) {
+      setIsDragging(false);
+    }
     e.target.releasePointerCapture(e.pointerId);
   };
 
@@ -119,7 +135,6 @@ export default function MediaModal({ media, onClose }) {
           <img 
             src={media.src} 
             alt={media.title} 
-            onClick={toggleZoom}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -149,20 +164,25 @@ export default function MediaModal({ media, onClose }) {
       {media.type === 'image' && !isZoomed && (
         <div style={{
           position: 'absolute',
-          bottom: '40px',
-          padding: '12px 24px',
-          background: 'rgba(5, 5, 5, 0.6)',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '30px',
-          color: 'rgba(255, 255, 255, 0.8)',
-          fontSize: '0.9rem',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
           pointerEvents: 'none',
           zIndex: 10002,
-          boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
-          animation: 'fadeIn 0.5s ease-out'
         }}>
-          Click to zoom, drag to pan
+          <div style={{
+            padding: '12px 24px',
+            background: 'rgba(5, 5, 5, 0.6)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '30px',
+            color: 'rgba(255, 255, 255, 0.8)',
+            fontSize: '0.9rem',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
+            animation: 'fadeIn 0.5s ease-out'
+          }}>
+            Click to zoom, drag to pan
+          </div>
         </div>
       )}
     </div>
