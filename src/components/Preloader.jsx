@@ -1,17 +1,36 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import gsap from 'gsap';
+import assetFiles from '../assetsData.json';
 
 export default function Preloader() {
   const [progress, setProgress] = useState(0);
+  const [currentFile, setCurrentFile] = useState('');
   const [isVisible, setIsVisible] = useState(true);
   const containerRef = useRef(null);
 
+  const allAssets = useMemo(() => {
+    const list = [];
+    Object.keys(assetFiles).forEach(key => {
+      assetFiles[key].forEach(filename => {
+        list.push(filename.split('/').pop());
+      });
+    });
+    return list;
+  }, []);
+
   useEffect(() => {
-    let current = 0;
+    const totalDuration = 5000; // 5 seconds
+    const intervalTime = 50; // update every 50ms
+    const totalSteps = totalDuration / intervalTime;
+    let currentStep = 0;
+
     const interval = setInterval(() => {
-      current += Math.random() * 15 + 5;
-      if (current >= 100) {
-        current = 100;
+      currentStep++;
+      const currentProgress = (currentStep / totalSteps) * 100;
+      
+      if (currentProgress >= 100) {
+        setProgress(100);
+        setCurrentFile('System ready.');
         clearInterval(interval);
         
         const timer = setTimeout(() => {
@@ -24,12 +43,18 @@ export default function Preloader() {
             });
           }
         }, 500);
+      } else {
+        setProgress(currentProgress);
+        // Map progress percentage to an index in the allAssets array
+        const assetIndex = Math.floor((currentProgress / 100) * allAssets.length);
+        if (allAssets[assetIndex]) {
+          setCurrentFile(`Loading: ${allAssets[assetIndex]}`);
+        }
       }
-      setProgress(Math.min(current, 100));
-    }, 80);
+    }, intervalTime);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [allAssets]);
 
   if (!isVisible) return null;
 
@@ -74,7 +99,7 @@ export default function Preloader() {
               width: `${progress}%`, 
               height: '100%', 
               background: 'linear-gradient(90deg, var(--accent-blue), var(--accent-purple))',
-              transition: 'width 0.3s ease',
+              transition: 'width 0.1s linear',
               boxShadow: '0 0 10px var(--accent-blue)'
             }} 
           />
@@ -82,6 +107,20 @@ export default function Preloader() {
         
         <div style={{ marginTop: '15px', fontSize: '1rem', color: 'rgba(255,255,255,0.8)', fontVariantNumeric: 'tabular-nums', fontWeight: '500' }}>
           {Math.round(progress)}%
+        </div>
+
+        <div style={{ 
+          marginTop: '20px', 
+          fontSize: '0.8rem', 
+          color: 'rgba(255,255,255,0.4)', 
+          fontFamily: 'monospace',
+          height: '20px',
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          maxWidth: '80vw',
+          textOverflow: 'ellipsis'
+        }}>
+          {currentFile}
         </div>
       </div>
     </div>
