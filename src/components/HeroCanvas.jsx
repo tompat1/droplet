@@ -20,7 +20,7 @@ import assetFiles from '../assetsData.json';
 const ZoomIndicator = () => {
   const { zoom } = useViewport();
   return (
-    <Panel position="bottom-left" style={{ margin: '0 0 15px 55px', color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace', fontSize: '0.85rem', pointerEvents: 'none', display: 'flex', alignItems: 'flex-end', height: '36px' }}>
+    <Panel position="bottom-left" style={{ margin: '0 0 115px 15px', paddingBottom: '10px', color: '#fff', fontWeight: 'bold', fontFamily: 'monospace', fontSize: '1rem', pointerEvents: 'none', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
       {Math.round(zoom * 100)}%
     </Panel>
   );
