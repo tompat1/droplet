@@ -23,6 +23,30 @@ export default function BrandCard({ data, isConnectable }) {
         </div>
       )}
 
+      {data.colors && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px', padding: '10px 0' }}>
+          {data.colors.map((color, idx) => (
+            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div 
+                style={{
+                  width: '28px', 
+                  height: '28px', 
+                  borderRadius: '50%', 
+                  backgroundColor: color.hex,
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  flexShrink: 0
+                }}
+                title={color.hex}
+              />
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.9)', textTransform: 'uppercase' }}>{color.name}</span>
+                <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>{color.hex}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {data.description && (
         <p style={{ fontSize: '14px', lineHeight: '1.5', color: 'rgba(255,255,255,0.8)' }}>
           {data.description}

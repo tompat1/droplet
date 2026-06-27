@@ -13,12 +13,38 @@
     "ads/droplet_asset_024.webp",
     "ads/droplet_asset_025.webp"
   ],
+  "Canvas Ads": [
+    "canvas_ads/droplet_ad_campaign_01.webp",
+    "canvas_ads/droplet_ad_campaign_02.webp",
+    "canvas_ads/droplet_ad_campaign_03.webp",
+    "canvas_ads/droplet_ad_campaign_04.webp",
+    "canvas_ads/droplet_ad_campaign_05.webp"
+  ],
+  "Canvas Products": [
+    "canvas_products/droplet_inthewild_merch_hoodie_032.webp",
+    "canvas_products/droplet_inthewild_merch_laptop_decal_030.webp",
+    "canvas_products/droplet_inthewild_merch_packaging_box_004.webp",
+    "canvas_products/droplet_inthewild_merch_retail_display_038.webp",
+    "canvas_products/droplet_inthewild_merch_sweatshirt_037.webp",
+    "canvas_products/droplet_inthewild_merch_water_bottle_033.webp"
+  ],
   "Merch Location Shots": [
     "location_shot/droplet_asset_039.webp",
     "location_shot/droplet_asset_040.webp",
     "location_shot/droplet_asset_041.webp",
     "location_shot/droplet_asset_042.webp",
-    "location_shot/droplet_asset_043.webp"
+    "location_shot/droplet_asset_043.webp",
+    "location_shot/droplet_inthewild_merch_hang_tag_028.webp",
+    "location_shot/droplet_inthewild_merch_hoodie_008.webp",
+    "location_shot/droplet_inthewild_merch_hoodie_012.webp",
+    "location_shot/droplet_inthewild_merch_packaging_box_040.webp",
+    "location_shot/droplet_inthewild_merch_phone_case_006.webp",
+    "location_shot/droplet_inthewild_merch_phone_case_014.webp",
+    "location_shot/droplet_inthewild_merch_phone_case_021.webp",
+    "location_shot/droplet_inthewild_merch_phone_case_036.webp",
+    "location_shot/droplet_inthewild_merch_water_bottle_002.webp",
+    "location_shot/droplet_inthewild_merch_water_bottle_016.webp",
+    "location_shot/droplet_inthewild_merch_water_bottle_026.webp"
   ],
   "Merch Studio Shots": [
     "merch/droplet_asset_005.webp",
@@ -57,6 +83,28 @@
     "merch/droplet_asset_064.webp"
   ],
   "On Location Personas Shots": [
+    "personas/droplet_inthewild_merch_cap_010.webp",
+    "personas/droplet_inthewild_merch_cap_018.webp",
+    "personas/droplet_inthewild_merch_cap_024.webp",
+    "personas/droplet_inthewild_merch_coffee_cup_005.webp",
+    "personas/droplet_inthewild_merch_coffee_cup_039.webp",
+    "personas/droplet_inthewild_merch_hoodie_009.webp",
+    "personas/droplet_inthewild_merch_hoodie_011.webp",
+    "personas/droplet_inthewild_merch_hoodie_020.webp",
+    "personas/droplet_inthewild_merch_hoodie_023.webp",
+    "personas/droplet_inthewild_merch_packaging_box_015.webp",
+    "personas/droplet_inthewild_merch_packaging_box_027.webp",
+    "personas/droplet_inthewild_merch_packaging_box_029.webp",
+    "personas/droplet_inthewild_merch_sweatshirt_034.webp",
+    "personas/droplet_inthewild_merch_t_shirt_007.webp",
+    "personas/droplet_inthewild_merch_t_shirt_013.webp",
+    "personas/droplet_inthewild_merch_t_shirt_019.webp",
+    "personas/droplet_inthewild_merch_t_shirt_022.webp",
+    "personas/droplet_inthewild_merch_t_shirt_031.webp",
+    "personas/droplet_inthewild_merch_tote_bag_001.webp",
+    "personas/droplet_inthewild_merch_tote_bag_017.webp",
+    "personas/droplet_inthewild_merch_tote_bag_025.webp",
+    "personas/droplet_inthewild_merch_tote_bag_035.webp",
     "personas/droplet_on_location_photoshoot_1.webp",
     "personas/droplet_on_location_photoshoot_2.webp",
     "personas/droplet_on_location_photoshoot_3.webp",

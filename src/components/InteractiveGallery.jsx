@@ -75,6 +75,7 @@ export default function InteractiveGallery() {
   const allAssets = useMemo(() => {
     const list = [];
     Object.keys(assetFiles).forEach(key => {
+      if (key === 'Canvas Ads') return;
       assetFiles[key].forEach(filename => {
         const isVideo = key === 'Campaign Videos' || filename.match(/\.(mp4|webm|mov)$/i);
         const basename = filename.split('/').pop();
@@ -110,10 +111,12 @@ export default function InteractiveGallery() {
     return () => ctx.revert();
   }, []);
 
-  const categories = Object.keys(assetFiles).map(key => ({
-    title: key,
-    assets: assetFiles[key]
-  }));
+  const categories = Object.keys(assetFiles)
+    .filter(key => key !== 'Canvas Ads' && key !== 'Canvas Products')
+    .map(key => ({
+      title: key,
+      assets: assetFiles[key]
+    }));
 
   return (
     <div id="asset-gallery" ref={galleryRef} style={{ padding: '80px 5%', maxWidth: '1600px', margin: '0 auto', position: 'relative', zIndex: 5 }}>

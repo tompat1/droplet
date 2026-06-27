@@ -46,8 +46,22 @@ const nodeTypes = {
 const primaryLogoImage = '/assets/branding/droplet_logo.png';
 const brandingGuideImage = '/assets/branding/droplet_branding_guide_drop.webp';
 const adsMockupsImage = '/assets/branding/droplet_branding_guide_drop_25_ads.webp';
+const productImagesImage = '/assets/branding/merch/droplet_asset_005.webp';
 
 const videos = assetFiles['Campaign Videos'] || [];
+const ads = assetFiles['Canvas Ads'] || [];
+const products = assetFiles['Canvas Products'] || [];
+
+const brandColors = [
+  { name: 'Tidal Cobalt', hex: '#4C5CFF' },
+  { name: 'Signal Ember', hex: '#FF6A00' },
+  { name: 'Quarry Bone', hex: '#F3EEE5' },
+  { name: 'Midnight Utility', hex: '#111317' },
+  { name: 'Chrome Drift', hex: '#A6ACB8' },
+  { name: 'Deep Moss', hex: '#3F4A38' },
+  { name: 'Violet Dusk', hex: '#5B4A6F' },
+  { name: 'Terra Root', hex: '#6B5445' },
+];
 
 const staticNodes = [
   {
@@ -64,7 +78,7 @@ const staticNodes = [
   {
     id: '2',
     type: 'brandCard',
-    position: { x: 550, y: 0 },
+    position: { x: 550, y: 150 },
     data: {
       title: 'Branding Guide',
       subtitle: 'Guidelines & Usage',
@@ -75,12 +89,37 @@ const staticNodes = [
   {
     id: '6',
     type: 'brandCard',
-    position: { x: 1050, y: -250 },
+    position: { x: 1050, y: -150 },
     data: {
       title: 'Ads Mockups',
       subtitle: 'Campaign Previews',
       image: adsMockupsImage,
-      description: 'Preview of Droplet ad placements across various media.'
+      description: 'Preview of Droplet ad placements across various media.',
+      nodeGroup: 'ads'
+    },
+  },
+  {
+    id: '8',
+    type: 'brandCard',
+    position: { x: 1050, y: -450 },
+    data: {
+      title: 'Color Palette',
+      subtitle: 'Brand Core Colors',
+      colors: brandColors,
+      description: 'The definitive Droplet color system for all applications.',
+      nodeGroup: 'products'
+    },
+  },
+  {
+    id: '7',
+    type: 'brandCard',
+    position: { x: 1550, y: -450 },
+    data: {
+      title: 'Product Images',
+      subtitle: 'Merch & Studio',
+      image: productImagesImage,
+      description: 'High quality studio photography of physical products and merch.',
+      nodeGroup: 'products'
     },
   },
 ];
@@ -93,12 +132,13 @@ const videoNodes = videos.map((videoFilename, index) => {
     return {
       id: '3',
       type: 'brandCard',
-      position: { x: 550, y: 400 },
+      position: { x: 1050, y: 450 },
       data: {
         title: 'Brand Video',
         subtitle: 'Hero Campaign',
         video: `/assets/videos/${videoFilename}`,
-        description: 'Dynamic motion graphics and campaign hero video.'
+        description: 'Dynamic motion graphics and campaign hero video.',
+        nodeGroup: 'videos'
       }
     };
   }
@@ -106,12 +146,50 @@ const videoNodes = videos.map((videoFilename, index) => {
   return {
     id,
     type: 'brandCard',
-    position: { x: 1050 + ((index - 1) * 500), y: 400 },
+    position: { x: 1550 + ((index - 1) * 500), y: 450 },
     data: {
       title: 'Video',
       subtitle: title.substring(0, 20) + (title.length > 20 ? '...' : ''),
       video: `/assets/videos/${videoFilename}`,
-      description: `Droplet extended video showcase.`
+      description: `Droplet extended video showcase.`,
+      nodeGroup: 'videos'
+    }
+  };
+});
+
+const adNodes = ads.map((adFilename, index) => {
+  const id = `ad-${index}`;
+  const title = adFilename.split('/').pop().replace(/\.(webp|png|jpg)$/i, '').replace(/_/g, ' ');
+
+  return {
+    id,
+    type: 'brandCard',
+    position: { x: 1550 + (index * 500), y: -150 },
+    data: {
+      title: 'Ad Mockup',
+      subtitle: title.substring(0, 20) + (title.length > 20 ? '...' : ''),
+      image: `/assets/branding/${adFilename}`,
+      description: `Droplet ad placement showcase.`,
+      nodeGroup: 'ads'
+    }
+  };
+});
+
+
+const productNodes = products.map((productFilename, index) => {
+  const id = `product-${index}`;
+  const title = productFilename.split('/').pop().replace(/\.(webp|png|jpg)$/i, '').replace(/_/g, ' ');
+
+  return {
+    id,
+    type: 'brandCard',
+    position: { x: 2050 + (index * 500), y: -450 },
+    data: {
+      title: 'Product Image',
+      subtitle: title.substring(0, 20) + (title.length > 20 ? '...' : ''),
+      image: `/assets/branding/${productFilename}`,
+      description: `Droplet physical product showcase.`,
+      nodeGroup: 'products'
     }
   };
 });
@@ -124,16 +202,20 @@ const initialNodes = [
     data: { label: '' }
   },
   ...staticNodes, 
-  ...videoNodes
+  ...videoNodes,
+  ...adNodes,
+  ...productNodes
 ];
 
 const initialEdges = [
   { id: 'e1-2', source: '1', target: '2', type: 'smoothstep', animated: true, style: { stroke: '#4B5EFA', strokeWidth: 4 } },
   { id: 'e2-6', source: '2', target: '6', type: 'smoothstep', animated: true, style: { stroke: '#4B5EFA', strokeWidth: 4 } },
+  { id: 'e2-8', source: '2', target: '8', type: 'smoothstep', animated: true, style: { stroke: '#FF6A00', strokeWidth: 4 } },
+  { id: 'e8-7', source: '8', target: '7', type: 'smoothstep', animated: true, style: { stroke: '#ff00ff', strokeWidth: 4 } },
 ];
 
 if (videos.length > 0) {
-  initialEdges.push({ id: 'e1-3', source: '1', target: '3', type: 'smoothstep', animated: true, style: { stroke: '#7928ca', strokeWidth: 4 } });
+  initialEdges.push({ id: 'e2-3', source: '2', target: '3', type: 'smoothstep', animated: true, style: { stroke: '#00ffcc', strokeWidth: 4 } });
 }
 
 videos.forEach((videoFilename, index) => {
@@ -154,10 +236,54 @@ videos.forEach((videoFilename, index) => {
   }
 });
 
+ads.forEach((adFilename, index) => {
+  const targetId = `ad-${index}`;
+  const sourceId = index === 0 ? '6' : `ad-${index - 1}`;
+  const colors = ['#4B5EFA', '#00ffcc', '#ff00ff', '#f5a623'];
+  const strokeColor = colors[index % colors.length];
+  
+  initialEdges.push({
+    id: `e${sourceId}-${targetId}`,
+    source: sourceId,
+    target: targetId,
+    type: 'smoothstep',
+    animated: true,
+    style: { stroke: strokeColor, strokeWidth: 4 }
+  });
+});
+
+products.forEach((productFilename, index) => {
+  const targetId = `product-${index}`;
+  const sourceId = index === 0 ? '7' : `product-${index - 1}`;
+  const colors = ['#ff00ff', '#f5a623', '#4B5EFA', '#00ffcc'];
+  const strokeColor = colors[index % colors.length];
+  
+  initialEdges.push({
+    id: `e${sourceId}-${targetId}`,
+    source: sourceId,
+    target: targetId,
+    type: 'smoothstep',
+    animated: true,
+    style: { stroke: strokeColor, strokeWidth: 4 }
+  });
+});
+
+const allCanvasMedias = initialNodes
+  .filter(node => node.data && (node.data.image || node.data.video || node.data.colors))
+  .map(node => ({
+    type: node.data.image ? 'image' : (node.data.video ? 'video' : 'palette'),
+    src: node.data.image || node.data.video || 'palette-' + node.id,
+    title: node.data.title,
+    colors: node.data.colors,
+    nodeGroup: node.data.nodeGroup
+  }));
+
 export default function HeroCanvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [activeMedia, setActiveMedia] = useState(null);
+  const [activeIndex, setActiveIndex] = useState(null);
+  const [activeGroupMedias, setActiveGroupMedias] = useState([]);
+  const activeMedia = activeIndex !== null ? activeGroupMedias[activeIndex] : null;
   
   const containerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -182,12 +308,19 @@ export default function HeroCanvas() {
   );
 
   const onNodeClick = useCallback((event, node) => {
-    if (node.data.image) {
-      setActiveMedia({ type: 'image', src: node.data.image, title: node.data.title });
-    } else if (node.data.video) {
-      setActiveMedia({ type: 'video', src: node.data.video, title: node.data.title });
+    const src = node.data.image || node.data.video || (node.data.colors ? 'palette-' + node.id : null);
+    if (src) {
+      const groupMedias = allCanvasMedias.filter(m => m.nodeGroup === node.data.nodeGroup);
+      const index = groupMedias.findIndex(m => m.src === src);
+      if (index !== -1) {
+        setActiveGroupMedias(groupMedias);
+        setActiveIndex(index);
+      }
     }
   }, []);
+
+  const handleNext = () => setActiveIndex(prev => (prev + 1) % activeGroupMedias.length);
+  const handlePrev = () => setActiveIndex(prev => (prev - 1 + activeGroupMedias.length) % activeGroupMedias.length);
 
   return (
     <div ref={containerRef} style={{ width: '100%', height: isFullscreen ? '100vh' : '85vh', position: 'relative', backgroundColor: isFullscreen ? '#050505' : 'transparent' }}>
@@ -214,8 +347,8 @@ export default function HeroCanvas() {
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.5}
+        fitViewOptions={{ nodes: [{ id: '1' }, { id: '2' }], padding: 0.3 }}
+        minZoom={0.2}
         maxZoom={2}
       >
         <Background color="#ffffff" gap={24} size={1} opacity={0.05} />
@@ -231,7 +364,12 @@ export default function HeroCanvas() {
         <ZoomIndicator />
       </ReactFlow>
       
-      <MediaModal media={activeMedia} onClose={() => setActiveMedia(null)} />
+      <MediaModal 
+        media={activeMedia} 
+        onClose={() => setActiveIndex(null)} 
+        onNext={handleNext} 
+        onPrev={handlePrev} 
+      />
     </div>
   );
 }

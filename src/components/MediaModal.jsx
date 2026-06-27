@@ -226,14 +226,29 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
               willChange: 'transform'
             }} 
           />
-        ) : (
+        ) : media.type === 'video' ? (
           <video 
             src={media.src} 
             controls 
             autoPlay 
             style={{ width: '100%', height: '100%', objectFit: 'contain', maxHeight: '100vh' }} 
           />
-        )}
+        ) : media.type === 'palette' ? (
+          <div style={{ background: 'var(--bg-color)', padding: '40px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <h2 style={{ fontSize: '2rem', marginBottom: '30px', textAlign: 'center', color: '#fff' }}>{media.title}</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '30px' }}>
+              {media.colors?.map((color, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                  <div style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: color.hex, border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0 }} />
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '18px', fontWeight: 'bold', color: 'rgba(255,255,255,0.9)', textTransform: 'uppercase' }}>{color.name}</span>
+                    <span style={{ fontSize: '14px', fontFamily: 'monospace', color: 'rgba(255,255,255,0.5)' }}>{color.hex}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {media.type === 'image' && !isZoomed && (
