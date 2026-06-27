@@ -54,6 +54,7 @@ const ConvergingLines = () => {
 
 export default function CallToAction() {
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
 
   useEffect(() => {
     const handleScroll = () => {
@@ -89,10 +90,21 @@ export default function CallToAction() {
           See how Droplet can turn one brand mark into a complete digital asset system.
         </p>
         
-        <form onSubmit={(e) => e.preventDefault()} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <form 
+          onSubmit={(e) => {
+            e.preventDefault();
+            const subject = encodeURIComponent('Request a Demo: Droplet Asset System');
+            const body = encodeURIComponent(`Hi team,\n\nI'm interested in a demo of Droplet.\n\nPlease contact me at: ${emailInput}`);
+            window.location.href = `mailto:droplet@rynell.org?subject=${subject}&body=${body}`;
+          }} 
+          style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
+        >
           <input 
             type="email" 
+            value={emailInput}
+            onChange={(e) => setEmailInput(e.target.value)}
             placeholder="Enter your email address" 
+            required
             style={{
               padding: '16px 24px',
               borderRadius: '8px',
