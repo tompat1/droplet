@@ -15,13 +15,14 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (!media) return;
       if (e.key === 'Escape') onClose();
       if (e.key === 'ArrowRight' && onNext && !isZoomed) onNext();
       if (e.key === 'ArrowLeft' && onPrev && !isZoomed) onPrev();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, onNext, onPrev, isZoomed]);
+  }, [onClose, onNext, onPrev, isZoomed, media]);
 
   if (!media) return null;
 

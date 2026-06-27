@@ -364,12 +364,14 @@ export default function HeroCanvas() {
         <ZoomIndicator />
       </ReactFlow>
       
-      <MediaModal 
-        media={activeMedia} 
-        onClose={() => setActiveIndex(null)} 
-        onNext={handleNext} 
-        onPrev={handlePrev} 
-      />
+      {activeMedia && (
+        <MediaModal 
+          media={activeMedia} 
+          onClose={() => setActiveIndex(null)} 
+          onNext={handleNext} 
+          onPrev={handlePrev} 
+        />
+      )}
     </div>
   );
 }
