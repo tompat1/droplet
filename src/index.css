@@ -118,7 +118,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .scroll-arrow-btn {
   position: absolute;
-  bottom: 5px;
+  top: -10px;
   background: #050505;
   border: 2px solid var(--accent-neon);
   border-radius: 50%;
@@ -132,6 +132,18 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 0 15px rgba(75, 94, 250, 0.4);
   transition: all 0.3s ease;
   animation: bounce-subtle 2s infinite ease-in-out;
+}
+
+@media (min-width: 768px) {
+  .scroll-arrow-btn {
+    top: -20px;
+    width: 60px;
+    height: 60px;
+  }
+  .scroll-arrow-btn svg {
+    width: 32px;
+    height: 32px;
+  }
 }
 
 .scroll-arrow-btn:hover {
@@ -192,4 +204,45 @@ h1, h2, h3, h4, h5, h6 {
   fill: #ffffff !important;
   width: 16px !important;
   height: 16px !important;
+}
+
+/* Responsive Gallery Grid & Lines */
+.gallery-grid {
+  display: grid;
+  gap: 0; /* Handled by padding on children */
+}
+
+.gallery-grid-cell {
+  padding: 12px;
+}
+
+.gallery-lines-desktop,
+.gallery-lines-tablet {
+  display: none;
+}
+
+.gallery-line-mobile {
+  display: block;
+}
+
+@media (min-width: 1024px) {
+  .gallery-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .gallery-lines-desktop { display: block; }
+  .gallery-lines-tablet, .gallery-line-mobile { display: none; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .gallery-lines-tablet { display: block; }
+  .gallery-lines-desktop, .gallery-line-mobile { display: none; }
+}
+
+@media (max-width: 767px) {
+  .gallery-grid {
+    grid-template-columns: repeat(1, 1fr);
+  }
 }
