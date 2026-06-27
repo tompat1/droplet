@@ -7,10 +7,10 @@ const outputJson = path.join(__dirname, '../src/assetsData.json');
 const data = {};
 
 function formatTitle(dirName) {
-  if (dirName.toLowerCase() === 'location_shot' || dirName.toLowerCase().trim() === 'location') return 'Location Shot';
+  if (dirName.toLowerCase() === 'location_shot' || dirName.toLowerCase().trim() === 'location') return 'Merch Location Shots';
   if (dirName.toLowerCase() === 'ads') return 'Ads';
-  if (dirName.toLowerCase() === 'merch') return 'Merch';
-  if (dirName.toLowerCase() === 'personas') return 'Personas';
+  if (dirName.toLowerCase() === 'merch') return 'Merch Studio Shots';
+  if (dirName.toLowerCase() === 'personas') return 'On Location Personas Shots';
   // Fallback
   return dirName.charAt(0).toUpperCase() + dirName.slice(1);
 }
@@ -34,7 +34,7 @@ const videosDir = path.join(__dirname, '../public/assets/videos');
 if (fs.existsSync(videosDir)) {
   const videoFiles = fs.readdirSync(videosDir).filter(f => f.match(/\.(mp4|webm|mov)$/i));
   if (videoFiles.length > 0) {
-    data['Videos'] = videoFiles;
+    data['Campaign Videos'] = videoFiles;
   }
 }
 
