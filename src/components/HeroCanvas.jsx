@@ -47,7 +47,7 @@ const primaryLogoImage = '/assets/branding/droplet_logo.png';
 const brandingGuideImage = '/assets/branding/droplet_branding_guide_drop.webp';
 const adsMockupsImage = '/assets/branding/droplet_branding_guide_drop_25_ads.webp';
 
-const videos = assetFiles['Videos'] || [];
+const videos = assetFiles['Campaign Videos'] || [];
 
 const staticNodes = [
   {
@@ -116,7 +116,16 @@ const videoNodes = videos.map((videoFilename, index) => {
   };
 });
 
-const initialNodes = [...staticNodes, ...videoNodes];
+const initialNodes = [
+  {
+    id: 'padding-node',
+    position: { x: -500, y: 0 },
+    style: { opacity: 0, pointerEvents: 'none', border: 'none', background: 'transparent', width: 1, height: 1 },
+    data: { label: '' }
+  },
+  ...staticNodes, 
+  ...videoNodes
+];
 
 const initialEdges = [
   { id: 'e1-2', source: '1', target: '2', type: 'smoothstep', animated: true, style: { stroke: '#4B5EFA', strokeWidth: 4 } },
@@ -183,17 +192,18 @@ export default function HeroCanvas() {
   return (
     <div ref={containerRef} style={{ width: '100%', height: isFullscreen ? '100vh' : '85vh', position: 'relative', backgroundColor: isFullscreen ? '#050505' : 'transparent' }}>
       {!isFullscreen && (
-        <div style={{ position: 'absolute', top: '5%', left: '5%', zIndex: 10, pointerEvents: 'none' }}>
-          <h1 style={{ fontSize: '4.5rem', marginBottom: '10px' }}>
+        <div style={{ position: 'absolute', top: '5%', left: '5%', zIndex: 10, pointerEvents: 'none', width: 'min-content' }}>
+          <h1 style={{ fontSize: '4.5rem', marginBottom: '10px', whiteSpace: 'nowrap' }}>
             <span className="text-gradient">Droplet</span> Brand Space
           </h1>
-          <div style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', maxWidth: '500px', pointerEvents: 'auto', lineHeight: '1.6' }}>
-            <p>
-              Through these nodes we showcase how the origin logo branches out by branding- and color-guides with the creation of new assets like images, videos and ad mocks.
+          <div className="glass-panel" style={{ padding: '24px', borderRadius: '16px', fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', pointerEvents: 'auto', lineHeight: '1.6' }}>
+            <p style={{ margin: 0 }}>
+              From one origin logo to a full brand universe: guides, mockups, videos, merch, and campaign assets, ready whenever your brand needs them. Endless possibilities.
             </p>
           </div>
         </div>
       )}
+      
       
       <ReactFlow
         nodes={nodes}

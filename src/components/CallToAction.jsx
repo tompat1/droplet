@@ -79,14 +79,14 @@ export default function CallToAction() {
         fontWeight: '300',
         textShadow: '0 2px 10px rgba(0,0,0,0.5)'
       }}>
-        "This is how powerful the branding experience can be. Let us help you add beautiful branding-variation and together we’ll push the branding-experience forward!"
+        "This is brand momentum in motion.<br />From one identity to endless variations, assets, and campaigns. At any moment"
       </div>
       </div>
 
       <div className="glass-panel" style={{ maxWidth: '600px', margin: '0 auto', padding: '60px 40px' }}>
         <h2 style={{ fontSize: '2.5rem', marginBottom: '20px' }}>Ready to Dive In?</h2>
         <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '1.2rem', marginBottom: '40px' }}>
-          Request a demo of the Droplet platform and see how we can elevate your brand's digital presence.
+          See how Droplet can turn one brand mark into a complete digital asset system.
         </p>
         
         <form onSubmit={(e) => e.preventDefault()} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

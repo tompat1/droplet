@@ -13,14 +13,14 @@
     "ads/droplet_asset_024.webp",
     "ads/droplet_asset_025.webp"
   ],
-  "Location Shot": [
+  "Merch Location Shots": [
     "location_shot/droplet_asset_039.webp",
     "location_shot/droplet_asset_040.webp",
     "location_shot/droplet_asset_041.webp",
     "location_shot/droplet_asset_042.webp",
     "location_shot/droplet_asset_043.webp"
   ],
-  "Merch": [
+  "Merch Studio Shots": [
     "merch/droplet_asset_005.webp",
     "merch/droplet_asset_006.webp",
     "merch/droplet_asset_007.webp",
@@ -56,7 +56,7 @@
     "merch/droplet_asset_062.webp",
     "merch/droplet_asset_064.webp"
   ],
-  "Personas": [
+  "On Location Personas Shots": [
     "personas/droplet_on_location_photoshoot_1.webp",
     "personas/droplet_on_location_photoshoot_2.webp",
     "personas/droplet_on_location_photoshoot_3.webp",
@@ -68,7 +68,7 @@
     "personas/droplet_studio_persona_photoshoot_1.webp",
     "personas/droplet_studio_persona_photoshoot_2.webp"
   ],
-  "Videos": [
+  "Campaign Videos": [
     "droplet_Seedance 2.0_2026-06-26_11-08-17.mp4",
     "pomelli_creative_video_9_16_0523.mp4",
     "rotera_kepsarna_utifran_dessa.mp4",

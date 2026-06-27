@@ -76,7 +76,7 @@ export default function InteractiveGallery() {
     const list = [];
     Object.keys(assetFiles).forEach(key => {
       assetFiles[key].forEach(filename => {
-        const isVideo = key === 'Videos' || filename.match(/\.(mp4|webm|mov)$/i);
+        const isVideo = key === 'Campaign Videos' || filename.match(/\.(mp4|webm|mov)$/i);
         const basename = filename.split('/').pop();
         const title = basename.replace(/\.(webp|png|jpg|mp4|webm|mov)$/i, '');
         const mediaSrc = isVideo ? `/assets/videos/${filename}` : `/assets/branding/${filename}`;
@@ -122,7 +122,7 @@ export default function InteractiveGallery() {
       <div className="glass-panel" style={{ position: 'relative', zIndex: 2, maxWidth: '800px', margin: '0 auto 60px auto', padding: '40px', textAlign: 'center' }}>
         <h2 style={{ fontSize: '3rem', marginBottom: '16px' }}>Asset <span className="text-gradient">Gallery</span></h2>
         <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '1.2rem', maxWidth: '700px', margin: '0 auto', lineHeight: '1.6' }}>
-          Here's the perfect example of the variety and power of all the different branding materials in their raw, highest-quality format. This is how you build the Droplet brand.
+          Follow the paths and explore the Droplet asset system: ads, mockups, videos, merch, and brand files brought together in one polished gallery
         </p>
       </div>
       
@@ -139,7 +139,7 @@ export default function InteractiveGallery() {
           </h3>
           <div className="gallery-grid">
             {category.assets.map((filename, index) => {
-              const isVideo = category.title === 'Videos' || filename.match(/\.(mp4|webm|mov)$/i);
+              const isVideo = category.title === 'Campaign Videos' || filename.match(/\.(mp4|webm|mov)$/i);
               const basename = filename.split('/').pop();
               const title = basename.replace(/\.(webp|png|jpg|mp4|webm|mov)$/i, '');
               const mediaSrc = isVideo ? `/assets/videos/${filename}` : `/assets/branding/${filename}`;
