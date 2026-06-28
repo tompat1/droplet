@@ -1,7 +1,7 @@
 import React from 'react';
 import { Handle, Position } from '@xyflow/react';
 
-export default function BrandCard({ data, isConnectable, selected }) {
+export default function BrandCard({ id, data, isConnectable, selected }) {
   return (
     <div 
       className="glass-panel" 
@@ -17,9 +17,35 @@ export default function BrandCard({ data, isConnectable, selected }) {
     >
       <Handle type="target" position={Position.Left} isConnectable={isConnectable} style={{ background: 'var(--bg-color)', border: '2px solid var(--accent-neon)' }} />
       
-      <div style={{ marginBottom: '16px' }}>
-        <h3 style={{ fontSize: '20px', marginBottom: '4px' }}>{data.title}</h3>
-        {data.subtitle && <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)' }}>{data.subtitle}</p>}
+      <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h3 style={{ fontSize: '20px', marginBottom: '4px' }}>{data.title}</h3>
+          {data.subtitle && <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)' }}>{data.subtitle}</p>}
+        </div>
+        {data.canCollapse && (
+          <button 
+            onClick={(e) => { e.stopPropagation(); data.onToggleCollapse(id); }}
+            style={{ 
+              background: data.isCollapsed ? 'var(--accent-neon)' : 'rgba(255,255,255,0.1)', 
+              border: 'none', 
+              color: 'white', 
+              borderRadius: '6px', 
+              width: '28px',
+              height: '28px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              fontSize: '18px',
+              fontFamily: 'monospace',
+              transition: 'all 0.2s ease',
+              boxShadow: data.isCollapsed ? '0 0 10px rgba(75, 94, 250, 0.4)' : 'none'
+            }}
+            title={data.isCollapsed ? "Expand Branch" : "Collapse Branch"}
+          >
+            {data.isCollapsed ? '+' : '−'}
+          </button>
+        )}
       </div>
 
       {data.image && (
@@ -63,6 +89,44 @@ export default function BrandCard({ data, isConnectable, selected }) {
           {data.description}
         </p>
       )}
+
+      <div style={{ marginTop: '20px' }}>
+        <button
+          style={{
+            width: '100%',
+            padding: '10px',
+            background: 'rgba(75, 94, 250, 0.15)',
+            border: '1px dashed rgba(75, 94, 250, 0.4)',
+            borderRadius: '8px',
+            color: 'var(--accent-neon)',
+            fontSize: '13px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            transition: 'all 0.2s ease',
+            backdropFilter: 'blur(4px)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(75, 94, 250, 0.3)';
+            e.currentTarget.style.border = '1px solid rgba(75, 94, 250, 0.8)';
+            e.currentTarget.style.boxShadow = '0 0 10px rgba(75, 94, 250, 0.4)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(75, 94, 250, 0.15)';
+            e.currentTarget.style.border = '1px dashed rgba(75, 94, 250, 0.4)';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            alert(`AI Generation Flow triggered for "${data.title}"\n\nImagine a prompt dialog opening here, passing the context of this node to Google Veo or OpenAI to generate new brand assets!`);
+          }}
+        >
+          <span>✨</span> Generate Branch
+        </button>
+      </div>
 
       <Handle type="source" position={Position.Right} isConnectable={isConnectable} style={{ background: 'var(--bg-color)', border: '2px solid var(--accent-neon)' }} />
     </div>

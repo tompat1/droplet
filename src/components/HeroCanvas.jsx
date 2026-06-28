@@ -9,7 +9,9 @@ import {
   ControlButton,
   MarkerType,
   Panel,
-  useViewport
+  useViewport,
+  MiniMap,
+  useReactFlow
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -23,6 +25,15 @@ const ZoomIndicator = () => {
     <div style={{ color: '#fff', fontWeight: 'bold', fontFamily: 'monospace', fontSize: '0.9rem', pointerEvents: 'none', textShadow: '0 2px 4px rgba(0,0,0,0.8)', textAlign: 'center', marginBottom: '8px' }}>
       {Math.round(zoom * 100)}%
     </div>
+  );
+};
+
+const ZoomToOneButton = () => {
+  const { zoomTo } = useReactFlow();
+  return (
+    <ControlButton onClick={() => zoomTo(1, { duration: 400 })} title="Zoom 1:1">
+      <span style={{ fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace' }}>1:1</span>
+    </ControlButton>
   );
 };
 
@@ -381,6 +392,43 @@ export default function HeroCanvas() {
   
   const containerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [collapsedBranches, setCollapsedBranches] = useState({});
+
+  useEffect(() => {
+    const handleToggle = (id) => {
+      setCollapsedBranches(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    setNodes((nds) => nds.map(node => {
+      let hidden = false;
+      if (node.id.startsWith('ad-') && collapsedBranches['6']) hidden = true;
+      if (node.id.startsWith('wild-') && collapsedBranches['7']) hidden = true;
+      if (node.id.startsWith('shot-') && collapsedBranches['9']) hidden = true;
+      if (node.id.startsWith('video-') && collapsedBranches['3']) hidden = true;
+      
+      const canCollapse = ['3', '6', '7', '9'].includes(node.id);
+      
+      return { 
+        ...node, 
+        hidden,
+        data: {
+          ...node.data,
+          canCollapse,
+          isCollapsed: collapsedBranches[node.id] || false,
+          onToggleCollapse: handleToggle
+        }
+      };
+    }));
+    
+    setEdges((eds) => eds.map(edge => {
+      let hidden = false;
+      if (edge.target.startsWith('ad-') && collapsedBranches['6']) hidden = true;
+      if (edge.target.startsWith('wild-') && collapsedBranches['7']) hidden = true;
+      if (edge.target.startsWith('shot-') && collapsedBranches['9']) hidden = true;
+      if (edge.target.startsWith('video-') && collapsedBranches['3']) hidden = true;
+      return { ...edge, hidden };
+    }));
+  }, [collapsedBranches, setNodes, setEdges]);
 
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -462,9 +510,27 @@ export default function HeroCanvas() {
             <ControlButton onClick={toggleFullscreen} title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}>
               {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
             </ControlButton>
+            <ZoomToOneButton />
           </Controls>
         </Panel>
         <MultiSelectHint />
+        <MiniMap 
+          position="bottom-right"
+          style={{ background: 'rgba(20,20,25,0.8)', backdropFilter: 'blur(10px)', border: '1px solid #666', borderRadius: '12px', margin: '20px' }} 
+          nodeColor={(n) => {
+            if (n.id === '1') return '#ffffff';
+            if (n.id.startsWith('ad-') || n.id === '6') return '#4B5EFA';
+            if (n.id.startsWith('wild-') || n.id === '7') return '#ff00ff';
+            if (n.id.startsWith('shot-') || n.id === '9') return '#f5a623';
+            if (n.id.startsWith('video-') || n.id === '3') return '#00ffcc';
+            return 'rgba(255,255,255,0.2)';
+          }}
+          maskColor="rgba(0, 0, 0, 0.7)"
+          maskStrokeColor="rgba(255, 255, 255, 0.8)"
+          maskStrokeWidth={2}
+          pannable
+          zoomable
+        />
       </ReactFlow>
       
       {activeMedia && (
