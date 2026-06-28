@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
 
 export default function BrandCard({ id, data, isConnectable, selected }) {
-  const isEditMode = data.isEditMode !== false; // defaults to true
+  const isEditMode = data.isEditMode === true; // defaults to false
 
   const { setNodes, setEdges, getNode } = useReactFlow();
   

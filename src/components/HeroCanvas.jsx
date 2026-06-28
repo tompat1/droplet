@@ -18,6 +18,7 @@ import '@xyflow/react/dist/style.css';
 import BrandCard from './BrandCard';
 import MediaModal from './MediaModal';
 import assetFiles from '../assetsData.json';
+import { defaultAssetTags } from '../defaultTags';
 
 const ZoomIndicator = () => {
   const { zoom } = useViewport();
@@ -124,6 +125,25 @@ const NodeSearch = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const [assetTags, setAssetTags] = useState(() => {
+    try {
+      const stored = localStorage.getItem('gallery-asset-tags');
+      if (stored) return JSON.parse(stored);
+    } catch(e) {}
+    return defaultAssetTags;
+  });
+
+  useEffect(() => {
+    const handleTagsUpdate = () => {
+      try {
+        const stored = localStorage.getItem('gallery-asset-tags');
+        if (stored) setAssetTags(JSON.parse(stored));
+      } catch(e) {}
+    };
+    window.addEventListener('customTagsUpdated', handleTagsUpdate);
+    return () => window.removeEventListener('customTagsUpdated', handleTagsUpdate);
+  }, []);
+
   const handleSearchChange = (e) => {
     const val = e.target.value;
     setSearchTerm(val);
@@ -147,11 +167,15 @@ const NodeSearch = () => {
        (n.data.video && n.data.video.toLowerCase().replace(/[-_]/g, ' ').includes(term)))
     ).map(n => ({ ...n, searchType: 'canvas' }));
 
-    const galleryMatches = galleryAssets.filter(g => 
-      g.title.toLowerCase().replace(/[-_]/g, ' ').includes(term) || 
-      g.subtitle.toLowerCase().replace(/[-_]/g, ' ').includes(term) ||
-      g.originalTitle.toLowerCase().replace(/[-_]/g, ' ').includes(term)
-    ).map(g => ({ ...g, searchType: 'gallery' }));
+    const galleryMatches = galleryAssets.filter(g => {
+      const tags = assetTags[g.src] || [];
+      const tagMatch = tags.some(tag => tag.toLowerCase().replace(/[-_]/g, ' ').includes(term));
+      
+      return tagMatch ||
+        g.title.toLowerCase().replace(/[-_]/g, ' ').includes(term) || 
+        g.subtitle.toLowerCase().replace(/[-_]/g, ' ').includes(term) ||
+        g.originalTitle.toLowerCase().replace(/[-_]/g, ' ').includes(term);
+    }).map(g => ({ ...g, searchType: 'gallery' }));
 
     setSuggestions([...nodeMatches, ...galleryMatches]);
     setShowSuggestions(true);
@@ -701,7 +725,7 @@ export default function HeroCanvas() {
   const containerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [collapsedBranches, setCollapsedBranches] = useState({});
-  const [isEditMode, setIsEditMode] = useState(true);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
     const handleToggle = (id) => {
