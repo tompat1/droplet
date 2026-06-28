@@ -550,8 +550,8 @@ export default function HeroCanvas() {
           maskColor="rgba(0, 0, 0, 0.7)"
           maskStrokeColor="rgba(255, 255, 255, 0.8)"
           maskStrokeWidth={2}
-          pannable
-          zoomable
+          pannable={true}
+          zoomable={true}
         />
       </ReactFlow>
       
