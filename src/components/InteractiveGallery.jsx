@@ -93,6 +93,29 @@ export default function InteractiveGallery() {
   const handleNext = () => setActiveIndex(prev => (prev + 1) % allAssets.length);
   const handlePrev = () => setActiveIndex(prev => (prev - 1 + allAssets.length) % allAssets.length);
 
+  const [highlightedSrc, setHighlightedSrc] = useState(null);
+
+  useEffect(() => {
+    const handleOpenGalleryItem = (e) => {
+      const src = e.detail;
+      setHighlightedSrc(src);
+      
+      setTimeout(() => {
+        const elId = `gallery-item-${src.replace(/[^a-zA-Z0-9]/g, '-')}`;
+        const el = document.getElementById(elId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 50);
+
+      setTimeout(() => {
+        setHighlightedSrc(null);
+      }, 3000);
+    };
+    window.addEventListener('openGalleryItem', handleOpenGalleryItem);
+    return () => window.removeEventListener('openGalleryItem', handleOpenGalleryItem);
+  }, []);
+
   useEffect(() => {
     const ctx = gsap.context(() => {
       gsap.from('.gallery-item', {
@@ -146,12 +169,26 @@ export default function InteractiveGallery() {
               const basename = filename.split('/').pop();
               const title = basename.replace(/\.(webp|png|jpg|mp4|webm|mov)$/i, '');
               const mediaSrc = isVideo ? `/assets/videos/${filename}` : `/assets/branding/${filename}`;
+              const isHighlighted = highlightedSrc === mediaSrc;
+              const elId = `gallery-item-${mediaSrc.replace(/[^a-zA-Z0-9]/g, '-')}`;
               
               return (
                 <div key={`${catIndex}-${index}`} className="gallery-grid-cell" style={{ display: 'flex', justifyContent: 'center' }}>
                   <div 
+                    id={elId}
                     className="gallery-item glass-panel" 
-                    style={{ padding: '16px', display: 'flex', flexDirection: 'column', cursor: 'pointer', height: '100%', width: '100%', maxWidth: '280px' }}
+                    style={{ 
+                      padding: '16px', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      cursor: 'pointer', 
+                      height: '100%', 
+                      width: '100%', 
+                      maxWidth: '280px',
+                      transition: 'box-shadow 0.5s ease, border 0.5s ease',
+                      boxShadow: isHighlighted ? '0 0 30px rgba(75, 94, 250, 0.8), inset 0 0 10px rgba(75, 94, 250, 0.5)' : undefined,
+                      border: isHighlighted ? '1px solid rgba(75, 94, 250, 1)' : undefined
+                    }}
                   onClick={() => {
                     const globalIndex = allAssets.findIndex(a => a.src === mediaSrc);
                     setActiveIndex(globalIndex);

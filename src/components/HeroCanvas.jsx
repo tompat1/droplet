@@ -94,6 +94,18 @@ const MultiSelectHint = () => {
   );
 };
 
+const galleryAssets = [];
+Object.keys(assetFiles).forEach(key => {
+  if (key === 'Canvas Ads' || key === 'Canvas In The Wild Products' || key === 'Canvas Products Shots') return;
+  assetFiles[key].forEach(filename => {
+    const isVideo = key === 'Campaign Videos' || filename.match(/\.(mp4|webm|mov)$/i);
+    const basename = filename.split('/').pop();
+    const title = basename.replace(/\.(webp|png|jpg|mp4|webm|mov)$/i, '').replace(/_/g, ' ');
+    const mediaSrc = isVideo ? `/assets/videos/${filename}` : `/assets/branding/${filename}`;
+    galleryAssets.push({ id: `gallery-${filename}`, type: 'gallery', src: mediaSrc, title, subtitle: `Gallery: ${key}`, originalTitle: basename });
+  });
+});
+
 const NodeSearch = () => {
   const { setCenter, getNodes } = useReactFlow();
   const [searchTerm, setSearchTerm] = useState('');
@@ -124,22 +136,39 @@ const NodeSearch = () => {
     const term = val.toLowerCase();
     const nodes = getNodes();
     
-    const matches = nodes.filter(n => 
+    const nodeMatches = nodes.filter(n => 
       n.id !== 'padding-node' &&
       !n.hidden &&
       n.data && 
-      n.data.title && 
-      (n.data.title.toLowerCase().includes(term) || 
-       (n.data.subtitle && n.data.subtitle.toLowerCase().includes(term)))
-    );
-    setSuggestions(matches);
+      ((n.data.title && n.data.title.toLowerCase().includes(term)) || 
+       (n.data.subtitle && n.data.subtitle.toLowerCase().includes(term)) ||
+       (n.data.image && n.data.image.toLowerCase().includes(term)) ||
+       (n.data.video && n.data.video.toLowerCase().includes(term)))
+    ).map(n => ({ ...n, searchType: 'canvas' }));
+
+    const galleryMatches = galleryAssets.filter(g => 
+      g.title.toLowerCase().includes(term) || 
+      g.subtitle.toLowerCase().includes(term) ||
+      g.originalTitle.toLowerCase().includes(term)
+    ).map(g => ({ ...g, searchType: 'gallery' }));
+
+    setSuggestions([...nodeMatches, ...galleryMatches]);
     setShowSuggestions(true);
   };
 
-  const handleSelect = (node) => {
-    setSearchTerm(node.data.title);
+  const handleSelect = (item) => {
     setShowSuggestions(false);
-    setCenter(node.position.x + 180, node.position.y + 200, { zoom: 1.2, duration: 800 });
+    if (item.searchType === 'canvas') {
+      setSearchTerm(item.data.title);
+      setCenter(item.position.x + 180, item.position.y + 200, { zoom: 1.2, duration: 800 });
+    } else {
+      setSearchTerm(item.title);
+      window.dispatchEvent(new CustomEvent('openGalleryItem', { detail: item.src }));
+      const galleryEl = document.getElementById('asset-gallery');
+      if (galleryEl) {
+        galleryEl.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
   };
 
   return (
@@ -147,13 +176,13 @@ const NodeSearch = () => {
       <div ref={wrapperRef} style={{ position: 'relative', width: '300px' }}>
         <input 
           type="text"
-          placeholder="Search canvas nodes..."
+          placeholder="Search canvas nodes and gallery..."
           value={searchTerm}
           onChange={handleSearchChange}
           onFocus={() => { if (searchTerm.trim() !== '') setShowSuggestions(true); }}
           style={{
             width: '100%',
-            padding: '12px 20px',
+            padding: '12px 36px 12px 20px',
             borderRadius: '24px',
             background: 'rgba(20, 20, 25, 0.8)',
             border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -167,6 +196,34 @@ const NodeSearch = () => {
           onFocusCapture={(e) => e.target.style.borderColor = 'var(--accent-blue)'}
           onBlurCapture={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'}
         />
+        
+        {searchTerm && (
+          <button 
+            onClick={() => { setSearchTerm(''); setSuggestions([]); setShowSuggestions(false); }}
+            style={{
+              position: 'absolute',
+              right: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'transparent',
+              border: 'none',
+              color: 'rgba(255,255,255,0.6)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '4px',
+              borderRadius: '50%',
+            }}
+            onMouseOver={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.9)'}
+            onMouseOut={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        )}
         
         {showSuggestions && suggestions.length > 0 && (
           <div style={{
@@ -184,10 +241,10 @@ const NodeSearch = () => {
             maxHeight: '300px',
             overflowY: 'auto'
           }}>
-            {suggestions.map((node) => (
+            {suggestions.map((item) => (
               <div 
-                key={node.id}
-                onClick={() => handleSelect(node)}
+                key={item.id}
+                onClick={() => handleSelect(item)}
                 style={{
                   padding: '12px 16px',
                   cursor: 'pointer',
@@ -200,9 +257,26 @@ const NodeSearch = () => {
                 onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
                 onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
               >
-                <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#fff' }}>{node.data.title}</div>
-                {node.data.subtitle && (
-                  <div style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.6)' }}>{node.data.subtitle}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#fff' }}>
+                    {item.searchType === 'canvas' ? item.data.title : item.title}
+                  </div>
+                  <div style={{ 
+                    fontSize: '0.65rem', 
+                    padding: '2px 6px', 
+                    borderRadius: '4px', 
+                    background: item.searchType === 'canvas' ? 'rgba(75, 94, 250, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                    color: item.searchType === 'canvas' ? 'var(--accent-blue)' : 'rgba(255,255,255,0.6)',
+                    textTransform: 'uppercase',
+                    fontWeight: 'bold'
+                  }}>
+                    {item.searchType}
+                  </div>
+                </div>
+                {(item.searchType === 'canvas' ? item.data.subtitle : item.subtitle) && (
+                  <div style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.6)' }}>
+                    {item.searchType === 'canvas' ? item.data.subtitle : item.subtitle}
+                  </div>
                 )}
               </div>
             ))}
