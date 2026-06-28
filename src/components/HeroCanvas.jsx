@@ -415,7 +415,9 @@ export default function HeroCanvas() {
           ...node.data,
           canCollapse,
           isCollapsed: collapsedBranches[node.id] || false,
-          onToggleCollapse: handleToggle
+          onToggleCollapse: handleToggle,
+          setGlobalNodes: setNodes,
+          setGlobalEdges: setEdges
         }
       };
     }));
