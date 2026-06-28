@@ -94,6 +94,125 @@ const MultiSelectHint = () => {
   );
 };
 
+const NodeSearch = () => {
+  const { setCenter, getNodes } = useReactFlow();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchTerm(val);
+    
+    if (val.trim() === '') {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const term = val.toLowerCase();
+    const nodes = getNodes();
+    
+    const matches = nodes.filter(n => 
+      n.id !== 'padding-node' &&
+      !n.hidden &&
+      n.data && 
+      n.data.title && 
+      (n.data.title.toLowerCase().includes(term) || 
+       (n.data.subtitle && n.data.subtitle.toLowerCase().includes(term)))
+    );
+    setSuggestions(matches);
+    setShowSuggestions(true);
+  };
+
+  const handleSelect = (node) => {
+    setSearchTerm(node.data.title);
+    setShowSuggestions(false);
+    setCenter(node.position.x + 180, node.position.y + 200, { zoom: 1.2, duration: 800 });
+  };
+
+  return (
+    <Panel position="top-center" style={{ marginTop: '20px', zIndex: 20 }}>
+      <div ref={wrapperRef} style={{ position: 'relative', width: '300px' }}>
+        <input 
+          type="text"
+          placeholder="Search canvas nodes..."
+          value={searchTerm}
+          onChange={handleSearchChange}
+          onFocus={() => { if (searchTerm.trim() !== '') setShowSuggestions(true); }}
+          style={{
+            width: '100%',
+            padding: '12px 20px',
+            borderRadius: '24px',
+            background: 'rgba(20, 20, 25, 0.8)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            color: '#fff',
+            fontSize: '0.95rem',
+            outline: 'none',
+            backdropFilter: 'blur(10px)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+            transition: 'border-color 0.3s ease'
+          }}
+          onFocusCapture={(e) => e.target.style.borderColor = 'var(--accent-blue)'}
+          onBlurCapture={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'}
+        />
+        
+        {showSuggestions && suggestions.length > 0 && (
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            marginTop: '8px',
+            background: 'rgba(20, 20, 25, 0.95)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+            maxHeight: '300px',
+            overflowY: 'auto'
+          }}>
+            {suggestions.map((node) => (
+              <div 
+                key={node.id}
+                onClick={() => handleSelect(node)}
+                style={{
+                  padding: '12px 16px',
+                  cursor: 'pointer',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  transition: 'background 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+              >
+                <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#fff' }}>{node.data.title}</div>
+                {node.data.subtitle && (
+                  <div style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.6)' }}>{node.data.subtitle}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Panel>
+  );
+};
+
 const nodeTypes = {
   brandCard: BrandCard,
 };
@@ -537,6 +656,7 @@ export default function HeroCanvas() {
           </div>
         </Panel>
         <MultiSelectHint />
+        <NodeSearch />
         <MiniMap 
           position="bottom-right"
           style={{ background: 'rgba(20,20,25,0.8)', backdropFilter: 'blur(10px)', border: '1px solid #666', borderRadius: '12px', margin: '20px' }} 
