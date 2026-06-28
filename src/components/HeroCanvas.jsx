@@ -111,6 +111,7 @@ const NodeSearch = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchHistory, setSearchHistory] = useState([]);
   const wrapperRef = useRef(null);
 
   useEffect(() => {
@@ -129,7 +130,7 @@ const NodeSearch = () => {
     
     if (val.trim() === '') {
       setSuggestions([]);
-      setShowSuggestions(false);
+      setShowSuggestions(true);
       return;
     }
 
@@ -157,6 +158,10 @@ const NodeSearch = () => {
   };
 
   const handleSelect = (item) => {
+    setSearchHistory(prev => {
+      const filtered = prev.filter(p => p.id !== item.id);
+      return [item, ...filtered].slice(0, 5);
+    });
     setSearchTerm('');
     setSuggestions([]);
     setShowSuggestions(false);
@@ -193,8 +198,11 @@ const NodeSearch = () => {
             boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
             transition: 'border-color 0.3s ease'
           }}
-          onFocusCapture={(e) => e.target.style.borderColor = 'var(--accent-blue)'}
-          onBlurCapture={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'}
+          onFocus={(e) => {
+            e.target.style.borderColor = 'var(--accent-blue)';
+            setShowSuggestions(true);
+          }}
+          onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'}
         />
         
         {searchTerm && (
@@ -225,7 +233,7 @@ const NodeSearch = () => {
           </button>
         )}
         
-        {showSuggestions && (searchTerm.trim() !== '') && (
+        {showSuggestions && (searchTerm.trim() !== '' ? true : searchHistory.length > 0) && (
           <div style={{
             position: 'absolute',
             top: '100%',
@@ -242,25 +250,82 @@ const NodeSearch = () => {
             display: 'flex',
             flexDirection: 'column'
           }}>
-            <div style={{ 
-              padding: '8px 16px', 
-              fontSize: '0.75rem', 
-              color: 'rgba(255,255,255,0.5)', 
-              borderBottom: '1px solid rgba(255,255,255,0.1)',
-              background: 'rgba(0,0,0,0.2)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px'
-            }}>
-              {suggestions.length} result{suggestions.length !== 1 ? 's' : ''} found
-            </div>
-            
-            {suggestions.length === 0 ? (
-              <div style={{ padding: '24px 16px', textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem' }}>
-                No matches found for "{searchTerm}"
-              </div>
+            {searchTerm.trim() === '' ? (
+              <>
+                <div style={{ 
+                  padding: '8px 16px', 
+                  fontSize: '0.75rem', 
+                  color: 'rgba(255,255,255,0.5)', 
+                  borderBottom: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(0,0,0,0.2)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Recent Searches
+                </div>
+                <div style={{ overflowY: 'auto', flex: 1 }}>
+                  {searchHistory.map((item, index) => (
+                    <div 
+                      key={`history-${item.id}-${index}`}
+                      onClick={() => handleSelect(item)}
+                      style={{
+                        padding: '12px 16px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ color: 'rgba(255,255,255,0.4)', display: 'flex' }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                          </div>
+                          <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#fff' }}>
+                            {item.searchType === 'canvas' ? item.data.title : item.title}
+                          </div>
+                        </div>
+                        <div style={{ 
+                          fontSize: '0.65rem', 
+                          padding: '2px 6px', 
+                          borderRadius: '4px', 
+                          background: item.searchType === 'canvas' ? 'rgba(75, 94, 250, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                          color: item.searchType === 'canvas' ? 'var(--accent-blue)' : 'rgba(255,255,255,0.6)',
+                          textTransform: 'uppercase',
+                          fontWeight: 'bold'
+                        }}>
+                          {item.searchType}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             ) : (
+              <>
+                <div style={{ 
+                  padding: '8px 16px', 
+                  fontSize: '0.75rem', 
+                  color: 'rgba(255,255,255,0.5)', 
+                  borderBottom: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(0,0,0,0.2)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  {suggestions.length} result{suggestions.length !== 1 ? 's' : ''} found
+                </div>
+                
+                {suggestions.length === 0 ? (
+                  <div style={{ padding: '24px 16px', textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem' }}>
+                    No matches found for "{searchTerm}"
+                  </div>
+                ) : (
               <div style={{ overflowY: 'auto', flex: 1 }}>
-                {suggestions.map((item) => (
+                {suggestions.map((item, index) => (
               <div 
                 key={item.id}
                 onClick={() => handleSelect(item)}
@@ -277,8 +342,18 @@ const NodeSearch = () => {
                 onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#fff' }}>
-                    {item.searchType === 'canvas' ? item.data.title : item.title}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ 
+                      color: 'rgba(255,255,255,0.4)', 
+                      fontSize: '0.75rem', 
+                      fontFamily: 'monospace',
+                      width: '24px'
+                    }}>
+                      {index + 1}.
+                    </div>
+                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#fff' }}>
+                      {item.searchType === 'canvas' ? item.data.title : item.title}
+                    </div>
                   </div>
                   <div style={{ 
                     fontSize: '0.65rem', 
@@ -300,6 +375,8 @@ const NodeSearch = () => {
               </div>
             ))}
               </div>
+            )}
+              </>
             )}
           </div>
         )}
