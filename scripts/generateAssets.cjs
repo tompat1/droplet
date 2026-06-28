@@ -10,7 +10,8 @@ function formatTitle(dirName) {
   if (dirName.toLowerCase() === 'location_shot' || dirName.toLowerCase().trim() === 'location') return 'Merch Location Shots';
   if (dirName.toLowerCase() === 'ads') return 'Ads';
   if (dirName.toLowerCase() === 'canvas_ads') return 'Canvas Ads';
-  if (dirName.toLowerCase() === 'canvas_products') return 'Canvas Products';
+  if (dirName.toLowerCase() === 'canvas_in_the_wild_products') return 'Canvas In The Wild Products';
+  if (dirName.toLowerCase() === 'canvas_products_shots') return 'Canvas Products Shots';
   if (dirName.toLowerCase() === 'merch') return 'Merch Studio Shots';
   if (dirName.toLowerCase() === 'personas') return 'On Location Personas Shots';
   // Fallback

@@ -25,13 +25,22 @@
     "canvas_ads/droplet_ad_campaign_09.webp",
     "canvas_ads/droplet_ad_campaign_10.webp"
   ],
-  "Canvas Products": [
-    "canvas_products/droplet_inthewild_merch_hoodie_032.webp",
-    "canvas_products/droplet_inthewild_merch_laptop_decal_030.webp",
-    "canvas_products/droplet_inthewild_merch_packaging_box_004.webp",
-    "canvas_products/droplet_inthewild_merch_retail_display_038.webp",
-    "canvas_products/droplet_inthewild_merch_sweatshirt_037.webp",
-    "canvas_products/droplet_inthewild_merch_water_bottle_033.webp"
+  "Canvas In The Wild Products": [
+    "canvas_in_the_wild_products/droplet_inthewild_merch_hoodie_032.webp",
+    "canvas_in_the_wild_products/droplet_inthewild_merch_laptop_decal_030.webp",
+    "canvas_in_the_wild_products/droplet_inthewild_merch_packaging_box_004.webp",
+    "canvas_in_the_wild_products/droplet_inthewild_merch_retail_display_038.webp",
+    "canvas_in_the_wild_products/droplet_inthewild_merch_sweatshirt_037.webp",
+    "canvas_in_the_wild_products/droplet_inthewild_merch_water_bottle_033.webp"
+  ],
+  "Canvas Products Shots": [
+    "canvas_products_shots/hoodie_droplet_base_002.webp",
+    "canvas_products_shots/packaging_box_droplet_base_006.webp",
+    "canvas_products_shots/phone_case_droplet_base_009.webp",
+    "canvas_products_shots/t_shirt_droplet_base_001.webp",
+    "canvas_products_shots/tote_bag_droplet_base_004.webp",
+    "canvas_products_shots/water_bottle_droplet_base_005.webp",
+    "canvas_products_shots/wrapping_droplet_base_008.webp"
   ],
   "Merch Location Shots": [
     "location_shot/droplet_asset_039.webp",
@@ -87,18 +96,9 @@
     "merch/droplet_asset_058.webp",
     "merch/droplet_asset_059.webp",
     "merch/droplet_asset_062.webp",
-    "merch/droplet_asset_064.webp",
-    "merch/hang_tag_droplet_base_007.webp",
-    "merch/hoodie_droplet_base_002.webp",
-    "merch/packaging_box_droplet_base_006.webp",
-    "merch/phone_case_droplet_base_009.webp",
-    "merch/t_shirt_droplet_base_001.webp",
-    "merch/tote_bag_droplet_base_004.webp",
-    "merch/water_bottle_droplet_base_005.webp",
-    "merch/wrapping_droplet_base_008.webp"
+    "merch/droplet_asset_064.webp"
   ],
   "On Location Personas Shots": [
-    "personas/droplet_inthewild_merch_cap_010.webp",
     "personas/droplet_inthewild_merch_cap_018.webp",
     "personas/droplet_inthewild_merch_cap_024.webp",
     "personas/droplet_inthewild_merch_coffee_cup_005.webp",

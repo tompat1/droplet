@@ -47,10 +47,12 @@ const primaryLogoImage = '/assets/branding/droplet_logo.png';
 const brandingGuideImage = '/assets/branding/droplet_branding_guide_drop.webp';
 const adsMockupsImage = '/assets/branding/droplet_branding_guide_drop_25_ads.webp';
 const productImagesImage = '/assets/branding/merch/droplet_asset_005.webp';
+const inTheWildHeaderImage = '/assets/branding/droplet_inthewild_merch_cap_010.webp';
 
 const videos = assetFiles['Campaign Videos'] || [];
 const ads = assetFiles['Canvas Ads'] || [];
-const products = assetFiles['Canvas Products'] || [];
+const inTheWildProducts = assetFiles['Canvas In The Wild Products'] || [];
+const productShots = assetFiles['Canvas Products Shots'] || [];
 
 const brandColors = [
   { name: 'Tidal Cobalt', hex: '#4C5CFF' },
@@ -78,7 +80,7 @@ const staticNodes = [
   {
     id: '2',
     type: 'brandCard',
-    position: { x: 550, y: 150 },
+    position: { x: 460, y: 150 },
     data: {
       title: 'Branding Guide',
       subtitle: 'Guidelines & Usage',
@@ -89,7 +91,7 @@ const staticNodes = [
   {
     id: '6',
     type: 'brandCard',
-    position: { x: 1050, y: -150 },
+    position: { x: 870, y: -150 },
     data: {
       title: 'Ads Mockups',
       subtitle: 'Campaign Previews',
@@ -101,7 +103,7 @@ const staticNodes = [
   {
     id: '8',
     type: 'brandCard',
-    position: { x: 1050, y: -450 },
+    position: { x: 870, y: -450 },
     data: {
       title: 'Color Palette',
       subtitle: 'Brand Core Colors',
@@ -113,13 +115,25 @@ const staticNodes = [
   {
     id: '7',
     type: 'brandCard',
-    position: { x: 1550, y: -450 },
+    position: { x: 1280, y: -450 },
     data: {
-      title: 'Product Images',
-      subtitle: 'Merch & Studio',
+      title: 'In The Wild Products',
+      subtitle: 'Merch on Location',
+      image: inTheWildHeaderImage,
+      description: 'High quality lifestyle photography of physical products in the wild.',
+      nodeGroup: 'wild_products'
+    },
+  },
+  {
+    id: '9',
+    type: 'brandCard',
+    position: { x: 1280, y: -750 },
+    data: {
+      title: 'Product Shots',
+      subtitle: 'Studio Photography',
       image: productImagesImage,
       description: 'High quality studio photography of physical products and merch.',
-      nodeGroup: 'products'
+      nodeGroup: 'product_shots'
     },
   },
 ];
@@ -132,7 +146,7 @@ const videoNodes = videos.map((videoFilename, index) => {
     return {
       id: '3',
       type: 'brandCard',
-      position: { x: 1050, y: 450 },
+      position: { x: 870, y: 450 },
       data: {
         title: 'Brand Video',
         subtitle: 'Hero Campaign',
@@ -146,7 +160,7 @@ const videoNodes = videos.map((videoFilename, index) => {
   return {
     id,
     type: 'brandCard',
-    position: { x: 1550 + ((index - 1) * 500), y: 450 },
+    position: { x: 1280 + ((index - 1) * 410), y: 450 },
     data: {
       title: 'Video',
       subtitle: title.substring(0, 20) + (title.length > 20 ? '...' : ''),
@@ -164,7 +178,7 @@ const adNodes = ads.map((adFilename, index) => {
   return {
     id,
     type: 'brandCard',
-    position: { x: 1550 + (index * 500), y: -150 },
+    position: { x: 1280 + (index * 410), y: -150 },
     data: {
       title: 'Ad Mockup',
       subtitle: title.substring(0, 20) + (title.length > 20 ? '...' : ''),
@@ -176,20 +190,38 @@ const adNodes = ads.map((adFilename, index) => {
 });
 
 
-const productNodes = products.map((productFilename, index) => {
-  const id = `product-${index}`;
+const inTheWildNodes = inTheWildProducts.map((productFilename, index) => {
+  const id = `wild-${index}`;
   const title = productFilename.split('/').pop().replace(/\.(webp|png|jpg)$/i, '').replace(/_/g, ' ');
 
   return {
     id,
     type: 'brandCard',
-    position: { x: 2050 + (index * 500), y: -450 },
+    position: { x: 1690 + (index * 410), y: -450 },
     data: {
-      title: 'Product Image',
+      title: 'In The Wild',
       subtitle: title.substring(0, 20) + (title.length > 20 ? '...' : ''),
       image: `/assets/branding/${productFilename}`,
       description: `Droplet physical product showcase.`,
-      nodeGroup: 'products'
+      nodeGroup: 'wild_products'
+    }
+  };
+});
+
+const productShotNodes = productShots.map((productFilename, index) => {
+  const id = `shot-${index}`;
+  const title = productFilename.split('/').pop().replace(/\.(webp|png|jpg)$/i, '').replace(/_/g, ' ');
+
+  return {
+    id,
+    type: 'brandCard',
+    position: { x: 1690 + (index * 410), y: -750 },
+    data: {
+      title: 'Product Shot',
+      subtitle: title.substring(0, 20) + (title.length > 20 ? '...' : ''),
+      image: `/assets/branding/${productFilename}`,
+      description: `Droplet studio product showcase.`,
+      nodeGroup: 'product_shots'
     }
   };
 });
@@ -204,7 +236,8 @@ const initialNodes = [
   ...staticNodes, 
   ...videoNodes,
   ...adNodes,
-  ...productNodes
+  ...inTheWildNodes,
+  ...productShotNodes
 ];
 
 const initialEdges = [
@@ -212,6 +245,7 @@ const initialEdges = [
   { id: 'e2-6', source: '2', target: '6', type: 'smoothstep', animated: true, style: { stroke: '#4B5EFA', strokeWidth: 4 } },
   { id: 'e2-8', source: '2', target: '8', type: 'smoothstep', animated: true, style: { stroke: '#FF6A00', strokeWidth: 4 } },
   { id: 'e8-7', source: '8', target: '7', type: 'smoothstep', animated: true, style: { stroke: '#ff00ff', strokeWidth: 4 } },
+  { id: 'e8-9', source: '8', target: '9', type: 'smoothstep', animated: true, style: { stroke: '#f5a623', strokeWidth: 4 } },
 ];
 
 if (videos.length > 0) {
@@ -252,10 +286,26 @@ ads.forEach((adFilename, index) => {
   });
 });
 
-products.forEach((productFilename, index) => {
-  const targetId = `product-${index}`;
-  const sourceId = index === 0 ? '7' : `product-${index - 1}`;
+inTheWildProducts.forEach((productFilename, index) => {
+  const targetId = `wild-${index}`;
+  const sourceId = index === 0 ? '7' : `wild-${index - 1}`;
   const colors = ['#ff00ff', '#f5a623', '#4B5EFA', '#00ffcc'];
+  const strokeColor = colors[index % colors.length];
+  
+  initialEdges.push({
+    id: `e${sourceId}-${targetId}`,
+    source: sourceId,
+    target: targetId,
+    type: 'smoothstep',
+    animated: true,
+    style: { stroke: strokeColor, strokeWidth: 4 }
+  });
+});
+
+productShots.forEach((productFilename, index) => {
+  const targetId = `shot-${index}`;
+  const sourceId = index === 0 ? '9' : `shot-${index - 1}`;
+  const colors = ['#f5a623', '#4B5EFA', '#00ffcc', '#ff00ff'];
   const strokeColor = colors[index % colors.length];
   
   initialEdges.push({
