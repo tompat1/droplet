@@ -18,7 +18,12 @@
     "canvas_ads/droplet_ad_campaign_02.webp",
     "canvas_ads/droplet_ad_campaign_03.webp",
     "canvas_ads/droplet_ad_campaign_04.webp",
-    "canvas_ads/droplet_ad_campaign_05.webp"
+    "canvas_ads/droplet_ad_campaign_05.webp",
+    "canvas_ads/droplet_ad_campaign_06.webp",
+    "canvas_ads/droplet_ad_campaign_07.webp",
+    "canvas_ads/droplet_ad_campaign_08.webp",
+    "canvas_ads/droplet_ad_campaign_09.webp",
+    "canvas_ads/droplet_ad_campaign_10.webp"
   ],
   "Canvas Products": [
     "canvas_products/droplet_inthewild_merch_hoodie_032.webp",
@@ -47,6 +52,8 @@
     "location_shot/droplet_inthewild_merch_water_bottle_026.webp"
   ],
   "Merch Studio Shots": [
+    "merch/cap_droplet_base_003.webp",
+    "merch/coaster_droplet_base_010.webp",
     "merch/droplet_asset_005.webp",
     "merch/droplet_asset_006.webp",
     "merch/droplet_asset_007.webp",
@@ -80,7 +87,15 @@
     "merch/droplet_asset_058.webp",
     "merch/droplet_asset_059.webp",
     "merch/droplet_asset_062.webp",
-    "merch/droplet_asset_064.webp"
+    "merch/droplet_asset_064.webp",
+    "merch/hang_tag_droplet_base_007.webp",
+    "merch/hoodie_droplet_base_002.webp",
+    "merch/packaging_box_droplet_base_006.webp",
+    "merch/phone_case_droplet_base_009.webp",
+    "merch/t_shirt_droplet_base_001.webp",
+    "merch/tote_bag_droplet_base_004.webp",
+    "merch/water_bottle_droplet_base_005.webp",
+    "merch/wrapping_droplet_base_008.webp"
   ],
   "On Location Personas Shots": [
     "personas/droplet_inthewild_merch_cap_010.webp",
