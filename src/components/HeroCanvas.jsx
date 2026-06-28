@@ -68,14 +68,14 @@ const MultiSelectHint = () => {
           <path d="M12 8h.01"></path>
         </svg>
         <div style={{
-          width: isHovered ? '280px' : '0px',
+          width: isHovered ? '420px' : '0px',
           opacity: isHovered ? 1 : 0,
           overflow: 'hidden',
           transition: 'all 0.3s ease',
           whiteSpace: 'nowrap',
           fontSize: '0.85rem'
         }}>
-          Hold <kbd style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace' }}>Shift</kbd> + Drag to multi-select
+          Hold <kbd style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace' }}>Shift</kbd> + Drag to multi-select &nbsp;&nbsp;|&nbsp;&nbsp; Refresh to reset view
         </div>
       </div>
     </Panel>
@@ -124,7 +124,7 @@ const staticNodes = [
   {
     id: '2',
     type: 'brandCard',
-    position: { x: 460, y: 150 },
+    position: { x: 460, y: 240 },
     data: {
       title: 'Branding Guide',
       subtitle: 'Guidelines & Usage',
@@ -135,7 +135,7 @@ const staticNodes = [
   {
     id: '6',
     type: 'brandCard',
-    position: { x: 870, y: -150 },
+    position: { x: 870, y: -190 },
     data: {
       title: 'Ads Mockups',
       subtitle: 'Campaign Previews',
@@ -147,7 +147,7 @@ const staticNodes = [
   {
     id: '8',
     type: 'brandCard',
-    position: { x: 870, y: -450 },
+    position: { x: 870, y: -620 },
     data: {
       title: 'Color Palette',
       subtitle: 'Brand Core Colors',
@@ -159,7 +159,7 @@ const staticNodes = [
   {
     id: '7',
     type: 'brandCard',
-    position: { x: 1280, y: -450 },
+    position: { x: 1280, y: -620 },
     data: {
       title: 'In The Wild Products',
       subtitle: 'Merch on Location',
@@ -171,7 +171,7 @@ const staticNodes = [
   {
     id: '9',
     type: 'brandCard',
-    position: { x: 1280, y: -750 },
+    position: { x: 1280, y: -1050 },
     data: {
       title: 'Product Shots',
       subtitle: 'Studio Photography',
@@ -190,7 +190,7 @@ const videoNodes = videos.map((videoFilename, index) => {
     return {
       id: '3',
       type: 'brandCard',
-      position: { x: 870, y: 450 },
+      position: { x: 870, y: 480 },
       data: {
         title: 'Brand Video',
         subtitle: 'Hero Campaign',
@@ -204,7 +204,7 @@ const videoNodes = videos.map((videoFilename, index) => {
   return {
     id,
     type: 'brandCard',
-    position: { x: 1280 + ((index - 1) * 410), y: 450 },
+    position: { x: 1280 + ((index - 1) * 410), y: 480 },
     data: {
       title: 'Video',
       subtitle: title.substring(0, 20) + (title.length > 20 ? '...' : ''),
@@ -222,7 +222,7 @@ const adNodes = ads.map((adFilename, index) => {
   return {
     id,
     type: 'brandCard',
-    position: { x: 1280 + (index * 410), y: -150 },
+    position: { x: 1280 + (index * 410), y: -190 },
     data: {
       title: 'Ad Mockup',
       subtitle: title.substring(0, 20) + (title.length > 20 ? '...' : ''),
@@ -241,7 +241,7 @@ const inTheWildNodes = inTheWildProducts.map((productFilename, index) => {
   return {
     id,
     type: 'brandCard',
-    position: { x: 1690 + (index * 410), y: -450 },
+    position: { x: 1690 + (index * 410), y: -620 },
     data: {
       title: 'In The Wild',
       subtitle: title.substring(0, 20) + (title.length > 20 ? '...' : ''),
@@ -259,7 +259,7 @@ const productShotNodes = productShots.map((productFilename, index) => {
   return {
     id,
     type: 'brandCard',
-    position: { x: 1690 + (index * 410), y: -750 },
+    position: { x: 1690 + (index * 410), y: -1050 },
     data: {
       title: 'Product Shot',
       subtitle: title.substring(0, 20) + (title.length > 20 ? '...' : ''),
