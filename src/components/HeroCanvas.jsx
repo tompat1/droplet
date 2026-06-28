@@ -57,6 +57,7 @@ const MultiSelectHint = () => {
       <div 
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        onClick={() => setIsHovered(!isHovered)}
         style={{
           background: isHovered ? 'rgba(20,20,25,0.8)' : 'rgba(20,20,25,0.4)',
           backdropFilter: 'blur(10px)',
