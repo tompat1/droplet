@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
 
 export default function BrandCard({ id, data, isConnectable, selected }) {
+  const isEditMode = data.isEditMode !== false; // defaults to true
+
   const { setNodes, setEdges, getNode } = useReactFlow();
   
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -150,7 +152,15 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               style={{ fontSize: '14px', background: 'rgba(0,0,0,0.5)', color: 'white', border: '1px solid var(--accent-neon)', borderRadius: '4px', width: '100%', outline: 'none' }}
             />
           ) : (
-            <p onClick={() => setIsEditingSubtitle(true)} style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', cursor: 'text', minHeight: '16px' }}>{data.subtitle || 'Add subtitle...'}</p>
+            <div 
+              onClick={(e) => { 
+                if (isEditMode) {
+                  e.stopPropagation(); 
+                  setIsEditingSubtitle(true); 
+                }
+              }}
+              style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', cursor: isEditMode ? 'text' : 'default', minHeight: '16px' }}
+            >{data.subtitle || 'Add subtitle...'}</div>
           )}
         </div>
         
@@ -166,15 +176,17 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               {data.isCollapsed ? '+' : '−'}
             </button>
           )}
-          <button 
-            onClick={handleDeleteInitiate}
-            style={{ 
-              background: 'rgba(255,50,50,0.15)', border: 'none', color: '#ff8888', borderRadius: '6px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '18px', transition: 'all 0.2s ease'
-            }}
-            title="Delete Node"
-          >
-            ×
-          </button>
+          {isEditMode && (
+            <button 
+              onClick={handleDeleteInitiate}
+              style={{ 
+                background: 'rgba(255,50,50,0.15)', border: 'none', color: '#ff8888', borderRadius: '6px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '18px', transition: 'all 0.2s ease'
+              }}
+              title="Delete Node"
+            >
+              ×
+            </button>
+          )}
         </div>
       </div>
 
@@ -185,12 +197,14 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           style={{ width: '100%', height: '180px', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px', position: 'relative' }}
         >
           <img src={data.image} alt={data.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          <div 
-            onClick={handleChangeImage}
-            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isHoveringImage ? 1 : 0, transition: 'opacity 0.2s', cursor: 'pointer', color: 'white', fontWeight: 'bold', backdropFilter: 'blur(2px)' }}
-          >
-            Change Image
-          </div>
+          {isEditMode && (
+            <div 
+              onClick={handleChangeImage}
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isHoveringImage ? 1 : 0, transition: 'opacity 0.2s', cursor: 'pointer', color: 'white', fontWeight: 'bold', backdropFilter: 'blur(2px)' }}
+            >
+              Change Image
+            </div>
+          )}
         </div>
       )}
 
@@ -230,11 +244,20 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           style={{ fontSize: '14px', lineHeight: '1.5', background: 'rgba(0,0,0,0.5)', color: 'white', border: '1px solid var(--accent-neon)', borderRadius: '4px', width: '100%', minHeight: '60px', outline: 'none', resize: 'vertical' }}
         />
       ) : (
-        <p onClick={() => setIsEditingDesc(true)} style={{ fontSize: '14px', lineHeight: '1.5', color: 'rgba(255,255,255,0.8)', cursor: 'text', minHeight: '20px' }}>
+        <p 
+          onClick={(e) => { 
+            if (isEditMode) {
+              e.stopPropagation(); 
+              setIsEditingDesc(true); 
+            }
+          }}
+          style={{ fontSize: '14px', lineHeight: '1.5', color: 'rgba(255,255,255,0.8)', cursor: isEditMode ? 'text' : 'default', minHeight: '20px' }}
+        >
           {data.description || 'Add description...'}
         </p>
       )}
 
+      {isEditMode && (
       <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {genState === 'idle' && (
           <button
@@ -343,6 +366,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           </div>
         )}
       </div>
+      )}
 
       <Handle type="source" position={Position.Right} isConnectable={isConnectable} style={{ background: 'var(--bg-color)', border: '2px solid var(--accent-neon)' }} />
 

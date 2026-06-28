@@ -393,6 +393,7 @@ export default function HeroCanvas() {
   const containerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [collapsedBranches, setCollapsedBranches] = useState({});
+  const [isEditMode, setIsEditMode] = useState(true);
 
   useEffect(() => {
     const handleToggle = (id) => {
@@ -417,7 +418,8 @@ export default function HeroCanvas() {
           isCollapsed: collapsedBranches[node.id] || false,
           onToggleCollapse: handleToggle,
           setGlobalNodes: setNodes,
-          setGlobalEdges: setEdges
+          setGlobalEdges: setEdges,
+          isEditMode
         }
       };
     }));
@@ -430,7 +432,7 @@ export default function HeroCanvas() {
       if (edge.target.startsWith('video-') && collapsedBranches['3']) hidden = true;
       return { ...edge, hidden };
     }));
-  }, [collapsedBranches, setNodes, setEdges]);
+  }, [collapsedBranches, setNodes, setEdges, isEditMode]);
 
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -514,6 +516,24 @@ export default function HeroCanvas() {
             </ControlButton>
             <ZoomToOneButton />
           </Controls>
+          <div 
+            onClick={() => setIsEditMode(!isEditMode)}
+            style={{ 
+              marginTop: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', 
+              background: 'rgba(20,20,25,0.8)', border: '1px solid rgba(255,255,255,0.1)', 
+              padding: '8px', borderRadius: '8px', cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: isEditMode ? '0 0 10px rgba(75, 94, 250, 0.2)' : 'none'
+            }}
+            title="Toggle Edit Mode"
+          >
+            <span style={{ color: isEditMode ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Edit Mode
+            </span>
+            <div style={{ width: '36px', height: '20px', background: isEditMode ? 'var(--accent-neon)' : 'rgba(255,255,255,0.2)', borderRadius: '10px', position: 'relative', transition: 'all 0.3s' }}>
+              <div style={{ width: '16px', height: '16px', background: 'white', borderRadius: '50%', position: 'absolute', top: '2px', left: isEditMode ? '18px' : '2px', transition: 'all 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
+            </div>
+          </div>
         </Panel>
         <MultiSelectHint />
         <MiniMap 
