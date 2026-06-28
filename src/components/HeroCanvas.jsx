@@ -107,7 +107,7 @@ Object.keys(assetFiles).forEach(key => {
 });
 
 const NodeSearch = () => {
-  const { setCenter, getNodes } = useReactFlow();
+  const { setCenter, getNodes, setNodes } = useReactFlow();
   const [searchTerm, setSearchTerm] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -167,6 +167,22 @@ const NodeSearch = () => {
     setShowSuggestions(false);
     if (item.searchType === 'canvas') {
       setCenter(item.position.x + 180, item.position.y + 200, { zoom: 1.2, duration: 800 });
+      
+      setNodes((nds) => nds.map((n) => {
+        if (n.id === item.id) {
+          return { ...n, data: { ...n.data, isHighlighted: true } };
+        }
+        return n;
+      }));
+      
+      setTimeout(() => {
+        setNodes((nds) => nds.map((n) => {
+          if (n.id === item.id) {
+            return { ...n, data: { ...n.data, isHighlighted: false } };
+          }
+          return n;
+        }));
+      }, 3000);
     } else {
       window.dispatchEvent(new CustomEvent('openGalleryItem', { detail: item.src }));
       const galleryEl = document.getElementById('asset-gallery');

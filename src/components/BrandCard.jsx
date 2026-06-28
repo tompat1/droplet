@@ -127,10 +127,12 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         width: '320px', 
         padding: '20px', 
         cursor: 'grab',
-        borderColor: selected ? 'var(--accent-neon)' : 'rgba(255,255,255,0.1)',
-        boxShadow: selected ? '0 0 25px rgba(76, 92, 255, 0.6), 0 4px 30px rgba(0, 0, 0, 0.2)' : '0 4px 30px rgba(0, 0, 0, 0.1)',
-        transform: selected ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)',
-        transition: 'all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+        borderColor: (data.isHighlighted || selected) ? 'rgba(75, 94, 250, 1)' : 'rgba(255,255,255,0.1)',
+        boxShadow: data.isHighlighted 
+          ? '0 0 30px rgba(75, 94, 250, 0.8), inset 0 0 10px rgba(75, 94, 250, 0.5)' 
+          : (selected ? '0 0 25px rgba(76, 92, 255, 0.6), 0 4px 30px rgba(0, 0, 0, 0.2)' : '0 4px 30px rgba(0, 0, 0, 0.1)'),
+        transform: data.isHighlighted ? 'scale(1.05)' : (selected ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)'),
+        transition: 'all 0.5s ease'
       }}
     >
       <Handle type="target" position={Position.Left} isConnectable={isConnectable} style={{ background: 'var(--bg-color)', border: '2px solid var(--accent-neon)' }} />
