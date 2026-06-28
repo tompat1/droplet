@@ -79,14 +79,14 @@ const MultiSelectHint = () => {
           <path d="M12 8h.01"></path>
         </svg>
         <div style={{
-          width: isHovered ? '600px' : '0px',
+          width: isHovered ? '700px' : '0px',
           opacity: isHovered ? 1 : 0,
           overflow: 'hidden',
           transition: 'all 0.3s ease',
           whiteSpace: 'nowrap',
           fontSize: '0.85rem'
         }}>
-          Drag in the Canvas to multi-select &nbsp;&nbsp;|&nbsp;&nbsp; Hold <kbd style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace' }}>Space</kbd> to move canvas &nbsp;&nbsp;|&nbsp;&nbsp; Refresh to reset view
+          Drag in the Canvas to multi-select &nbsp;&nbsp;|&nbsp;&nbsp; Hold <kbd style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace' }}>Space</kbd> to move canvas &nbsp;&nbsp;|&nbsp;&nbsp; Scroll in MiniMap to Zoom
         </div>
       </div>
     </Panel>
