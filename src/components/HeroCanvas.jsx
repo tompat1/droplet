@@ -100,7 +100,7 @@ Object.keys(assetFiles).forEach(key => {
   assetFiles[key].forEach(filename => {
     const isVideo = key === 'Campaign Videos' || filename.match(/\.(mp4|webm|mov)$/i);
     const basename = filename.split('/').pop();
-    const title = basename.replace(/\.(webp|png|jpg|mp4|webm|mov)$/i, '').replace(/_/g, ' ');
+    const title = basename.replace(/\.(webp|png|jpg|mp4|webm|mov)$/i, '').replace(/[-_]/g, ' ');
     const mediaSrc = isVideo ? `/assets/videos/${filename}` : `/assets/branding/${filename}`;
     galleryAssets.push({ id: `gallery-${filename}`, type: 'gallery', src: mediaSrc, title, subtitle: `Gallery: ${key}`, originalTitle: basename });
   });
@@ -133,23 +133,23 @@ const NodeSearch = () => {
       return;
     }
 
-    const term = val.toLowerCase();
+    const term = val.toLowerCase().replace(/[-_]/g, ' ');
     const nodes = getNodes();
     
     const nodeMatches = nodes.filter(n => 
       n.id !== 'padding-node' &&
       !n.hidden &&
       n.data && 
-      ((n.data.title && n.data.title.toLowerCase().includes(term)) || 
-       (n.data.subtitle && n.data.subtitle.toLowerCase().includes(term)) ||
-       (n.data.image && n.data.image.toLowerCase().includes(term)) ||
-       (n.data.video && n.data.video.toLowerCase().includes(term)))
+      ((n.data.title && n.data.title.toLowerCase().replace(/[-_]/g, ' ').includes(term)) || 
+       (n.data.subtitle && n.data.subtitle.toLowerCase().replace(/[-_]/g, ' ').includes(term)) ||
+       (n.data.image && n.data.image.toLowerCase().replace(/[-_]/g, ' ').includes(term)) ||
+       (n.data.video && n.data.video.toLowerCase().replace(/[-_]/g, ' ').includes(term)))
     ).map(n => ({ ...n, searchType: 'canvas' }));
 
     const galleryMatches = galleryAssets.filter(g => 
-      g.title.toLowerCase().includes(term) || 
-      g.subtitle.toLowerCase().includes(term) ||
-      g.originalTitle.toLowerCase().includes(term)
+      g.title.toLowerCase().replace(/[-_]/g, ' ').includes(term) || 
+      g.subtitle.toLowerCase().replace(/[-_]/g, ' ').includes(term) ||
+      g.originalTitle.toLowerCase().replace(/[-_]/g, ' ').includes(term)
     ).map(g => ({ ...g, searchType: 'gallery' }));
 
     setSuggestions([...nodeMatches, ...galleryMatches]);
@@ -157,12 +157,12 @@ const NodeSearch = () => {
   };
 
   const handleSelect = (item) => {
+    setSearchTerm('');
+    setSuggestions([]);
     setShowSuggestions(false);
     if (item.searchType === 'canvas') {
-      setSearchTerm(item.data.title);
       setCenter(item.position.x + 180, item.position.y + 200, { zoom: 1.2, duration: 800 });
     } else {
-      setSearchTerm(item.title);
       window.dispatchEvent(new CustomEvent('openGalleryItem', { detail: item.src }));
       const galleryEl = document.getElementById('asset-gallery');
       if (galleryEl) {
@@ -225,7 +225,7 @@ const NodeSearch = () => {
           </button>
         )}
         
-        {showSuggestions && suggestions.length > 0 && (
+        {showSuggestions && (searchTerm.trim() !== '') && (
           <div style={{
             position: 'absolute',
             top: '100%',
@@ -238,10 +238,29 @@ const NodeSearch = () => {
             borderRadius: '12px',
             overflow: 'hidden',
             boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-            maxHeight: '300px',
-            overflowY: 'auto'
+            maxHeight: '350px',
+            display: 'flex',
+            flexDirection: 'column'
           }}>
-            {suggestions.map((item) => (
+            <div style={{ 
+              padding: '8px 16px', 
+              fontSize: '0.75rem', 
+              color: 'rgba(255,255,255,0.5)', 
+              borderBottom: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(0,0,0,0.2)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              {suggestions.length} result{suggestions.length !== 1 ? 's' : ''} found
+            </div>
+            
+            {suggestions.length === 0 ? (
+              <div style={{ padding: '24px 16px', textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem' }}>
+                No matches found for "{searchTerm}"
+              </div>
+            ) : (
+              <div style={{ overflowY: 'auto', flex: 1 }}>
+                {suggestions.map((item) => (
               <div 
                 key={item.id}
                 onClick={() => handleSelect(item)}
@@ -280,6 +299,8 @@ const NodeSearch = () => {
                 )}
               </div>
             ))}
+              </div>
+            )}
           </div>
         )}
       </div>

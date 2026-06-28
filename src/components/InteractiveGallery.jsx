@@ -79,7 +79,7 @@ export default function InteractiveGallery() {
       assetFiles[key].forEach(filename => {
         const isVideo = key === 'Campaign Videos' || filename.match(/\.(mp4|webm|mov)$/i);
         const basename = filename.split('/').pop();
-        const title = basename.replace(/\.(webp|png|jpg|mp4|webm|mov)$/i, '');
+        const title = basename.replace(/\.(webp|png|jpg|mp4|webm|mov)$/i, '').replace(/[-_]/g, ' ');
         const mediaSrc = isVideo ? `/assets/videos/${filename}` : `/assets/branding/${filename}`;
         list.push({ type: isVideo ? 'video' : 'image', src: mediaSrc, title });
       });
@@ -167,7 +167,7 @@ export default function InteractiveGallery() {
             {category.assets.map((filename, index) => {
               const isVideo = category.title === 'Campaign Videos' || filename.match(/\.(mp4|webm|mov)$/i);
               const basename = filename.split('/').pop();
-              const title = basename.replace(/\.(webp|png|jpg|mp4|webm|mov)$/i, '');
+              const title = basename.replace(/\.(webp|png|jpg|mp4|webm|mov)$/i, '').replace(/[-_]/g, ' ');
               const mediaSrc = isVideo ? `/assets/videos/${filename}` : `/assets/branding/${filename}`;
               const isHighlighted = highlightedSrc === mediaSrc;
               const elId = `gallery-item-${mediaSrc.replace(/[^a-zA-Z0-9]/g, '-')}`;
