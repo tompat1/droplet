@@ -7,7 +7,7 @@ const ConvergingLines = () => {
       <div style={{ maxWidth: '1600px', margin: '0 auto', position: 'relative', height: '100%' }}>
         
         {/* Match InteractiveGallery content box width precisely with 5vw */}
-        <div style={{ position: 'absolute', left: '5vw', right: '5vw', top: 0, bottom: '480px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'absolute', left: '5vw', right: '5vw', top: 0, bottom: 0, display: 'flex', flexDirection: 'column' }}>
           
           {/* Straight Lines Section (Flexible height) */}
           <div style={{ flex: 1, position: 'relative', minHeight: '20px' }}>
