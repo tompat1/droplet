@@ -38,6 +38,50 @@ const ExitFullscreenIcon = () => (
   </svg>
 );
 
+const MultiSelectHint = () => {
+  const [isHovered, setIsHovered] = useState(false);
+  
+  return (
+    <Panel position="top-right" style={{ margin: '20px', zIndex: 10 }}>
+      <div 
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{
+          background: isHovered ? 'rgba(20,20,25,0.8)' : 'rgba(20,20,25,0.4)',
+          backdropFilter: 'blur(10px)',
+          border: isHovered ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(75, 94, 250, 0.5)',
+          padding: '8px 12px',
+          borderRadius: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          color: isHovered ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.8)',
+          cursor: 'help',
+          transition: 'all 0.3s ease',
+          boxShadow: isHovered ? '0 4px 6px rgba(0,0,0,0.1)' : '0 0 15px rgba(75, 94, 250, 0.5)',
+          animation: isHovered ? 'none' : 'bounce-subtle 2s infinite ease-in-out'
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M12 16v-4"></path>
+          <path d="M12 8h.01"></path>
+        </svg>
+        <div style={{
+          width: isHovered ? '280px' : '0px',
+          opacity: isHovered ? 1 : 0,
+          overflow: 'hidden',
+          transition: 'all 0.3s ease',
+          whiteSpace: 'nowrap',
+          fontSize: '0.85rem'
+        }}>
+          Hold <kbd style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace' }}>Shift</kbd> + Drag to multi-select
+        </div>
+      </div>
+    </Panel>
+  );
+};
+
 const nodeTypes = {
   brandCard: BrandCard,
 };
@@ -398,6 +442,7 @@ export default function HeroCanvas() {
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ nodes: [{ id: '1' }, { id: '2' }], padding: 0.3 }}
+        selectionMode="partial"
         minZoom={0.2}
         maxZoom={2}
       >
@@ -412,6 +457,7 @@ export default function HeroCanvas() {
           </ControlButton>
         </Controls>
         <ZoomIndicator />
+        <MultiSelectHint />
       </ReactFlow>
       
       {activeMedia && (

@@ -1,9 +1,20 @@
 import React from 'react';
 import { Handle, Position } from '@xyflow/react';
 
-export default function BrandCard({ data, isConnectable }) {
+export default function BrandCard({ data, isConnectable, selected }) {
   return (
-    <div className="glass-panel" style={{ width: '320px', padding: '20px', cursor: 'grab' }}>
+    <div 
+      className="glass-panel" 
+      style={{ 
+        width: '320px', 
+        padding: '20px', 
+        cursor: 'grab',
+        borderColor: selected ? 'var(--accent-neon)' : 'rgba(255,255,255,0.1)',
+        boxShadow: selected ? '0 0 25px rgba(76, 92, 255, 0.6), 0 4px 30px rgba(0, 0, 0, 0.2)' : '0 4px 30px rgba(0, 0, 0, 0.1)',
+        transform: selected ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)',
+        transition: 'all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+      }}
+    >
       <Handle type="target" position={Position.Left} isConnectable={isConnectable} style={{ background: 'var(--bg-color)', border: '2px solid var(--accent-neon)' }} />
       
       <div style={{ marginBottom: '16px' }}>
