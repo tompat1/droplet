@@ -20,9 +20,9 @@ import assetFiles from '../assetsData.json';
 const ZoomIndicator = () => {
   const { zoom } = useViewport();
   return (
-    <Panel position="bottom-left" style={{ margin: '0 0 115px 15px', paddingBottom: '10px', color: '#fff', fontWeight: 'bold', fontFamily: 'monospace', fontSize: '1rem', pointerEvents: 'none', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+    <div style={{ color: '#fff', fontWeight: 'bold', fontFamily: 'monospace', fontSize: '0.9rem', pointerEvents: 'none', textShadow: '0 2px 4px rgba(0,0,0,0.8)', textAlign: 'center', marginBottom: '8px' }}>
       {Math.round(zoom * 100)}%
-    </Panel>
+    </div>
   );
 };
 
@@ -42,7 +42,7 @@ const MultiSelectHint = () => {
   const [isHovered, setIsHovered] = useState(false);
   
   return (
-    <Panel position="top-right" style={{ margin: '20px', zIndex: 10 }}>
+    <Panel position="bottom-left" style={{ margin: '20px', zIndex: 10 }}>
       <div 
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -68,14 +68,14 @@ const MultiSelectHint = () => {
           <path d="M12 8h.01"></path>
         </svg>
         <div style={{
-          width: isHovered ? '420px' : '0px',
+          width: isHovered ? '600px' : '0px',
           opacity: isHovered ? 1 : 0,
           overflow: 'hidden',
           transition: 'all 0.3s ease',
           whiteSpace: 'nowrap',
           fontSize: '0.85rem'
         }}>
-          Hold <kbd style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace' }}>Shift</kbd> + Drag to multi-select &nbsp;&nbsp;|&nbsp;&nbsp; Refresh to reset view
+          Drag in the Canvas to multi-select &nbsp;&nbsp;|&nbsp;&nbsp; Hold <kbd style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace' }}>Space</kbd> to move canvas &nbsp;&nbsp;|&nbsp;&nbsp; Refresh to reset view
         </div>
       </div>
     </Panel>
@@ -417,13 +417,13 @@ export default function HeroCanvas() {
   const handlePrev = () => setActiveIndex(prev => (prev - 1 + activeGroupMedias.length) % activeGroupMedias.length);
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: isFullscreen ? '100vh' : '85vh', position: 'relative', backgroundColor: isFullscreen ? '#050505' : 'transparent' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
       {!isFullscreen && (
-        <div style={{ position: 'absolute', top: '5%', left: '5%', zIndex: 10, pointerEvents: 'none', width: 'min-content' }}>
+        <div style={{ padding: '40px 5% 0 5%', zIndex: 10 }}>
           <h1 style={{ fontSize: '4.5rem', marginBottom: '10px', whiteSpace: 'nowrap' }}>
             <span className="text-gradient">Droplet</span> Brand Space
           </h1>
-          <div className="glass-panel" style={{ padding: '24px', borderRadius: '16px', fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', pointerEvents: 'auto', lineHeight: '1.6' }}>
+          <div className="glass-panel" style={{ width: 'max-content', maxWidth: '800px', padding: '24px', borderRadius: '16px', fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', lineHeight: '1.6' }}>
             <p style={{ margin: 0 }}>
               From one origin logo to a full brand universe: guides, mockups, videos, merch, and campaign assets, ready whenever your brand needs them. Endless possibilities.
             </p>
@@ -431,7 +431,7 @@ export default function HeroCanvas() {
         </div>
       )}
       
-      
+      <div ref={containerRef} style={{ width: '100%', height: isFullscreen ? '100vh' : '72vh', position: 'relative', backgroundColor: isFullscreen ? '#050505' : 'transparent' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -443,20 +443,27 @@ export default function HeroCanvas() {
         fitView
         fitViewOptions={{ nodes: [{ id: '1' }, { id: '2' }], padding: 0.3 }}
         selectionMode="partial"
+        panOnDrag={false}
+        selectionOnDrag={true}
+        panOnScroll={true}
+        selectionKeyCode={null}
         minZoom={0.2}
         maxZoom={2}
       >
         <Background color="#ffffff" gap={24} size={1} opacity={0.05} />
-        <Controls 
-          showInteractive={false} 
-          showFitView={false}
-          className="custom-flow-controls"
-        >
-          <ControlButton onClick={toggleFullscreen} title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}>
-            {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
-          </ControlButton>
-        </Controls>
-        <ZoomIndicator />
+        <Panel position="top-left" style={{ margin: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', zIndex: 10 }}>
+          <ZoomIndicator />
+          <Controls 
+            showInteractive={false} 
+            showFitView={false}
+            className="custom-flow-controls"
+            style={{ position: 'relative', margin: 0, left: 'auto', right: 'auto', bottom: 'auto', top: 'auto' }}
+          >
+            <ControlButton onClick={toggleFullscreen} title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}>
+              {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
+            </ControlButton>
+          </Controls>
+        </Panel>
         <MultiSelectHint />
       </ReactFlow>
       
@@ -468,6 +475,7 @@ export default function HeroCanvas() {
           onPrev={handlePrev} 
         />
       )}
+      </div>
     </div>
   );
 }
