@@ -148,10 +148,10 @@ export default function InteractiveGallery() {
               const mediaSrc = isVideo ? `/assets/videos/${filename}` : `/assets/branding/${filename}`;
               
               return (
-                <div key={`${catIndex}-${index}`} className="gallery-grid-cell">
+                <div key={`${catIndex}-${index}`} className="gallery-grid-cell" style={{ display: 'flex', justifyContent: 'center' }}>
                   <div 
                     className="gallery-item glass-panel" 
-                    style={{ padding: '16px', display: 'flex', flexDirection: 'column', cursor: 'pointer', height: '100%' }}
+                    style={{ padding: '16px', display: 'flex', flexDirection: 'column', cursor: 'pointer', height: '100%', width: '100%', maxWidth: '280px' }}
                   onClick={() => {
                     const globalIndex = allAssets.findIndex(a => a.src === mediaSrc);
                     setActiveIndex(globalIndex);
