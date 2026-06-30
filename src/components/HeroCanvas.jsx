@@ -837,7 +837,8 @@ export default function HeroCanvas() {
         panOnDrag={interactionMode === 'pan'}
         selectionOnDrag={interactionMode === 'select'}
         panOnScroll={true}
-        selectionKeyCode={null}
+        selectionKeyCode={['Shift', 'Meta', 'Control']}
+        multiSelectionKeyCode={['Shift', 'Meta', 'Control']}
         minZoom={0.2}
         maxZoom={2}
       >
@@ -884,7 +885,9 @@ export default function HeroCanvas() {
                 transition: 'all 0.3s ease',
                 boxShadow: interactionMode === 'pan' ? '0 0 10px rgba(0, 255, 204, 0.2)' : 'none'
               }}
-              title="Toggle Pan/Select Mode"
+              title={interactionMode === 'pan' 
+                ? "Pan Mode is ON. Drag to pan. Tip: Hold Shift, Cmd, or Ctrl to draw a selection box or click individual nodes to multi-select." 
+                : "Pan Mode is OFF. Drag to select. Tip: Hold Spacebar to pan the canvas."}
             >
               <span style={{ color: interactionMode === 'pan' ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Pan Mode
