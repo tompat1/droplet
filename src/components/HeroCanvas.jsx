@@ -726,6 +726,13 @@ export default function HeroCanvas() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [collapsedBranches, setCollapsedBranches] = useState({});
   const [isEditMode, setIsEditMode] = useState(false);
+  
+  const [interactionMode, setInteractionMode] = useState(() => {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(hover: none) and (pointer: coarse)').matches ? 'pan' : 'select';
+    }
+    return 'select';
+  });
 
   useEffect(() => {
     const handleToggle = (id) => {
@@ -827,8 +834,8 @@ export default function HeroCanvas() {
         fitView
         fitViewOptions={{ nodes: [{ id: '1' }, { id: '2' }], padding: 0.3 }}
         selectionMode="partial"
-        panOnDrag={false}
-        selectionOnDrag={true}
+        panOnDrag={interactionMode === 'pan'}
+        selectionOnDrag={interactionMode === 'select'}
         panOnScroll={true}
         selectionKeyCode={null}
         minZoom={0.2}
@@ -848,22 +855,43 @@ export default function HeroCanvas() {
             </ControlButton>
             <ZoomToOneButton />
           </Controls>
-          <div 
-            onClick={() => setIsEditMode(!isEditMode)}
-            style={{ 
-              marginTop: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', 
-              background: 'rgba(20,20,25,0.8)', border: '1px solid rgba(255,255,255,0.1)', 
-              padding: '8px', borderRadius: '8px', cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: isEditMode ? '0 0 10px rgba(75, 94, 250, 0.2)' : 'none'
-            }}
-            title="Toggle Edit Mode"
-          >
-            <span style={{ color: isEditMode ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Edit Mode
-            </span>
-            <div style={{ width: '36px', height: '20px', background: isEditMode ? 'var(--accent-neon)' : 'rgba(255,255,255,0.2)', borderRadius: '10px', position: 'relative', transition: 'all 0.3s' }}>
-              <div style={{ width: '16px', height: '16px', background: 'white', borderRadius: '50%', position: 'absolute', top: '2px', left: isEditMode ? '18px' : '2px', transition: 'all 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
+          <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', marginTop: '12px' }}>
+            <div 
+              onClick={() => setInteractionMode(prev => prev === 'pan' ? 'select' : 'pan')}
+              style={{ 
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', 
+                background: 'rgba(20,20,25,0.8)', border: '1px solid rgba(255,255,255,0.1)', 
+                padding: '8px', borderRadius: '8px', cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: interactionMode === 'pan' ? '0 0 10px rgba(0, 255, 204, 0.2)' : 'none'
+              }}
+              title="Toggle Pan/Select Mode"
+            >
+              <span style={{ color: interactionMode === 'pan' ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Pan Mode
+              </span>
+              <div style={{ width: '36px', height: '20px', background: interactionMode === 'pan' ? '#00ffcc' : 'rgba(255,255,255,0.2)', borderRadius: '10px', position: 'relative', transition: 'all 0.3s' }}>
+                <div style={{ width: '16px', height: '16px', background: 'white', borderRadius: '50%', position: 'absolute', top: '2px', left: interactionMode === 'pan' ? '18px' : '2px', transition: 'all 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
+              </div>
+            </div>
+
+            <div 
+              onClick={() => setIsEditMode(!isEditMode)}
+              style={{ 
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', 
+                background: 'rgba(20,20,25,0.8)', border: '1px solid rgba(255,255,255,0.1)', 
+                padding: '8px', borderRadius: '8px', cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: isEditMode ? '0 0 10px rgba(75, 94, 250, 0.2)' : 'none'
+              }}
+              title="Toggle Edit Mode"
+            >
+              <span style={{ color: isEditMode ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Edit Mode
+              </span>
+              <div style={{ width: '36px', height: '20px', background: isEditMode ? 'var(--accent-neon)' : 'rgba(255,255,255,0.2)', borderRadius: '10px', position: 'relative', transition: 'all 0.3s' }}>
+                <div style={{ width: '16px', height: '16px', background: 'white', borderRadius: '50%', position: 'absolute', top: '2px', left: isEditMode ? '18px' : '2px', transition: 'all 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
+              </div>
             </div>
           </div>
         </Panel>

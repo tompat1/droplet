@@ -389,18 +389,16 @@ export default function InteractiveGallery() {
                         loop 
                         muted 
                         playsInline
+                        className="gallery-media-asset"
                         style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease' }} 
-                        onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'} 
-                        onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'} 
                       />
                     ) : (
                       <img 
                         src={mediaSrc} 
                         alt={title} 
                         loading="lazy"
+                        className="gallery-media-asset"
                         style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease' }} 
-                        onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'} 
-                        onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'} 
                       />
                     )}
                   </div>
