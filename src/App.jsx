@@ -6,6 +6,8 @@ import ThreeScene from './components/ThreeScene';
 import CallToAction from './components/CallToAction';
 import Preloader from './components/Preloader';
 
+import Overhero from './components/Overhero';
+
 function App() {
   return (
     <>
@@ -36,6 +38,8 @@ function App() {
       {/* <ThreeScene /> */}
 
       <main style={{ position: 'relative', zIndex: 1 }}>
+        <Overhero />
+        <ConnectorLine />
         <HeroCanvas />
         <ConnectorLine />
         <InteractiveGallery />

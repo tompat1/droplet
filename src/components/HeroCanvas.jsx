@@ -811,12 +811,12 @@ export default function HeroCanvas() {
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
       {!isFullscreen && (
         <div style={{ padding: '40px 5% 0 5%', zIndex: 10 }}>
-          <h1 style={{ fontSize: '4.5rem', marginBottom: '10px', whiteSpace: 'nowrap' }}>
-            <span className="text-gradient">Droplet</span> Brand Space
+          <h1 style={{ fontSize: '3.5rem', marginBottom: '10px', whiteSpace: 'nowrap' }}>
+            Fluid <span className="text-gradient">Node Canvas</span>
           </h1>
           <div className="glass-panel" style={{ width: 'max-content', maxWidth: '800px', padding: '24px', borderRadius: '16px', fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', lineHeight: '1.6' }}>
             <p style={{ margin: 0 }}>
-              From one origin logo to a full brand universe: guides, mockups, videos, merch, and campaign assets, ready whenever your brand needs them. Endless possibilities.
+              Navigate the Droplet ecosystem through our interactive, physics-based graph. Pan, zoom, and explore connections dynamically.
             </p>
           </div>
         </div>
