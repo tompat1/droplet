@@ -871,7 +871,7 @@ export default function HeroCanvas() {
         <NodeSearch />
         <MiniMap 
           position="bottom-right"
-          style={{ background: 'rgba(20,20,25,0.8)', backdropFilter: 'blur(10px)', border: '1px solid #666', borderRadius: '12px', margin: '20px' }} 
+          className="custom-minimap"
           nodeColor={(n) => {
             if (n.id === '1') return '#ffffff';
             if (n.id.startsWith('ad-') || n.id === '6') return '#4B5EFA';

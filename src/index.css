@@ -246,3 +246,21 @@ h1, h2, h3, h4, h5, h6 {
     grid-template-columns: repeat(1, 1fr);
   }
 }
+
+.custom-minimap {
+  background: rgba(20,20,25,0.8) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255,255,255,0.15) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  margin: 20px !important;
+}
+
+.custom-minimap svg {
+  border-radius: 12px !important;
+  display: block !important;
+}
+
+.custom-minimap .react-flow__minimap-mask {
+  border-radius: 12px !important;
+}
