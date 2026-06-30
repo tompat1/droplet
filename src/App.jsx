@@ -7,6 +7,7 @@ import CallToAction from './components/CallToAction';
 import Preloader from './components/Preloader';
 
 import Overhero from './components/Overhero';
+import CoreValues from './components/CoreValues';
 
 function App() {
   return (
@@ -39,9 +40,11 @@ function App() {
 
       <main style={{ position: 'relative', zIndex: 1 }}>
         <Overhero />
-        <ConnectorLine />
+        <ConnectorLine targetId="core-values" />
+        <CoreValues />
+        <ConnectorLine targetId="hero-canvas-section" />
         <HeroCanvas />
-        <ConnectorLine />
+        <ConnectorLine targetId="asset-gallery" />
         <InteractiveGallery />
         <CallToAction />
       </main>

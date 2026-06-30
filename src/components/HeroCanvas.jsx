@@ -808,7 +808,7 @@ export default function HeroCanvas() {
   const handlePrev = () => setActiveIndex(prev => (prev - 1 + activeGroupMedias.length) % activeGroupMedias.length);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+    <div id="hero-canvas-section" style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
       {!isFullscreen && (
         <div style={{ padding: '40px 5% 0 5%', zIndex: 10 }}>
           <h1 style={{ fontSize: '3.5rem', marginBottom: '10px', whiteSpace: 'nowrap' }}>
