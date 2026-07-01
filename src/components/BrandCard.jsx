@@ -154,6 +154,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         width: '320px', 
         padding: '20px', 
         cursor: 'default',
+        background: 'linear-gradient(135deg, rgba(20, 20, 25, 0.85) 0%, rgba(10, 10, 15, 0.9) 100%)',
         borderColor: (data.isHighlighted || selected) ? 'rgba(75, 94, 250, 1)' : 'rgba(255,255,255,0.1)',
         boxShadow: data.isHighlighted 
           ? '0 0 30px rgba(75, 94, 250, 0.8), inset 0 0 10px rgba(75, 94, 250, 0.5)' 
