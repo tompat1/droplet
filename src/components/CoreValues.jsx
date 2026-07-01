@@ -164,7 +164,7 @@ export default function CoreValues() {
             style={{
               position: 'absolute',
               top: 0, left: 0, width: '100%', height: '100%',
-              background: `linear-gradient(rgba(5, 5, 5, 0.5), rgba(5, 5, 5, 0.5)), url(${val.bgImage}) center/cover no-repeat`,
+              background: `linear-gradient(rgba(5, 5, 5, 0.15), rgba(5, 5, 5, 0.15)), url(${val.bgImage}) center/cover no-repeat`,
               opacity: activeIndex === idx ? 1 : 0,
               transition: 'opacity 1s ease-in-out',
               zIndex: -1,
