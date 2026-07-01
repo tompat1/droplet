@@ -23,6 +23,30 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
   const [genPrompt, setGenPrompt] = useState('');
   const [genRefs, setGenRefs] = useState([]);
 
+  // 3D Parallax Tilt State
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [isHoveringHandle, setIsHoveringHandle] = useState(false);
+  const cardRef = React.useRef(null);
+
+  const handleMouseMove = (e) => {
+    if (!cardRef.current || isHoveringHandle) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    const rotateX = ((y - centerY) / centerY) * -10;
+    const rotateY = ((x - centerX) / centerX) * 10;
+    
+    setTilt({ x: rotateX, y: rotateY });
+  };
+
+  const handleMouseLeaveParallax = () => {
+    setTilt({ x: 0, y: 0 });
+  };
+
   const handleSaveText = (e) => {
     e?.stopPropagation();
     const updater = data.setGlobalNodes || setNodes;
@@ -122,17 +146,20 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
   };
   return (
     <div 
+      ref={cardRef}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeaveParallax}
       className="glass-panel" 
       style={{ 
         width: '320px', 
         padding: '20px', 
-        cursor: 'grab',
+        cursor: 'default',
         borderColor: (data.isHighlighted || selected) ? 'rgba(75, 94, 250, 1)' : 'rgba(255,255,255,0.1)',
         boxShadow: data.isHighlighted 
           ? '0 0 30px rgba(75, 94, 250, 0.8), inset 0 0 10px rgba(75, 94, 250, 0.5)' 
           : (selected ? '0 0 25px rgba(76, 92, 255, 0.6), 0 4px 30px rgba(0, 0, 0, 0.2)' : '0 4px 30px rgba(0, 0, 0, 0.1)'),
-        transform: data.isHighlighted ? 'scale(1.05)' : (selected ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)'),
-        transition: 'all 0.5s ease'
+        transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) ${data.isHighlighted ? 'scale(1.05)' : (selected ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)')}`,
+        transition: tilt.x === 0 && tilt.y === 0 ? 'all 0.5s ease' : 'transform 0.1s ease-out, box-shadow 0.5s ease, border-color 0.5s ease'
       }}
     >
       <Handle type="target" position={Position.Left} isConnectable={isConnectable} style={{ background: 'var(--bg-color)', border: '2px solid var(--accent-neon)' }} />
@@ -145,7 +172,17 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               style={{ fontSize: '20px', marginBottom: '4px', background: 'rgba(0,0,0,0.5)', color: 'white', border: '1px solid var(--accent-neon)', borderRadius: '4px', width: '100%', outline: 'none' }}
             />
           ) : (
-            <h3 onClick={() => setIsEditingTitle(true)} style={{ fontSize: '20px', marginBottom: '4px', cursor: 'text' }}>{data.title || 'Add title...'}</h3>
+            <h3 
+              onClick={(e) => {
+                if (isEditMode) {
+                  e.stopPropagation();
+                  setIsEditingTitle(true);
+                }
+              }} 
+              style={{ fontSize: '20px', marginBottom: '4px', cursor: isEditMode ? 'text' : 'default' }}
+            >
+              {data.title || 'Add title...'}
+            </h3>
           )}
           
           {isEditingSubtitle ? (
@@ -166,7 +203,38 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           )}
         </div>
         
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div 
+            className="custom-drag-handle" 
+            style={{ 
+              color: 'rgba(255,255,255,0.3)', 
+              cursor: 'grab', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              padding: '4px',
+              transition: 'color 0.2s ease'
+            }} 
+            title="Drag Node"
+            onMouseEnter={(e) => {
+              setIsHoveringHandle(true);
+              setTilt({ x: 0, y: 0 });
+              e.currentTarget.style.color = 'rgba(255,255,255,0.8)';
+            }}
+            onMouseLeave={(e) => {
+              setIsHoveringHandle(false);
+              e.currentTarget.style.color = 'rgba(255,255,255,0.3)';
+            }}
+          >
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="9" cy="5" r="2"/>
+              <circle cx="15" cy="5" r="2"/>
+              <circle cx="9" cy="12" r="2"/>
+              <circle cx="15" cy="12" r="2"/>
+              <circle cx="9" cy="19" r="2"/>
+              <circle cx="15" cy="19" r="2"/>
+            </svg>
+          </div>
           {data.canCollapse && (
             <button 
               onClick={(e) => { e.stopPropagation(); data.onToggleCollapse(id); }}
