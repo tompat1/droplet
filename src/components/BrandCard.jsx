@@ -113,7 +113,8 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       const newId = `generated-${Date.now()}`;
       
       const isVideo = genPipeline === 'video';
-      const placeholderImg = isVideo ? null : `https://placehold.co/600x400/222/fff?text=AI+${encodeURIComponent((genPrompt || 'Asset').substring(0, 10))}`;
+      const aiImagePlaceholder = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="#111318"/><g transform="translate(300,200)"><circle r="70" fill="rgba(75,94,250,0.12)" stroke="rgba(75,94,250,0.3)" stroke-width="1.5"/><g fill="none" stroke="#4B5EFA" stroke-width="2.5" stroke-linecap="round"><line x1="0" y1="-38" x2="0" y2="-28"/><line x1="0" y1="28" x2="0" y2="38"/><line x1="-38" y1="0" x2="-28" y2="0"/><line x1="28" y1="0" x2="38" y2="0"/><line x1="-26" y1="-26" x2="-20" y2="-20"/><line x1="20" y1="20" x2="26" y2="26"/><line x1="26" y1="-26" x2="20" y2="-20"/><line x1="-20" y1="20" x2="-26" y2="26"/></g><path d="M0,-18 L5,0 L18,0 L8,10 L12,24 L0,14 L-12,24 L-8,10 L-18,0 L-5,0 Z" fill="#4B5EFA" opacity="0.9"/></g><text x="300" y="318" font-family="Inter, sans-serif" font-size="13" fill="rgba(255,255,255,0.4)" text-anchor="middle">AI Image Placeholder</text></svg>`)}`;
+      const placeholderImg = isVideo ? null : aiImagePlaceholder;
       const placeholderVideo = isVideo ? 'https://www.w3schools.com/html/mov_bbb.mp4' : null;
 
       const newNode = {
@@ -126,6 +127,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           description: genPrompt || `Generated from ${data.title}`,
           image: placeholderImg,
           video: placeholderVideo,
+          isGenerated: true,
           setGlobalNodes: data.setGlobalNodes,
           setGlobalEdges: data.setGlobalEdges
         }
@@ -144,6 +146,8 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       setGenRefs([]);
     }, 2000);
   };
+  const isParentCollapsed = data.isParentCollapsed === true;
+
   return (
     <div 
       ref={cardRef}
@@ -159,8 +163,12 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         boxShadow: data.isHighlighted 
           ? '0 0 30px rgba(75, 94, 250, 0.8), inset 0 0 10px rgba(75, 94, 250, 0.5)' 
           : (selected ? '0 0 25px rgba(76, 92, 255, 0.6), 0 4px 30px rgba(0, 0, 0, 0.2)' : '0 4px 30px rgba(0, 0, 0, 0.1)'),
-        transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) ${data.isHighlighted ? 'scale(1.05)' : (selected ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)')}`,
-        transition: tilt.x === 0 && tilt.y === 0 ? 'all 0.5s ease' : 'transform 0.1s ease-out, box-shadow 0.5s ease, border-color 0.5s ease'
+        opacity: isParentCollapsed ? 0 : 1,
+        pointerEvents: isParentCollapsed ? 'none' : 'auto',
+        transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) ${isParentCollapsed ? `translate(${data.parentOffsetX || 0}px, ${data.parentOffsetY || 0}px) scale(0.1)` : (data.isHighlighted ? 'scale(1.05)' : (selected ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)'))}`,
+        transition: isParentCollapsed 
+          ? 'all 0.6s cubic-bezier(0.25, 1, 0.5, 1)' 
+          : (tilt.x === 0 && tilt.y === 0 ? 'all 0.5s ease' : 'transform 0.1s ease-out, box-shadow 0.5s ease, border-color 0.5s ease, opacity 0.5s ease')
       }}
     >
       <Handle type="target" position={Position.Left} isConnectable={isConnectable} style={{ background: 'var(--bg-color)', border: '2px solid var(--accent-neon)' }} />
@@ -247,12 +255,14 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               {data.isCollapsed ? '+' : '−'}
             </button>
           )}
-          {isEditMode && (
+          {(isEditMode || data.isGenerated) && (
             <button 
               onClick={handleDeleteInitiate}
               style={{ 
-                background: 'rgba(255,50,50,0.15)', border: 'none', color: '#ff8888', borderRadius: '6px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '18px', transition: 'all 0.2s ease'
+                background: 'rgba(255,50,50,0.15)', border: '1px solid rgba(255,80,80,0.25)', color: '#ff8888', borderRadius: '6px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '18px', transition: 'all 0.2s ease'
               }}
+              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255,50,50,0.35)'; e.currentTarget.style.color = '#fff'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255,50,50,0.15)'; e.currentTarget.style.color = '#ff8888'; }}
               title="Delete Node"
             >
               ×

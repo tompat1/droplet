@@ -778,37 +778,76 @@ export default function HeroCanvas() {
       setCollapsedBranches(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
-    setNodes((nds) => nds.map(node => {
-      let hidden = false;
-      if (node.id.startsWith('ad-') && collapsedBranches['6']) hidden = true;
-      if (node.id.startsWith('wild-') && collapsedBranches['7']) hidden = true;
-      if (node.id.startsWith('shot-') && collapsedBranches['9']) hidden = true;
-      if (node.id.startsWith('video-') && collapsedBranches['3']) hidden = true;
-      
-      const canCollapse = ['3', '6', '7', '9'].includes(node.id);
-      
-      return { 
-        ...node, 
-        hidden,
-        data: {
-          ...node.data,
-          canCollapse,
-          isCollapsed: collapsedBranches[node.id] || false,
-          onToggleCollapse: handleToggle,
-          setGlobalNodes: setNodes,
-          setGlobalEdges: setEdges,
-          isEditMode
+    setNodes((nds) => {
+      const parentPositions = {};
+      nds.forEach(n => {
+        if (['3', '6', '7', '9'].includes(n.id)) {
+          parentPositions[n.id] = n.position;
         }
-      };
-    }));
+      });
+
+      return nds.map(node => {
+        let isParentCollapsed = false;
+        let parentId = null;
+        
+        if (node.id.startsWith('ad-')) {
+          parentId = '6';
+          if (collapsedBranches['6']) isParentCollapsed = true;
+        } else if (node.id.startsWith('wild-')) {
+          parentId = '7';
+          if (collapsedBranches['7']) isParentCollapsed = true;
+        } else if (node.id.startsWith('shot-')) {
+          parentId = '9';
+          if (collapsedBranches['9']) isParentCollapsed = true;
+        } else if (node.id.startsWith('video-') && node.id !== '3') {
+          parentId = '3';
+          if (collapsedBranches['3']) isParentCollapsed = true;
+        }
+        
+        let parentOffsetX = 0;
+        let parentOffsetY = 0;
+        if (parentId && parentPositions[parentId]) {
+          parentOffsetX = parentPositions[parentId].x - node.position.x;
+          parentOffsetY = parentPositions[parentId].y - node.position.y;
+        }
+
+        const canCollapse = ['3', '6', '7', '9'].includes(node.id);
+        
+        return { 
+          ...node, 
+          hidden: false,
+          data: {
+            ...node.data,
+            canCollapse,
+            isCollapsed: collapsedBranches[node.id] || false,
+            isParentCollapsed,
+            parentOffsetX,
+            parentOffsetY,
+            onToggleCollapse: handleToggle,
+            setGlobalNodes: setNodes,
+            setGlobalEdges: setEdges,
+            isEditMode
+          }
+        };
+      });
+    });
     
     setEdges((eds) => eds.map(edge => {
-      let hidden = false;
-      if (edge.target.startsWith('ad-') && collapsedBranches['6']) hidden = true;
-      if (edge.target.startsWith('wild-') && collapsedBranches['7']) hidden = true;
-      if (edge.target.startsWith('shot-') && collapsedBranches['9']) hidden = true;
-      if (edge.target.startsWith('video-') && collapsedBranches['3']) hidden = true;
-      return { ...edge, hidden };
+      let isParentCollapsed = false;
+      if (edge.target.startsWith('ad-') && collapsedBranches['6']) isParentCollapsed = true;
+      if (edge.target.startsWith('wild-') && collapsedBranches['7']) isParentCollapsed = true;
+      if (edge.target.startsWith('shot-') && collapsedBranches['9']) isParentCollapsed = true;
+      if (edge.target.startsWith('video-') && collapsedBranches['3']) isParentCollapsed = true;
+      return { 
+        ...edge, 
+        hidden: false,
+        style: {
+          ...edge.style,
+          opacity: isParentCollapsed ? 0 : 1,
+          transition: 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+          pointerEvents: isParentCollapsed ? 'none' : 'auto'
+        }
+      };
     }));
   }, [collapsedBranches, setNodes, setEdges, isEditMode]);
 
