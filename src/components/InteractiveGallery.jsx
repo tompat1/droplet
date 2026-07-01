@@ -10,7 +10,7 @@ gsap.registerPlugin(ScrollTrigger);
 const BackgroundLines = () => {
   const lineColors = ['#4B5EFA', '#ff00ff', '#00ffcc', '#FF5B24'];
   return (
-    <div style={{ position: 'absolute', left: '5vw', right: '5vw', top: 0, bottom: 0, pointerEvents: 'none', zIndex: 0 }}>
+    <div style={{ position: 'absolute', left: '5vw', right: '5vw', top: 0, bottom: 0, pointerEvents: 'none', zIndex: -1 }}>
       {/* Desktop: 4 Lines */}
       <div className="gallery-lines-desktop" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
         {/* Branching SVG */}
