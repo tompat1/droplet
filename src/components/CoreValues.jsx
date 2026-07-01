@@ -3,19 +3,23 @@ import React, { useState, useEffect, useRef } from 'react';
 const values = [
   {
     title: "Content is King",
-    description: "With Droplet's powerful asset creation, management, and Brand truth you will always deliver, in no-time."
+    description: "With Droplet's powerful asset creation, management, and Brand truth you will always deliver, in no-time.",
+    bgImage: "/assets/value_bg/value_bg_1.webp"
   },
   {
     title: "Context is King",
-    description: "One single point of truth for all assets in any form. Always."
+    description: "One single point of truth for all assets in any form. Always.",
+    bgImage: "/assets/value_bg/value_bg_2.webp"
   },
   {
     title: "Continuity is King",
-    description: "All the same, all the way, brand delivery in a predictable way, whether brand color, typography, styling or anything brand related. Always true to brand."
+    description: "All the same, all the way, brand delivery in a predictable way, whether brand color, typography, styling or anything brand related. Always true to brand.",
+    bgImage: "/assets/value_bg/value_bg_3.webp"
   },
   {
     title: "Cut the Noise",
-    description: "Remove the hallucinations and only work with brand trust and brand approval within your own quality-approved context."
+    description: "Remove the hallucinations and only work with brand trust and brand approval within your own quality-approved context.",
+    bgImage: "/assets/value_bg/value_bg_4.webp"
   }
 ];
 
@@ -153,6 +157,21 @@ export default function CoreValues() {
         padding: '0 5%'
       }}>
         
+        {/* Full Section Backgrounds */}
+        {values.map((val, idx) => (
+          <div 
+            key={`bg-${idx}`}
+            style={{
+              position: 'absolute',
+              top: 0, left: 0, width: '100%', height: '100%',
+              background: `linear-gradient(rgba(5, 5, 5, 0.5), rgba(5, 5, 5, 0.5)), url(${val.bgImage}) center/cover no-repeat`,
+              opacity: activeIndex === idx ? 1 : 0,
+              transition: 'opacity 1s ease-in-out',
+              zIndex: -1,
+              pointerEvents: 'none'
+            }}
+          />
+        ))}
         {/* MOBILE SPINE: Straight down the middle */}
         <div className="core-value-spine mobile-spine" style={{
           position: 'absolute', top: 0, bottom: 0, left: '50%', transform: 'translateX(-50%)',
@@ -219,7 +238,9 @@ export default function CoreValues() {
                     borderRadius: '24px', 
                     boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
                     border: '1px solid rgba(255,255,255,0.05)',
-                    background: '#0a0a0a', /* Solid dark background to hide the line */
+                    background: 'rgba(20, 20, 20, 0.6)', 
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
                     transform: 'translateZ(0)',
                     backfaceVisibility: 'hidden'
                   }}>
