@@ -183,12 +183,12 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           ) : (
             <h3 
               onClick={(e) => {
-                if (isEditMode) {
+                if (isEditMode || data.isGenerated) {
                   e.stopPropagation();
                   setIsEditingTitle(true);
                 }
               }} 
-              style={{ fontSize: '20px', marginBottom: '4px', cursor: isEditMode ? 'text' : 'default' }}
+              style={{ fontSize: '20px', marginBottom: '4px', cursor: (isEditMode || data.isGenerated) ? 'text' : 'default' }}
             >
               {data.title || 'Add title...'}
             </h3>
@@ -202,12 +202,12 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           ) : (
             <div 
               onClick={(e) => { 
-                if (isEditMode) {
+                if (isEditMode || data.isGenerated) {
                   e.stopPropagation(); 
                   setIsEditingSubtitle(true); 
                 }
               }}
-              style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', cursor: isEditMode ? 'text' : 'default', minHeight: '16px' }}
+              style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', cursor: (isEditMode || data.isGenerated) ? 'text' : 'default', minHeight: '16px' }}
             >{data.subtitle || 'Add subtitle...'}</div>
           )}
         </div>
