@@ -144,17 +144,13 @@ const NodeSearch = () => {
     return () => window.removeEventListener('customTagsUpdated', handleTagsUpdate);
   }, []);
 
-  const handleSearchChange = (e) => {
-    const val = e.target.value;
-    setSearchTerm(val);
-    
-    if (val.trim() === '') {
+  useEffect(() => {
+    if (searchTerm.trim() === '') {
       setSuggestions([]);
-      setShowSuggestions(true);
       return;
     }
 
-    const term = val.toLowerCase().replace(/[-_]/g, ' ');
+    const term = searchTerm.toLowerCase().replace(/[-_]/g, ' ');
     const nodes = getNodes();
     
     const nodeMatches = nodes.filter(n => 
@@ -178,6 +174,10 @@ const NodeSearch = () => {
     }).map(g => ({ ...g, searchType: 'gallery' }));
 
     setSuggestions([...nodeMatches, ...galleryMatches]);
+  }, [searchTerm, assetTags, getNodes]);
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
     setShowSuggestions(true);
   };
 
@@ -312,7 +312,7 @@ const NodeSearch = () => {
                         key={tag}
                         onClick={() => {
                           setSearchTerm(tag);
-                          // It will trigger search automatically because searchTerm changes
+                          setShowSuggestions(true);
                         }}
                         style={{
                           padding: '4px 10px',
