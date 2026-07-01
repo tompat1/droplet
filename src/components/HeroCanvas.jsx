@@ -727,12 +727,7 @@ export default function HeroCanvas() {
   const [collapsedBranches, setCollapsedBranches] = useState({});
   const [isEditMode, setIsEditMode] = useState(false);
   
-  const [interactionMode, setInteractionMode] = useState(() => {
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      return window.matchMedia('(hover: none) and (pointer: coarse)').matches ? 'pan' : 'select';
-    }
-    return 'select';
-  });
+  const [interactionMode, setInteractionMode] = useState('pan');
 
   useEffect(() => {
     const handleToggle = (id) => {
@@ -822,7 +817,7 @@ export default function HeroCanvas() {
         </div>
       )}
       
-      <div ref={containerRef} style={{ width: '100%', height: isFullscreen ? '100vh' : '72vh', position: 'relative', backgroundColor: isFullscreen ? '#050505' : 'transparent' }}>
+      <div ref={containerRef} style={{ width: '100%', minHeight: '500px', height: isFullscreen ? '100vh' : 'calc(100vh - 240px)', position: 'relative', backgroundColor: isFullscreen ? '#050505' : 'transparent' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -832,7 +827,7 @@ export default function HeroCanvas() {
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ nodes: [{ id: '1' }, { id: '2' }], padding: 0.3 }}
+        fitViewOptions={{ nodes: [{ id: '1' }, { id: '2' }], maxZoom: 0.5, minZoom: 0.5 }}
         selectionMode="partial"
         panOnDrag={interactionMode === 'pan'}
         selectionOnDrag={interactionMode === 'select'}
