@@ -273,7 +273,7 @@ const NodeSearch = () => {
           </button>
         )}
         
-        {showSuggestions && (searchTerm.trim() !== '' ? true : searchHistory.length > 0) && (
+        {showSuggestions && (
           <div style={{
             position: 'absolute',
             top: '100%',
@@ -301,8 +301,50 @@ const NodeSearch = () => {
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px'
                 }}>
-                  Recent Searches
+                  Explore Tags
                 </div>
+                <div style={{ padding: '12px 16px', display: 'flex', flexWrap: 'wrap', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                  {(() => {
+                    const stored = localStorage.getItem('gallery-available-tags');
+                    const tags = stored ? JSON.parse(stored) : ['apparel', 'merch', 'video', 'neon', 'mockup', 'social'];
+                    return tags.map(tag => (
+                      <span 
+                        key={tag}
+                        onClick={() => {
+                          setSearchTerm(tag);
+                          // It will trigger search automatically because searchTerm changes
+                        }}
+                        style={{
+                          padding: '4px 10px',
+                          background: 'rgba(75, 94, 250, 0.2)',
+                          color: 'var(--accent-blue)',
+                          borderRadius: '12px',
+                          fontSize: '0.8rem',
+                          cursor: 'pointer',
+                          border: '1px solid rgba(75, 94, 250, 0.4)',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(75, 94, 250, 0.4)'; e.currentTarget.style.color = '#fff'; }}
+                        onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(75, 94, 250, 0.2)'; e.currentTarget.style.color = 'var(--accent-blue)'; }}
+                      >
+                        #{tag}
+                      </span>
+                    ));
+                  })()}
+                </div>
+                {searchHistory.length > 0 && (
+                  <>
+                    <div style={{ 
+                      padding: '8px 16px', 
+                      fontSize: '0.75rem', 
+                      color: 'rgba(255,255,255,0.5)', 
+                      borderBottom: '1px solid rgba(255,255,255,0.1)',
+                      background: 'rgba(0,0,0,0.2)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Recent Searches
+                    </div>
                 <div style={{ overflowY: 'auto', flex: 1 }}>
                   {searchHistory.map((item, index) => (
                     <div 
@@ -344,6 +386,8 @@ const NodeSearch = () => {
                     </div>
                   ))}
                 </div>
+                </>
+                )}
               </>
             ) : (
               <>
