@@ -805,19 +805,17 @@ export default function HeroCanvas() {
   return (
     <div id="hero-canvas-section" style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
       {!isFullscreen && (
-        <div style={{ padding: '40px 5% 0 5%', zIndex: 10 }}>
-          <h1 style={{ fontSize: '3.5rem', marginBottom: '10px', whiteSpace: 'nowrap' }}>
+        <div style={{ padding: '20px 5% 0 5%', zIndex: 10, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: '40px' }}>
+          <h1 style={{ fontSize: '3.5rem', margin: 0, whiteSpace: 'nowrap' }}>
             Fluid <span className="text-gradient">Node Canvas</span>
           </h1>
-          <div className="glass-panel" style={{ width: 'max-content', maxWidth: '800px', padding: '24px', borderRadius: '16px', fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', lineHeight: '1.6' }}>
-            <p style={{ margin: 0 }}>
-              Navigate the Droplet ecosystem through our interactive, physics-based graph. Pan, zoom, and explore connections dynamically.
-            </p>
-          </div>
+          <p style={{ margin: 0, fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', lineHeight: '1.6', maxWidth: '650px', textAlign: 'left' }}>
+            Navigate the Droplet ecosystem through our interactive, physics-based graph. Pan, zoom, and explore <span style={{ fontWeight: 'bold', color: '#FF6A00' }}>connections dynamically.</span>
+          </p>
         </div>
       )}
       
-      <div ref={containerRef} style={{ width: '100%', minHeight: '500px', height: isFullscreen ? '100vh' : 'calc(100vh - 240px)', position: 'relative', backgroundColor: isFullscreen ? '#050505' : 'transparent' }}>
+      <div ref={containerRef} style={{ width: '100%', minHeight: '500px', height: isFullscreen ? '100vh' : 'calc(100vh - 120px)', position: 'relative', backgroundColor: isFullscreen ? '#050505' : 'transparent', marginTop: '20px' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}

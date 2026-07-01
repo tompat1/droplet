@@ -57,7 +57,7 @@ export default function Overhero() {
           boxShadow: '0 12px 40px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.1)' 
         }}>
           <p style={{ margin: 0, fontWeight: 300 }}>
-            From one origin logo to a full brand universe: guides, mockups, videos, merch, and campaign assets, ready whenever your brand needs them. <span style={{ fontWeight: 500, color: '#fff' }}>Endless possibilities.</span>
+            From one origin logo to a full brand universe: guides, mockups, videos, merch, and campaign assets, ready whenever your brand needs them. <span style={{ fontWeight: 500, color: '#FF6A00' }}>Endless possibilities.</span>
           </p>
         </div>
       </div>
