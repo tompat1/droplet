@@ -88,18 +88,20 @@ function DockedHandle({ side, playing, onClick }) {
       <div style={pulseStyle}>
         {bars.map((h, i) => (
           <div key={i} style={{
-            width: isVertical ? '4px' : `${h * 100}%`,
-            height: isVertical ? `${h * 24}px` : '4px',
-            minWidth: isVertical ? 'auto' : '6px',
-            minHeight: isVertical ? '6px' : 'auto',
+            width: isVertical ? `${h * 24}px` : '4px',
+            height: isVertical ? '4px' : `${h * 24}px`,
             borderRadius: '2px',
             background: playing
-              ? `linear-gradient(${isVertical ? 'to bottom' : 'to right'}, #00ff41, #aaff00)`
+              ? `linear-gradient(${isVertical ? 'to right' : 'to top'}, #00ff41, #aaff00)`
               : 'rgba(0,255,65,0.2)',
+            transformOrigin: isVertical 
+                ? (side === 'left' ? 'left center' : 'right center') 
+                : (side === 'top' ? 'center top' : 'center bottom'),
+            transform: playing ? 'none' : `scale${isVertical ? 'X' : 'Y'}(0.3)`,
             animation: playing
-              ? `${isVertical ? 'eqW' : 'eqH'}${i % 5} ${0.5 + i * 0.15}s ease-in-out ${i * 0.1}s infinite alternate`
+              ? `eqScale${isVertical ? 'X' : 'Y'}${i % 5} ${0.4 + i * 0.15}s ease-in-out ${i * 0.1}s infinite alternate`
               : 'none',
-            transition: 'background 0.4s ease',
+            transition: 'background 0.4s ease, transform 0.4s ease',
             boxShadow: playing ? '0 0 6px #00ff41' : 'none',
           }} />
         ))}
@@ -109,6 +111,9 @@ function DockedHandle({ side, playing, onClick }) {
           fontFamily: LCD_FONT,
           marginTop: isVertical ? '4px' : 0,
           marginLeft: isVertical ? 0 : '4px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}>
           {arrowMap[side]}
         </span>
@@ -118,16 +123,17 @@ function DockedHandle({ side, playing, onClick }) {
           from { box-shadow: 0 0 10px rgba(0,255,65,0.3); }
           to   { box-shadow: 0 0 24px rgba(0,255,65,0.7), 0 0 48px rgba(0,255,65,0.2); }
         }
-        @keyframes eqH0{from{height:20%}to{height:95%}}
-        @keyframes eqH1{from{height:35%}to{height:80%}}
-        @keyframes eqH2{from{height:15%}to{height:100%}}
-        @keyframes eqH3{from{height:50%}to{height:75%}}
-        @keyframes eqH4{from{height:25%}to{height:90%}}
-        @keyframes eqW0{from{width:20%}to{width:95%}}
-        @keyframes eqW1{from{width:35%}to{width:80%}}
-        @keyframes eqW2{from{width:15%}to{width:100%}}
-        @keyframes eqW3{from{width:50%}to{width:75%}}
-        @keyframes eqW4{from{width:25%}to{width:90%}}
+        @keyframes eqScaleY0{from{transform:scaleY(0.2)}to{transform:scaleY(1)}}
+        @keyframes eqScaleY1{from{transform:scaleY(0.4)}to{transform:scaleY(0.8)}}
+        @keyframes eqScaleY2{from{transform:scaleY(0.15)}to{transform:scaleY(1)}}
+        @keyframes eqScaleY3{from{transform:scaleY(0.5)}to{transform:scaleY(0.75)}}
+        @keyframes eqScaleY4{from{transform:scaleY(0.25)}to{transform:scaleY(0.9)}}
+        
+        @keyframes eqScaleX0{from{transform:scaleX(0.2)}to{transform:scaleX(1)}}
+        @keyframes eqScaleX1{from{transform:scaleX(0.4)}to{transform:scaleX(0.8)}}
+        @keyframes eqScaleX2{from{transform:scaleX(0.15)}to{transform:scaleX(1)}}
+        @keyframes eqScaleX3{from{transform:scaleX(0.5)}to{transform:scaleX(0.75)}}
+        @keyframes eqScaleX4{from{transform:scaleX(0.25)}to{transform:scaleX(0.9)}}
       `}</style>
     </div>
   );
@@ -191,6 +197,7 @@ function Playlist({ tracks, currentIndex, onSelect, isOpen, onToggle }) {
       {/* Toggle row */}
       <button
         onClick={onToggle}
+        title={isOpen ? 'Close Playlist' : 'Open Playlist'}
         style={{
           width: '100%', background: 'rgba(0,255,65,0.04)', border: 'none',
           borderBottom: isOpen ? '1px solid rgba(0,255,65,0.1)' : 'none',
@@ -215,6 +222,7 @@ function Playlist({ tracks, currentIndex, onSelect, isOpen, onToggle }) {
             <div
               key={i}
               onClick={() => onSelect(i)}
+              title={t.title.toUpperCase()}
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
                 padding: '4px 10px', cursor: 'pointer',
@@ -562,8 +570,13 @@ export default function AudioPlayer() {
         {/* ── Minimized strip ── */}
         {isMinimized && (
           <div style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <WinBtn onClick={togglePlay} active={isPlaying}>{isPlaying ? '⏸' : '▶'}</WinBtn>
-            <span style={{ flex: 1, fontSize: '0.62rem', color: '#00ff41', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textShadow: '0 0 5px #00ff41' }}>
+            <WinBtn onClick={togglePlay} active={isPlaying} title={isPlaying ? 'Pause' : 'Play'}>
+              {isPlaying ? '⏸' : '▶'}
+            </WinBtn>
+            <span
+              title={currentTrack ? currentTrack.title.toUpperCase() : ''}
+              style={{ flex: 1, fontSize: '0.62rem', color: '#00ff41', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textShadow: '0 0 5px #00ff41' }}
+            >
               {currentTrack ? currentTrack.title.toUpperCase() : 'NO TRACKS'}
             </span>
             <span style={{ fontSize: '0.6rem', color: '#00aa2c', flexShrink: 0 }}>{fmt(currentTime)}</span>

@@ -49,8 +49,9 @@ const ExitFullscreenIcon = () => (
   </svg>
 );
 
-const MultiSelectHint = () => {
+const MultiSelectHint = ({ interactionMode }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const kbdStyle = { background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace' };
   
   return (
     <Panel position="bottom-left" style={{ margin: '20px', zIndex: 10 }}>
@@ -87,7 +88,10 @@ const MultiSelectHint = () => {
           whiteSpace: 'nowrap',
           fontSize: '0.85rem'
         }}>
-          Drag in the Canvas to multi-select &nbsp;&nbsp;|&nbsp;&nbsp; Hold <kbd style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace' }}>Space</kbd> to move canvas &nbsp;&nbsp;|&nbsp;&nbsp; Scroll in MiniMap to Zoom
+          {interactionMode === 'pan'
+            ? <>Hold <kbd style={kbdStyle}>Shift</kbd> or <kbd style={kbdStyle}>Cmd</kbd> + Drag to multi-select &nbsp;&nbsp;|&nbsp;&nbsp; Drag to pan canvas &nbsp;&nbsp;|&nbsp;&nbsp; Scroll in MiniMap to Zoom</>
+            : <>Drag in the Canvas to multi-select &nbsp;&nbsp;|&nbsp;&nbsp; Hold <kbd style={kbdStyle}>Space</kbd> to move canvas &nbsp;&nbsp;|&nbsp;&nbsp; Scroll in MiniMap to Zoom</>
+          }
         </div>
       </div>
     </Panel>
@@ -976,7 +980,7 @@ export default function HeroCanvas() {
             </div>
           </div>
         </Panel>
-        <MultiSelectHint />
+        <MultiSelectHint interactionMode={interactionMode} />
         <NodeSearch />
         <MiniMap 
           position="bottom-right"

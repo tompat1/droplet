@@ -5,18 +5,23 @@
     "src": "/assets/audio/Ambient House with Ethereal Vocals.mp3"
   },
   {
-    "filename": "Jagged Edge.mp3",
-    "title": "Jagged Edge",
-    "src": "/assets/audio/Jagged Edge.mp3"
+    "filename": "Deep Pulse (Acid Edit).mp3",
+    "title": "Deep Pulse (Acid Edit)",
+    "src": "/assets/audio/Deep Pulse (Acid Edit).mp3"
   },
   {
-    "filename": "Signal Fires (Synth Solo Edit).mp3",
-    "title": "Signal Fires (Synth Solo Edit)",
-    "src": "/assets/audio/Signal Fires (Synth Solo Edit).mp3"
+    "filename": "Deep Pulse (Vocal Edit).mp3",
+    "title": "Deep Pulse (Vocal Edit)",
+    "src": "/assets/audio/Deep Pulse (Vocal Edit).mp3"
   },
   {
-    "filename": "Total Overdrive (Remix).mp3",
-    "title": "Total Overdrive (Remix)",
-    "src": "/assets/audio/Total Overdrive (Remix).mp3"
+    "filename": "Steel Rhythm (Extended).mp3",
+    "title": "Steel Rhythm (Extended)",
+    "src": "/assets/audio/Steel Rhythm (Extended).mp3"
+  },
+  {
+    "filename": "Steel Rhythm.mp3",
+    "title": "Steel Rhythm",
+    "src": "/assets/audio/Steel Rhythm.mp3"
   }
 ]
