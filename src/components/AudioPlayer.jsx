@@ -376,7 +376,8 @@ export default function AudioPlayer() {
 
   const selectTrack = (i) => {
     setTrackIndex(i);
-    if (isPlaying) setTimeout(() => audioRef.current?.play(), 50);
+    setIsPlaying(true);
+    setTimeout(() => audioRef.current?.play().catch(() => {}), 50);
   };
 
   /* ── Drag ── */
