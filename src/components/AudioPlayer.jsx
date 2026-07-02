@@ -535,7 +535,19 @@ export default function AudioPlayer() {
                 </div>
               </div>
               <Marquee text={currentTrack ? currentTrack.title : 'NO TRACKS — ADD .MP3 TO /public/assets/audio/'} playing={isPlaying} />
-              <div style={{ marginTop: '6px' }}><EQBars playing={isPlaying} /></div>
+              <div style={{ marginTop: '6px', display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+                <div style={{ flexGrow: 1 }}>
+                  <EQBars playing={isPlaying} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'right', paddingBottom: '2px' }}>
+                  <span style={{ fontSize: '0.55rem', color: isPlaying ? '#00ff41' : '#00aa2c', fontFamily: LCD_FONT, letterSpacing: '0.05em', textShadow: isPlaying ? '0 0 4px #00ff41' : 'none' }}>
+                    {hasTracks ? '320 KBPS' : '--- KBPS'}
+                  </span>
+                  <span style={{ fontSize: '0.55rem', color: isPlaying ? '#00ff41' : '#00aa2c', fontFamily: LCD_FONT, letterSpacing: '0.05em', textShadow: isPlaying ? '0 0 4px #00ff41' : 'none' }}>
+                    {hasTracks ? '44 KHZ' : '-- KHZ'}
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* ── Seek ── */}
@@ -552,33 +564,46 @@ export default function AudioPlayer() {
                 title={isMuted ? 'Unmute' : 'Mute'}
                 style={{
                   background: isMuted ? 'rgba(255,80,0,0.2)' : 'none',
-                  border: `1px solid ${isMuted ? 'rgba(255,80,0,0.5)' : 'rgba(255,255,255,0.12)'}`,
-                  color: isMuted ? '#ff5000' : '#888', borderRadius: '3px',
-                  cursor: 'pointer', fontSize: '0.6rem', padding: '2px 5px',
+                  border: `1px solid ${isMuted ? 'rgba(255,80,0,0.5)' : 'rgba(0,255,65,0.3)'}`,
+                  color: isMuted ? '#ff5000' : '#00aa2c', borderRadius: '3px',
+                  cursor: 'pointer', fontSize: '0.55rem', padding: '2px 6px',
                   letterSpacing: '0.05em', transition: 'all 0.2s', flexShrink: 0,
+                  fontWeight: 'bold', fontFamily: LCD_FONT,
                 }}
+                onMouseOver={e => { if(!isMuted) { e.currentTarget.style.color = '#00ff41'; e.currentTarget.style.borderColor = 'rgba(0,255,65,0.8)'; e.currentTarget.style.boxShadow = '0 0 4px rgba(0,255,65,0.3)'; } }}
+                onMouseOut={e => { if(!isMuted) { e.currentTarget.style.color = '#00aa2c'; e.currentTarget.style.borderColor = 'rgba(0,255,65,0.3)'; e.currentTarget.style.boxShadow = 'none'; } }}
               >
-                {isMuted ? '🔇' : '🔊'}
+                {isMuted ? 'MUTED' : 'MUTE'}
               </button>
             </div>
 
             {/* ── Transport ── */}
             <div style={{ padding: '4px 8px 4px', display: 'flex', gap: '4px', justifyContent: 'center' }}>
-              <WinBtn onClick={prev} title="Previous">⏮ PREV</WinBtn>
               <WinBtn onClick={togglePlay} title={isPlaying ? 'Pause' : 'Play'} active={isPlaying}>
-                {isPlaying ? '⏸ PAUS' : '▶ PLAY'}
+                <span style={{ fontSize: '0.85rem' }}>{isPlaying ? '⏸' : '▶'}</span>
+                {isPlaying ? 'PAUS' : 'PLAY'}
               </WinBtn>
-              <WinBtn onClick={stop} title="Stop">⏹ STOP</WinBtn>
-              <WinBtn onClick={next} title="Next">NEXT ⏭</WinBtn>
+              <WinBtn onClick={stop} title="Stop">
+                <span style={{ fontSize: '0.85rem' }}>⏹</span>
+                STOP
+              </WinBtn>
+              <WinBtn onClick={prev} title="Previous">
+                <span style={{ fontSize: '0.85rem' }}>⏮</span>
+                PREV
+              </WinBtn>
+              <WinBtn onClick={next} title="Next">
+                <span style={{ fontSize: '0.85rem' }}>⏭</span>
+                NEXT
+              </WinBtn>
             </div>
 
             {/* ── Mode toggles (above playlist) ── */}
             <div style={{ padding: '4px 8px', display: 'flex', gap: '4px' }}>
               <WinBtn onClick={() => setShuffle(s => !s)} title="Shuffle" active={shuffle}>
-                {shuffle ? '🔀 SHF ON' : '🔀 SHF'}
+                {shuffle ? 'SHUFFLE ON' : 'SHUFFLE OFF'}
               </WinBtn>
               <WinBtn onClick={() => setRepeat(r => !r)} title="Repeat one" active={repeat}>
-                {repeat ? '🔁 REP ON' : '🔁 REP'}
+                {repeat ? 'REPEAT ON' : 'REPEAT OFF'}
               </WinBtn>
             </div>
 
