@@ -43,7 +43,7 @@ function EQBars({ playing, count = 20, height = 28 }) {
 }
 
 /* ─── Docked Edge Handle ─── */
-function DockedHandle({ side, playing, onClick }) {
+function DockedHandle({ side, playing, onClick, onPrev, onNext }) {
   const isVertical = side === 'left' || side === 'right';
   const bars = [0.5, 0.8, 1.0, 0.7, 0.6];
 
@@ -52,11 +52,24 @@ function DockedHandle({ side, playing, onClick }) {
     flexDirection: isVertical ? 'column' : 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '3px',
-    padding: '10px 6px',
+    gap: '4px',
+    padding: '8px 6px',
   };
 
   const arrowMap = { left: '›', right: '‹', top: '↓', bottom: '↑' };
+  
+  const handleAction = (action, e) => {
+    e.stopPropagation();
+    action();
+  };
+
+  const btnStyle = {
+    background: 'none', border: 'none', color: '#00aa2c', cursor: 'pointer',
+    fontSize: '0.45rem', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'color 0.2s, text-shadow 0.2s', outline: 'none'
+  };
+  const hoverOn = (e) => { e.currentTarget.style.color = '#00ff41'; e.currentTarget.style.textShadow = '0 0 6px #00ff41'; };
+  const hoverOff = (e) => { e.currentTarget.style.color = '#00aa2c'; e.currentTarget.style.textShadow = 'none'; };
 
   return (
     <div
@@ -86,6 +99,15 @@ function DockedHandle({ side, playing, onClick }) {
       }}
     >
       <div style={pulseStyle}>
+        <button
+          title="Previous Track"
+          onClick={(e) => handleAction(onPrev, e)}
+          onMouseOver={hoverOn} onMouseOut={hoverOff}
+          style={btnStyle}
+        >
+          {isVertical ? '▲' : '◀'}
+        </button>
+
         {bars.map((h, i) => (
           <div key={i} style={{
             width: isVertical ? `${h * 24}px` : '4px',
@@ -105,12 +127,22 @@ function DockedHandle({ side, playing, onClick }) {
             boxShadow: playing ? '0 0 6px #00ff41' : 'none',
           }} />
         ))}
+
+        <button
+          title="Next Track"
+          onClick={(e) => handleAction(onNext, e)}
+          onMouseOver={hoverOn} onMouseOut={hoverOff}
+          style={btnStyle}
+        >
+          {isVertical ? '▼' : '▶'}
+        </button>
+
         <span style={{
           fontSize: '0.6rem',
           color: 'rgba(0,255,65,0.5)',
           fontFamily: LCD_FONT,
-          marginTop: isVertical ? '4px' : 0,
-          marginLeft: isVertical ? 0 : '4px',
+          marginTop: isVertical ? '2px' : 0,
+          marginLeft: isVertical ? 0 : '2px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -404,7 +436,7 @@ export default function AudioPlayer() {
     return (
       <>
         {currentTrack && <audio ref={audioRef} preload="auto" />}
-        <DockedHandle side={docked} playing={isPlaying} onClick={() => setDocked(null)} />
+        <DockedHandle side={docked} playing={isPlaying} onClick={() => setDocked(null)} onPrev={prev} onNext={next} />
       </>
     );
   }
