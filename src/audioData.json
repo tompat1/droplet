@@ -15,13 +15,23 @@
     "src": "/assets/audio/Deep Pulse (Vocal Edit).mp3"
   },
   {
+    "filename": "Midnight Echoes.mp3",
+    "title": "Midnight Echoes",
+    "src": "/assets/audio/Midnight Echoes.mp3"
+  },
+  {
     "filename": "Steel Rhythm (Extended).mp3",
     "title": "Steel Rhythm (Extended)",
     "src": "/assets/audio/Steel Rhythm (Extended).mp3"
   },
   {
-    "filename": "Steel Rhythm.mp3",
-    "title": "Steel Rhythm",
-    "src": "/assets/audio/Steel Rhythm.mp3"
+    "filename": "Stellar Pulse (Vocal Version) - Seamless Flow.mp3",
+    "title": "Stellar Pulse (Vocal Version)   Seamless Flow",
+    "src": "/assets/audio/Stellar Pulse (Vocal Version) - Seamless Flow.mp3"
+  },
+  {
+    "filename": "Stellar Pulse.mp3",
+    "title": "Stellar Pulse",
+    "src": "/assets/audio/Stellar Pulse.mp3"
   }
 ]
