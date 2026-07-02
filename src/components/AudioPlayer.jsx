@@ -55,8 +55,6 @@ function DockedHandle({ side, playing, onClick, onPrev, onNext }) {
     gap: '4px',
     padding: '8px 6px',
   };
-
-  const arrowMap = { left: '›', right: '‹', top: '↓', bottom: '↑' };
   
   const handleAction = (action, e) => {
     e.stopPropagation();
@@ -64,12 +62,20 @@ function DockedHandle({ side, playing, onClick, onPrev, onNext }) {
   };
 
   const btnStyle = {
-    background: 'none', border: 'none', color: '#00aa2c', cursor: 'pointer',
-    fontSize: '0.45rem', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    transition: 'color 0.2s, text-shadow 0.2s', outline: 'none'
+    background: 'none', border: 'none', color: '#FF6A00', cursor: 'pointer',
+    fontSize: '0.75rem', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'color 0.2s, text-shadow 0.2s, transform 0.2s', outline: 'none'
   };
-  const hoverOn = (e) => { e.currentTarget.style.color = '#00ff41'; e.currentTarget.style.textShadow = '0 0 6px #00ff41'; };
-  const hoverOff = (e) => { e.currentTarget.style.color = '#00aa2c'; e.currentTarget.style.textShadow = 'none'; };
+  const hoverOn = (e) => { 
+    e.currentTarget.style.color = '#ffffff'; 
+    e.currentTarget.style.textShadow = '0 0 8px #FF6A00'; 
+    e.currentTarget.style.transform = 'scale(1.1)';
+  };
+  const hoverOff = (e) => { 
+    e.currentTarget.style.color = '#FF6A00'; 
+    e.currentTarget.style.textShadow = 'none'; 
+    e.currentTarget.style.transform = 'scale(1)';
+  };
 
   return (
     <div
@@ -137,18 +143,6 @@ function DockedHandle({ side, playing, onClick, onPrev, onNext }) {
           {isVertical ? '▼' : '▶'}
         </button>
 
-        <span style={{
-          fontSize: '0.6rem',
-          color: 'rgba(0,255,65,0.5)',
-          fontFamily: LCD_FONT,
-          marginTop: isVertical ? '2px' : 0,
-          marginLeft: isVertical ? 0 : '2px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          {arrowMap[side]}
-        </span>
       </div>
       <style>{`
         @keyframes handleBreath {
