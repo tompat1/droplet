@@ -3,6 +3,7 @@ import ConnectorLine from './components/ConnectorLine';
 import InteractiveGallery from './components/InteractiveGallery';
 import CallToAction from './components/CallToAction';
 import Preloader from './components/Preloader';
+import AudioPlayer from './components/AudioPlayer';
 
 import Overhero from './components/Overhero';
 import CoreValues from './components/CoreValues';
@@ -14,6 +15,7 @@ function App() {
   return (
     <>
       <Preloader />
+      <AudioPlayer />
       <div className="app-background" style={{ zIndex: -4 }}></div>
       {/* Background Video */}
       <video

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import gsap from 'gsap';
 import assetFiles from '../assetsData.json';
+import audioTracks from '../audioData.json';
 
 export default function Preloader() {
   const [progress, setProgress] = useState(0);
@@ -19,8 +20,8 @@ export default function Preloader() {
   }, []);
 
   useEffect(() => {
-    const totalDuration = 5000; // 5 seconds
-    const intervalTime = 50; // update every 50ms
+    const totalDuration = 5000;
+    const intervalTime = 50;
     const totalSteps = totalDuration / intervalTime;
     let currentStep = 0;
     let timer;
@@ -28,32 +29,31 @@ export default function Preloader() {
     const interval = setInterval(() => {
       currentStep++;
       const currentProgress = (currentStep / totalSteps) * 100;
-      
+
       if (currentProgress >= 100) {
         setProgress(100);
         setCurrentFile('System ready.');
         clearInterval(interval);
-        
+
         timer = setTimeout(() => {
           if (containerRef.current) {
             gsap.to(containerRef.current, {
               opacity: 0,
               duration: 1,
               ease: 'power2.inOut',
-              onComplete: () => setIsVisible(false)
+              onComplete: () => setIsVisible(false),
             });
           }
         }, 500);
       } else {
         setProgress(currentProgress);
-        // Map progress percentage to an index in the allAssets array
         const assetIndex = Math.floor((currentProgress / 100) * allAssets.length);
         if (allAssets[assetIndex]) {
           setCurrentFile(`Loading: ${allAssets[assetIndex]}`);
         }
       }
     }, intervalTime);
-    
+
     return () => {
       clearInterval(interval);
       if (timer) clearTimeout(timer);
@@ -63,7 +63,7 @@ export default function Preloader() {
   if (!isVisible) return null;
 
   return (
-    <div 
+    <div
       ref={containerRef}
       style={{
         position: 'fixed',
@@ -79,7 +79,7 @@ export default function Preloader() {
         backgroundColor: '#050505',
       }}
     >
-      <div 
+      <div
         className="preloader-bg"
         style={{
           position: 'absolute',
@@ -88,47 +88,55 @@ export default function Preloader() {
           width: '100%',
           height: '100%',
           zIndex: 1,
-          opacity: 0.8 // slight dim so the text is visible
+          opacity: 0.8,
         }}
-      ></div>
+      />
 
+      {/* Hidden audio preloads */}
+      <div style={{ display: 'none' }}>
+        {audioTracks.map((t, i) => (
+          <audio key={i} src={t.src} preload="auto" />
+        ))}
+      </div>
+
+      {/* Loading Bar & Progress */}
       <div style={{ zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'absolute', bottom: '25%' }}>
-        <div style={{ 
-          width: '500px', 
+        <div style={{
+          width: '500px',
           maxWidth: '90vw',
-          height: '6px', 
-          background: 'rgba(0,0,0,0.6)', 
+          height: '6px',
+          background: 'rgba(0,0,0,0.6)',
           border: '1px solid rgba(255,255,255,0.1)',
-          overflow: 'hidden', 
+          overflow: 'hidden',
           borderRadius: '6px',
           boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
         }}>
-          <div 
-            style={{ 
-              width: `${progress}%`, 
-              height: '100%', 
+          <div
+            style={{
+              width: `${progress}%`,
+              height: '100%',
               background: 'linear-gradient(90deg, #FF5B24, #FFB347)',
               transition: 'width 0.1s linear',
               boxShadow: '0 0 15px #FF5B24, 0 0 30px #FFB347'
-            }} 
+            }}
           />
         </div>
-        
-        <div style={{ 
-          marginTop: '15px', 
-          fontSize: '1.5rem', 
-          color: '#fff', 
-          fontVariantNumeric: 'tabular-nums', 
+
+        <div style={{
+          marginTop: '15px',
+          fontSize: '1.5rem',
+          color: '#fff',
+          fontVariantNumeric: 'tabular-nums',
           fontWeight: '700',
           textShadow: '0 2px 10px rgba(0,0,0,0.8), 0 0 10px #FF5B24'
         }}>
           {Math.round(progress)}%
         </div>
 
-        <div style={{ 
-          marginTop: '12px', 
-          fontSize: '1rem', 
-          color: 'rgba(255,255,255,0.9)', 
+        <div style={{
+          marginTop: '12px',
+          fontSize: '1rem',
+          color: 'rgba(255,255,255,0.9)',
           fontFamily: 'monospace',
           height: '24px',
           overflow: 'hidden',
