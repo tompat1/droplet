@@ -7,7 +7,6 @@ import {
   Background,
   Controls,
   ControlButton,
-  MarkerType,
   Panel,
   useViewport,
   MiniMap,
@@ -129,7 +128,9 @@ const NodeSearch = () => {
     try {
       const stored = localStorage.getItem('gallery-asset-tags');
       if (stored) return JSON.parse(stored);
-    } catch(e) {}
+    } catch(e) {
+      console.warn('Failed to parse asset tags from localStorage:', e);
+    }
     return defaultAssetTags;
   });
 
@@ -138,7 +139,9 @@ const NodeSearch = () => {
       try {
         const stored = localStorage.getItem('gallery-asset-tags');
         if (stored) setAssetTags(JSON.parse(stored));
-      } catch(e) {}
+      } catch(e) {
+        console.warn('Failed to update asset tags from localStorage:', e);
+      }
     };
     window.addEventListener('customTagsUpdated', handleTagsUpdate);
     return () => window.removeEventListener('customTagsUpdated', handleTagsUpdate);
@@ -224,7 +227,6 @@ const NodeSearch = () => {
           placeholder="Search canvas nodes and gallery..."
           value={searchTerm}
           onChange={handleSearchChange}
-          onFocus={() => { if (searchTerm.trim() !== '') setShowSuggestions(true); }}
           style={{
             width: '100%',
             padding: '12px 36px 12px 20px',

@@ -116,7 +116,9 @@ export default function InteractiveGallery() {
         const parsed = JSON.parse(stored);
         return Array.from(new Set([...defaultAvailableTags, ...parsed]));
       }
-    } catch(e) {}
+    } catch(e) {
+      console.warn('Failed to parse available tags from localStorage:', e);
+    }
     return defaultAvailableTags;
   });
 
@@ -124,7 +126,9 @@ export default function InteractiveGallery() {
     try {
       const stored = localStorage.getItem('gallery-asset-tags');
       if (stored) return JSON.parse(stored);
-    } catch(e) {}
+    } catch(e) {
+      console.warn('Failed to parse asset tags from localStorage:', e);
+    }
     return defaultAssetTags;
   });
 

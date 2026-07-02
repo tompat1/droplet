@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Environment, MeshTransmissionMaterial, Float, Sparkles } from '@react-three/drei';
-import * as THREE from 'three';
+
 import gsap from 'gsap';
 
 function ProceduralDroplet() {

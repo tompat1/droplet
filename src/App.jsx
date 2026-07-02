@@ -1,13 +1,14 @@
-import React from 'react';
-import HeroCanvas from './components/HeroCanvas';
+import React, { lazy, Suspense } from 'react';
 import ConnectorLine from './components/ConnectorLine';
 import InteractiveGallery from './components/InteractiveGallery';
-import ThreeScene from './components/ThreeScene';
 import CallToAction from './components/CallToAction';
 import Preloader from './components/Preloader';
 
 import Overhero from './components/Overhero';
 import CoreValues from './components/CoreValues';
+
+const HeroCanvas = lazy(() => import('./components/HeroCanvas'));
+// const ThreeScene = lazy(() => import('./components/ThreeScene'));
 
 function App() {
   return (
@@ -36,14 +37,18 @@ function App() {
       </video>
       
       {/* 3D WebGL Layer (Temporarily Hidden) */}
-      {/* <ThreeScene /> */}
+      {/* <Suspense fallback={null}>
+        <ThreeScene />
+      </Suspense> */}
 
       <main style={{ position: 'relative', zIndex: 1 }}>
         <Overhero />
         <ConnectorLine targetId="core-values" />
         <CoreValues />
         <ConnectorLine targetId="hero-canvas-section" />
-        <HeroCanvas />
+        <Suspense fallback={<div style={{ width: '100%', height: 'calc(100vh - 120px)', minHeight: '500px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '1rem', fontFamily: 'monospace', background: 'rgba(20,20,25,0.2)', borderRadius: '16px', margin: '20px auto', maxWidth: '1600px' }}>Loading Canvas...</div>}>
+          <HeroCanvas />
+        </Suspense>
         <ConnectorLine targetId="asset-gallery" />
         <InteractiveGallery />
         <CallToAction />

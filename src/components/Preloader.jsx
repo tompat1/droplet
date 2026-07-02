@@ -23,6 +23,7 @@ export default function Preloader() {
     const intervalTime = 50; // update every 50ms
     const totalSteps = totalDuration / intervalTime;
     let currentStep = 0;
+    let timer;
 
     const interval = setInterval(() => {
       currentStep++;
@@ -33,7 +34,7 @@ export default function Preloader() {
         setCurrentFile('System ready.');
         clearInterval(interval);
         
-        const timer = setTimeout(() => {
+        timer = setTimeout(() => {
           if (containerRef.current) {
             gsap.to(containerRef.current, {
               opacity: 0,
@@ -53,7 +54,10 @@ export default function Preloader() {
       }
     }, intervalTime);
     
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (timer) clearTimeout(timer);
+    };
   }, [allAssets]);
 
   if (!isVisible) return null;
