@@ -307,6 +307,46 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
 }
 
+.edit-canvas-shortcut {
+  min-height: 42px;
+  max-width: min(180px, calc(100vw - 180px));
+  border-radius: 999px;
+  padding: 5px 13px 5px 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 106, 0, 0.36);
+  color: #fff;
+  background: rgba(10, 10, 15, 0.78);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28), 0 0 18px rgba(255, 106, 0, 0.16);
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.edit-canvas-shortcut:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 106, 0, 0.72);
+  background: rgba(20, 20, 25, 0.9);
+}
+
+.edit-canvas-shortcut img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.edit-canvas-shortcut span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
 .auth-pill:hover,
 .auth-icon-button:hover,
 .drawer-primary:hover,
@@ -805,6 +845,15 @@ h1, h2, h3, h4, h5, h6 {
 
   .auth-pill-text {
     max-width: 130px;
+  }
+
+  .edit-canvas-shortcut {
+    max-width: 42px;
+    padding: 5px;
+  }
+
+  .edit-canvas-shortcut span {
+    display: none;
   }
 
   .drawer-panel {

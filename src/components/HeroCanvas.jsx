@@ -1227,6 +1227,14 @@ export default function HeroCanvas() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  useEffect(() => {
+    const handleOpenEditor = () => {
+      setIsEditMode(true);
+    };
+    window.addEventListener('openHeroCanvasEditor', handleOpenEditor);
+    return () => window.removeEventListener('openHeroCanvasEditor', handleOpenEditor);
+  }, []);
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       containerRef.current?.requestFullscreen?.();

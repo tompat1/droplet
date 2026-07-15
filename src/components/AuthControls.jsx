@@ -138,11 +138,21 @@ export default function AuthControls() {
     }
   };
 
+  const handleEditCanvasShortcut = () => {
+    const canvasSection = document.getElementById('hero-canvas-section');
+    canvasSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.dispatchEvent(new CustomEvent('openHeroCanvasEditor'));
+  };
+
   return (
     <>
       <div className="auth-dock" aria-label="Account controls">
         {user ? (
           <>
+            <button className="edit-canvas-shortcut" onClick={handleEditCanvasShortcut} title="Edit canvas">
+              <img src="/assets/ui/edit-canvas-flash.png" alt="" />
+              <span>Edit Canvas</span>
+            </button>
             <button className="auth-pill" onClick={() => setActiveDrawer('account')} title="Account">
               <Avatar user={user} initials={initials} />
               <span className="auth-pill-text">{user.displayName || user.email}</span>
