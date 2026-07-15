@@ -561,6 +561,136 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.avatar-picker-anchor {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.avatar-edit-button {
+  position: relative;
+  display: block;
+  border: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+
+.avatar-edit-button:hover .auth-avatar {
+  box-shadow: 0 0 0 3px rgba(75, 94, 250, 0.35), 0 0 28px rgba(0, 255, 204, 0.28);
+}
+
+.avatar-edit-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-blue);
+  border: 2px solid #111317;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+}
+
+.avatar-picker-panel {
+  position: absolute;
+  top: 66px;
+  left: 0;
+  z-index: 5;
+  width: min(320px, calc(100vw - 48px));
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(9, 10, 15, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.46);
+}
+
+.avatar-picker-actions {
+  display: grid;
+  grid-template-columns: 1fr 76px;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.avatar-picker-actions button,
+.avatar-upload-button {
+  min-height: 38px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.avatar-upload-button input {
+  display: none;
+}
+
+.avatar-url-control {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.avatar-url-control span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.avatar-url-control input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  padding: 10px 11px;
+  outline: none;
+}
+
+.avatar-collage {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.avatar-collage button {
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.055);
+  cursor: pointer;
+}
+
+.avatar-collage button:hover {
+  border-color: rgba(0, 255, 204, 0.5);
+  transform: translateY(-1px);
+}
+
+.avatar-collage img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 50%;
+}
+
 .account-identity h2 {
   font-size: 1rem;
   letter-spacing: 0;

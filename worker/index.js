@@ -660,8 +660,16 @@ function cleanText(value, maxLength) {
 }
 
 function normalizeAvatarUrl(value) {
-  const url = cleanText(value, 1000);
+  const url = cleanText(value, 350000);
   if (!url) return '';
+
+  if (/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(url) && url.length <= 350000) {
+    return url;
+  }
+
+  if (/^data:image\/svg\+xml;utf8,/i.test(url) && url.length <= 50000) {
+    return url;
+  }
 
   try {
     const parsed = new URL(url);
