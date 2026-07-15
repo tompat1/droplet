@@ -60,6 +60,10 @@ async function routeApi(request, env, url) {
   const session = await requireSession(request, env);
   if (!session) return json({ error: 'Authentication required' }, 401);
 
+  if (request.method === 'PATCH' && path === '/auth/profile') {
+    return updateProfile(request, env, session.user.id);
+  }
+
   if (path.startsWith('/admin/')) {
     if (session.user.role !== 'admin') return json({ error: 'Admin access required' }, 403);
 
@@ -117,6 +121,7 @@ async function register(request, env) {
   const email = normalizeEmail(body.email);
   const password = String(body.password || '');
   const displayName = cleanText(body.displayName, 120);
+  const avatarUrl = normalizeAvatarUrl(body.avatarUrl);
 
   if (!email || !email.includes('@')) return json({ error: 'Valid email is required' }, 400);
   if (password.length < 10) return json({ error: 'Password must be at least 10 characters' }, 400);
@@ -129,10 +134,10 @@ async function register(request, env) {
   const role = await determineNewUserRole(env, email);
 
   await env.DB.prepare(
-    'INSERT INTO users (id, email, display_name, password_hash, role) VALUES (?, ?, ?, ?, ?)'
-  ).bind(userId, email, displayName, passwordHash, role).run();
+    'INSERT INTO users (id, email, display_name, avatar_url, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)'
+  ).bind(userId, email, displayName, avatarUrl, passwordHash, role).run();
 
-  const user = { id: userId, email, display_name: displayName, role };
+  const user = { id: userId, email, display_name: displayName, avatar_url: avatarUrl, role };
   const { cookie } = await createSession(env, userId);
 
   return json({ user: publicUser(user) }, 201, cookie);
@@ -157,7 +162,7 @@ async function login(request, env) {
   const password = String(body.password || '');
 
   const user = await env.DB.prepare(
-    'SELECT id, email, display_name, password_hash, role FROM users WHERE email = ?'
+    'SELECT id, email, display_name, avatar_url, password_hash, role FROM users WHERE email = ?'
   ).bind(email).first();
 
   if (!user || !(await verifyPassword(password, user.password_hash))) {
@@ -168,9 +173,25 @@ async function login(request, env) {
   return json({ user: publicUser(user) }, 200, cookie);
 }
 
+async function updateProfile(request, env, userId) {
+  const body = await readJson(request);
+  const displayName = cleanText(body.displayName, 120);
+  const avatarUrl = normalizeAvatarUrl(body.avatarUrl);
+
+  await env.DB.prepare(
+    'UPDATE users SET display_name = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+  ).bind(displayName, avatarUrl, userId).run();
+
+  const user = await env.DB.prepare(
+    'SELECT id, email, display_name, avatar_url, role FROM users WHERE id = ?'
+  ).bind(userId).first();
+
+  return json({ user: publicUser(user) });
+}
+
 async function listUsers(env) {
   const result = await env.DB.prepare(
-    `SELECT users.id, users.email, users.display_name, users.role, users.created_at, users.updated_at,
+    `SELECT users.id, users.email, users.display_name, users.avatar_url, users.role, users.created_at, users.updated_at,
       COUNT(canvases.id) AS canvas_count
      FROM users
      LEFT JOIN canvases ON canvases.user_id = users.id
@@ -186,6 +207,7 @@ async function createUserAsAdmin(request, env) {
   const email = normalizeEmail(body.email);
   const password = String(body.password || '');
   const displayName = cleanText(body.displayName, 120);
+  const avatarUrl = normalizeAvatarUrl(body.avatarUrl);
   const role = body.role === 'admin' ? 'admin' : 'user';
 
   if (!email || !email.includes('@')) return json({ error: 'Valid email is required' }, 400);
@@ -198,14 +220,15 @@ async function createUserAsAdmin(request, env) {
   const passwordHash = await hashPassword(password);
 
   await env.DB.prepare(
-    'INSERT INTO users (id, email, display_name, password_hash, role) VALUES (?, ?, ?, ?, ?)'
-  ).bind(userId, email, displayName, passwordHash, role).run();
+    'INSERT INTO users (id, email, display_name, avatar_url, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)'
+  ).bind(userId, email, displayName, avatarUrl, passwordHash, role).run();
 
   return json({
     user: publicAdminUser({
       id: userId,
       email,
       display_name: displayName,
+      avatar_url: avatarUrl,
       role,
       canvas_count: 0,
       created_at: new Date().toISOString(),
@@ -217,6 +240,7 @@ async function createUserAsAdmin(request, env) {
 async function updateUserAsAdmin(request, env, userId, currentUserId) {
   const body = await readJson(request);
   const displayName = cleanText(body.displayName, 120);
+  const avatarUrl = normalizeAvatarUrl(body.avatarUrl);
   const role = body.role === 'admin' ? 'admin' : 'user';
 
   const target = await env.DB.prepare('SELECT id, role FROM users WHERE id = ?').bind(userId).first();
@@ -227,8 +251,8 @@ async function updateUserAsAdmin(request, env, userId, currentUserId) {
   }
 
   await env.DB.prepare(
-    'UPDATE users SET display_name = ?, role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-  ).bind(displayName, role, userId).run();
+    'UPDATE users SET display_name = ?, avatar_url = ?, role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+  ).bind(displayName, avatarUrl, role, userId).run();
 
   return json({ ok: true });
 }
@@ -392,7 +416,7 @@ async function requireSession(request, env) {
 
   const tokenHash = await sha256Hex(token);
   const row = await env.DB.prepare(
-    `SELECT sessions.id, sessions.user_id, users.email, users.display_name, users.role
+    `SELECT sessions.id, sessions.user_id, users.email, users.display_name, users.avatar_url, users.role
      FROM sessions
      JOIN users ON users.id = sessions.user_id
      WHERE sessions.token_hash = ?
@@ -408,6 +432,7 @@ async function requireSession(request, env) {
       id: row.user_id,
       email: row.email,
       display_name: row.display_name,
+      avatar_url: row.avatar_url,
       role: row.role
     }
   };
@@ -530,6 +555,7 @@ function publicUser(user) {
     id: user.id,
     email: user.email,
     displayName: user.display_name || user.displayName || '',
+    avatarUrl: user.avatar_url || user.avatarUrl || '',
     role: user.role || 'user',
     isAdmin: user.role === 'admin'
   };
@@ -540,6 +566,7 @@ function publicAdminUser(user) {
     id: user.id,
     email: user.email,
     displayName: user.display_name || user.displayName || '',
+    avatarUrl: user.avatar_url || user.avatarUrl || '',
     role: user.role || 'user',
     canvasCount: Number(user.canvas_count || 0),
     createdAt: user.created_at,
@@ -630,6 +657,20 @@ function normalizeEmail(value) {
 
 function cleanText(value, maxLength) {
   return String(value || '').trim().slice(0, maxLength);
+}
+
+function normalizeAvatarUrl(value) {
+  const url = cleanText(value, 1000);
+  if (!url) return '';
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return parsed.toString();
+  } catch {
+    return '';
+  }
+
+  return '';
 }
 
 function nullableNumber(value) {

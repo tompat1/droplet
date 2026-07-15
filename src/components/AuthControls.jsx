@@ -8,7 +8,8 @@ import {
   UserPlus,
   RefreshCw,
   Trash2,
-  Save
+  Save,
+  ImagePlus
 } from 'lucide-react';
 import { adminApi } from '../lib/apiClient';
 import { useAuth } from './AuthContext';
@@ -17,16 +18,27 @@ const emptyAuthForm = { email: '', password: '', displayName: '' };
 const emptyUserForm = { email: '', password: '', displayName: '', role: 'user' };
 
 export default function AuthControls() {
-  const { user, isAdmin, isLoading, login, logout, register } = useAuth();
+  const { user, isAdmin, isLoading, login, logout, register, updateProfile } = useAuth();
   const [activeDrawer, setActiveDrawer] = useState(null);
   const [authMode, setAuthMode] = useState('login');
   const [authForm, setAuthForm] = useState(emptyAuthForm);
   const [status, setStatus] = useState('');
+  const [profileStatus, setProfileStatus] = useState('');
+  const [profileForm, setProfileForm] = useState({ displayName: '', avatarUrl: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const initials = useMemo(() => {
     const source = user?.displayName || user?.email || 'D';
     return source.slice(0, 2).toUpperCase();
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      setProfileForm({
+        displayName: user.displayName || '',
+        avatarUrl: user.avatarUrl || ''
+      });
+    }
   }, [user]);
 
   const handleAuthSubmit = async (event) => {
@@ -53,13 +65,27 @@ export default function AuthControls() {
     setActiveDrawer(null);
   };
 
+  const handleProfileSubmit = async (event) => {
+    event.preventDefault();
+    setProfileStatus('');
+    setIsSubmitting(true);
+    try {
+      await updateProfile(profileForm);
+      setProfileStatus('Profile updated.');
+    } catch (err) {
+      setProfileStatus(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <>
       <div className="auth-dock" aria-label="Account controls">
         {user ? (
           <>
             <button className="auth-pill" onClick={() => setActiveDrawer('account')} title="Account">
-              <span className="auth-avatar">{initials}</span>
+              <Avatar user={user} initials={initials} />
               <span className="auth-pill-text">{user.displayName || user.email}</span>
             </button>
             {isAdmin && (
@@ -113,12 +139,28 @@ export default function AuthControls() {
         {user && (
           <div className="account-panel">
             <div className="account-identity">
-              <span className="auth-avatar large">{initials}</span>
+              <Avatar user={user} initials={initials} size="large" />
               <div>
                 <h2>{user.displayName || 'Droplet User'}</h2>
                 <p>{user.email}</p>
               </div>
             </div>
+            <form className="drawer-form profile-form" onSubmit={handleProfileSubmit}>
+              <h3><ImagePlus size={17} /> Profile Image</h3>
+              <label>
+                <span>Display name</span>
+                <input value={profileForm.displayName} onChange={(e) => setProfileForm({ ...profileForm, displayName: e.target.value })} autoComplete="name" />
+              </label>
+              <label>
+                <span>Avatar image URL</span>
+                <input type="url" value={profileForm.avatarUrl} onChange={(e) => setProfileForm({ ...profileForm, avatarUrl: e.target.value })} placeholder="https://..." />
+              </label>
+              {profileStatus && <div className={`drawer-status ${profileStatus.includes('updated') ? 'success' : 'error'}`}>{profileStatus}</div>}
+              <button className="drawer-primary" type="submit" disabled={isSubmitting}>
+                <Save size={17} />
+                {isSubmitting ? 'Saving...' : 'Save Profile'}
+              </button>
+            </form>
             <div className="account-meta">
               <span>Role</span>
               <strong>{user.role || 'user'}</strong>
@@ -179,6 +221,7 @@ function AdminDrawer({ open, onClose }) {
     try {
       await adminApi.updateUser(targetUser.id, {
         displayName: targetUser.displayName,
+        avatarUrl: targetUser.avatarUrl,
         role: nextRole
       });
       await loadUsers();
@@ -246,6 +289,7 @@ function AdminDrawer({ open, onClose }) {
           </div>
           {users.map((targetUser) => (
             <div className="admin-user-row" key={targetUser.id}>
+              <Avatar user={targetUser} initials={(targetUser.displayName || targetUser.email || 'U').slice(0, 2).toUpperCase()} />
               <div>
                 <strong>{targetUser.displayName || 'Unnamed user'}</strong>
                 <span>{targetUser.email}</span>
@@ -269,6 +313,18 @@ function AdminDrawer({ open, onClose }) {
       </div>
     </Drawer>
   );
+}
+
+function Avatar({ user, initials, size }) {
+  if (user?.avatarUrl) {
+    return (
+      <span className={`auth-avatar ${size === 'large' ? 'large' : ''}`}>
+        <img src={user.avatarUrl} alt="" loading="lazy" referrerPolicy="no-referrer" />
+      </span>
+    );
+  }
+
+  return <span className={`auth-avatar ${size === 'large' ? 'large' : ''}`}>{initials}</span>;
 }
 
 function Drawer({ open, title, onClose, children }) {

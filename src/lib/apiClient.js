@@ -24,7 +24,8 @@ export const authApi = {
   me: () => apiRequest('/auth/me'),
   register: (input) => apiRequest('/auth/register', { method: 'POST', body: input }),
   login: (input) => apiRequest('/auth/login', { method: 'POST', body: input }),
-  logout: () => apiRequest('/auth/logout', { method: 'POST' })
+  logout: () => apiRequest('/auth/logout', { method: 'POST' }),
+  updateProfile: (input) => apiRequest('/auth/profile', { method: 'PATCH', body: input })
 };
 
 export const canvasApi = {
