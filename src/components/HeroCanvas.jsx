@@ -851,6 +851,9 @@ const CanvasPersistencePanel = ({
   const { getViewport, setViewport, fitView } = useReactFlow();
   const [isBusy, setIsBusy] = useState(false);
   const [draftName, setDraftName] = useState(activeCanvasName || 'Fluid Node Canvas');
+  const hasAutoLoadedCanvas = useRef(false);
+  const activeCanvasFromList = canvases.find((canvas) => canvas.id === activeCanvasId);
+  const displayCanvasName = activeCanvasName || activeCanvasFromList?.name || 'Unsaved Canvas';
   const isNameDirty = draftName.trim() !== (activeCanvasName || 'Fluid Node Canvas');
   const canSave = user && !isBusy && (!activeCanvasId || isCanvasDirty || isNameDirty);
 
@@ -867,7 +870,9 @@ const CanvasPersistencePanel = ({
     }
 
     const payload = await canvasApi.list();
-    setCanvases(payload.canvases || []);
+    const nextCanvases = payload.canvases || [];
+    setCanvases(nextCanvases);
+    return nextCanvases;
   }, [setActiveCanvasId, setActiveCanvasName, setCanvases, user]);
 
   useEffect(() => {
@@ -896,6 +901,30 @@ const CanvasPersistencePanel = ({
       window.requestAnimationFrame(() => fitView({ duration: 350, nodes: [{ id: '1' }, { id: '2' }], maxZoom: 0.5 }));
     }
   }, [fitView, setActiveCanvasId, setActiveCanvasName, setCollapsedBranches, setEdges, setInteractionMode, setIsCanvasDirty, setNodes, setViewport]);
+
+  useEffect(() => {
+    if (!user) {
+      hasAutoLoadedCanvas.current = false;
+      return;
+    }
+
+    if (hasAutoLoadedCanvas.current || activeCanvasId || isCanvasDirty) return;
+
+    hasAutoLoadedCanvas.current = true;
+    refreshCanvases()
+      .then((nextCanvases) => {
+        const latestCanvas = nextCanvases?.[0];
+        if (!latestCanvas) return;
+        setStatus('Loading latest saved canvas...');
+        return canvasApi.get(latestCanvas.id);
+      })
+      .then((payload) => {
+        if (!payload?.canvas) return;
+        applyCanvasSnapshot(payload.canvas);
+        setStatus('Canvas loaded.');
+      })
+      .catch((err) => setStatus(err.message));
+  }, [activeCanvasId, applyCanvasSnapshot, isCanvasDirty, refreshCanvases, setStatus, user]);
 
   const loadCanvas = async (canvasId) => {
     if (!canvasId) return;
@@ -1022,7 +1051,7 @@ const CanvasPersistencePanel = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Canvas</div>
-          <div style={{ fontSize: '0.95rem', fontWeight: 800 }}>{user ? (activeCanvasName || 'Unsaved Canvas') : 'Login required'}</div>
+          <div style={{ fontSize: '0.95rem', fontWeight: 800 }}>{user ? displayCanvasName : 'Login required'}</div>
         </div>
         <button type="button" onClick={createNewCanvas} disabled={!user || isBusy} style={{ ...controlStyle, cursor: user && !isBusy ? 'pointer' : 'not-allowed', opacity: user ? 1 : 0.5 }}>
           New
