@@ -11,13 +11,7 @@
 		{
 			"binding": "DB",
 			"database_name": "droplet-prod",
-			"database_id": "replace-with-cloudflare-d1-database-id"
-		},
-		{
-			"binding": "droplet_prod",
-			"database_name": "droplet-prod",
-			"database_id": "e9e21e3d-dc12-4083-958d-8f20eef19c55",
-			"remote": true
+			"database_id": "e9e21e3d-dc12-4083-958d-8f20eef19c55"
 		}
 	]
 }
