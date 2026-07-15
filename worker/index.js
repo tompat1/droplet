@@ -1,6 +1,7 @@
 const SESSION_COOKIE = 'droplet_session';
 const SESSION_DAYS = 30;
 const MAX_JSON_BYTES = 1_500_000;
+const PBKDF2_ITERATIONS = 100000;
 
 export default {
   async fetch(request, env) {
@@ -548,18 +549,27 @@ function publicAdminUser(user) {
 
 async function hashPassword(password) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const key = await derivePasswordKey(password, salt);
-  return `pbkdf2:${bytesToHex(salt)}:${bytesToHex(new Uint8Array(key))}`;
+  const key = await derivePasswordKey(password, salt, PBKDF2_ITERATIONS);
+  return `pbkdf2:${PBKDF2_ITERATIONS}:${bytesToHex(salt)}:${bytesToHex(new Uint8Array(key))}`;
 }
 
 async function verifyPassword(password, encoded) {
-  const [scheme, saltHex, expectedHex] = String(encoded || '').split(':');
-  if (scheme !== 'pbkdf2' || !saltHex || !expectedHex) return false;
-  const key = await derivePasswordKey(password, hexToBytes(saltHex));
+  const parts = String(encoded || '').split(':');
+  const [scheme] = parts;
+  if (scheme !== 'pbkdf2') return false;
+
+  const hasIterationField = parts.length === 4;
+  const iterations = hasIterationField ? Number(parts[1]) : PBKDF2_ITERATIONS;
+  const saltHex = hasIterationField ? parts[2] : parts[1];
+  const expectedHex = hasIterationField ? parts[3] : parts[2];
+
+  if (!saltHex || !expectedHex || !Number.isFinite(iterations) || iterations > PBKDF2_ITERATIONS) return false;
+
+  const key = await derivePasswordKey(password, hexToBytes(saltHex), iterations);
   return timingSafeEqual(bytesToHex(new Uint8Array(key)), expectedHex);
 }
 
-async function derivePasswordKey(password, salt) {
+async function derivePasswordKey(password, salt, iterations) {
   const key = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(password),
@@ -569,7 +579,7 @@ async function derivePasswordKey(password, salt) {
   );
 
   return crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: 210000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
     key,
     256
   );
