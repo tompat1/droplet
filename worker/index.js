@@ -35,11 +35,11 @@ async function routeApi(request, env, url) {
   }
 
   if (request.method === 'POST' && path === '/auth/register') {
-    return register(request, env);
+    return withAuthDiagnostics('register', () => register(request, env));
   }
 
   if (request.method === 'POST' && path === '/auth/login') {
-    return login(request, env);
+    return withAuthDiagnostics('login', () => login(request, env));
   }
 
   if (request.method === 'POST' && path === '/auth/logout') {
@@ -135,6 +135,19 @@ async function register(request, env) {
   const { cookie } = await createSession(env, userId);
 
   return json({ user: publicUser(user) }, 201, cookie);
+}
+
+async function withAuthDiagnostics(action, handler) {
+  try {
+    return await handler();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Auth ${action} failed`, {
+      message,
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    return json({ error: `Auth ${action} failed: ${message}` }, 500);
+  }
 }
 
 async function login(request, env) {
