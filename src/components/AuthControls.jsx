@@ -38,6 +38,7 @@ export default function AuthControls() {
   const [profileStatus, setProfileStatus] = useState('');
   const [profileForm, setProfileForm] = useState({ displayName: '', avatarUrl: '' });
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
+  const [isSavingAvatar, setIsSavingAvatar] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const initials = useMemo(() => {
@@ -92,9 +93,25 @@ export default function AuthControls() {
     }
   };
 
-  const handleAvatarSelect = (avatarUrl) => {
+  const saveAvatar = async (avatarUrl) => {
+    const nextProfile = { ...profileForm, avatarUrl };
+    setProfileForm(nextProfile);
+    setProfileStatus('');
+    setIsSavingAvatar(true);
+    try {
+      await updateProfile(nextProfile);
+      setProfileStatus(avatarUrl ? 'Avatar saved.' : 'Avatar cleared.');
+      setIsAvatarPickerOpen(false);
+    } catch (err) {
+      setProfileStatus(err.message);
+    } finally {
+      setIsSavingAvatar(false);
+    }
+  };
+
+  const handleAvatarUrlChange = (avatarUrl) => {
     setProfileForm((current) => ({ ...current, avatarUrl }));
-    setProfileStatus('Avatar selected. Save profile to keep it.');
+    setProfileStatus('Press Save Avatar or Save Profile to keep this URL.');
   };
 
   const handleAvatarUpload = async (event) => {
@@ -104,7 +121,7 @@ export default function AuthControls() {
     setProfileStatus('');
     try {
       const avatarUrl = await resizeAvatarFile(file);
-      handleAvatarSelect(avatarUrl);
+      await saveAvatar(avatarUrl);
     } catch (err) {
       setProfileStatus(err.message);
     } finally {
@@ -182,18 +199,22 @@ export default function AuthControls() {
                     <div className="avatar-picker-actions">
                       <label className="avatar-upload-button">
                         <Upload size={16} />
-                        Upload
+                        {isSavingAvatar ? 'Saving...' : 'Upload'}
                         <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleAvatarUpload} />
                       </label>
-                      <button type="button" onClick={() => handleAvatarSelect('')}>Clear</button>
+                      <button type="button" onClick={() => saveAvatar('')} disabled={isSavingAvatar}>Clear</button>
                     </div>
                     <label className="avatar-url-control">
                       <span><LinkIcon size={14} /> Image URL</span>
-                      <input type="url" value={profileForm.avatarUrl} onChange={(e) => handleAvatarSelect(e.target.value)} placeholder="https://..." />
+                      <input type="url" value={profileForm.avatarUrl} onChange={(e) => handleAvatarUrlChange(e.target.value)} placeholder="https://..." />
                     </label>
+                    <button className="avatar-save-button" type="button" onClick={() => saveAvatar(profileForm.avatarUrl)} disabled={isSavingAvatar}>
+                      <Save size={15} />
+                      {isSavingAvatar ? 'Saving...' : 'Save Avatar'}
+                    </button>
                     <div className="avatar-collage" aria-label="Avatar icon presets">
                       {avatarPresets.map((preset) => (
-                        <button type="button" key={preset.id} onClick={() => handleAvatarSelect(preset.url)} title={preset.name}>
+                        <button type="button" key={preset.id} onClick={() => saveAvatar(preset.url)} disabled={isSavingAvatar} title={preset.name}>
                           <img src={preset.url} alt="" />
                         </button>
                       ))}
@@ -212,7 +233,7 @@ export default function AuthControls() {
                 <span>Display name</span>
                 <input value={profileForm.displayName} onChange={(e) => setProfileForm({ ...profileForm, displayName: e.target.value })} autoComplete="name" />
               </label>
-              {profileStatus && <div className={`drawer-status ${profileStatus.includes('updated') || profileStatus.includes('selected') ? 'success' : 'error'}`}>{profileStatus}</div>}
+              {profileStatus && <div className={`drawer-status ${profileStatus.includes('updated') || profileStatus.includes('saved') || profileStatus.includes('cleared') ? 'success' : 'error'}`}>{profileStatus}</div>}
               <button className="drawer-primary" type="submit" disabled={isSubmitting}>
                 <Save size={17} />
                 {isSubmitting ? 'Saving...' : 'Save Profile'}

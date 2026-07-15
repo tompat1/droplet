@@ -617,7 +617,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .avatar-picker-actions button,
-.avatar-upload-button {
+.avatar-upload-button,
+.avatar-save-button {
   min-height: 38px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -630,6 +631,13 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 800;
   font-size: 0.82rem;
   cursor: pointer;
+}
+
+.avatar-picker-actions button:disabled,
+.avatar-save-button:disabled,
+.avatar-collage button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .avatar-upload-button input {
@@ -662,6 +670,13 @@ h1, h2, h3, h4, h5, h6 {
   color: #fff;
   padding: 10px 11px;
   outline: none;
+}
+
+.avatar-save-button {
+  width: 100%;
+  margin-bottom: 10px;
+  background: rgba(75, 94, 250, 0.72);
+  border-color: rgba(75, 94, 250, 0.86);
 }
 
 .avatar-collage {
