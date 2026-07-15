@@ -12,7 +12,9 @@
     "preview": "vite preview",
     "cf:deploy": "wrangler deploy",
     "db:migrate:local": "wrangler d1 execute droplet-prod --local --file=./migrations/0001_initial.sql",
-    "db:migrate:remote": "wrangler d1 execute droplet-prod --remote --file=./migrations/0001_initial.sql"
+    "db:migrate:remote": "wrangler d1 execute droplet-prod --remote --file=./migrations/0001_initial.sql",
+    "db:migrate:roles:local": "wrangler d1 execute droplet-prod --local --file=./migrations/0002_user_roles.sql",
+    "db:migrate:roles:remote": "wrangler d1 execute droplet-prod --remote --file=./migrations/0002_user_roles.sql"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

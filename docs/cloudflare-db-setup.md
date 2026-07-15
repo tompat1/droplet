@@ -51,6 +51,13 @@ Remote database:
 npx wrangler d1 execute droplet-prod --remote --file=./migrations/0001_initial.sql
 ```
 
+Apply follow-up migrations after the base schema:
+
+```bash
+npm run db:migrate:roles:local
+npm run db:migrate:roles:remote
+```
+
 ## 5. Build and Deploy
 
 ```bash
@@ -76,6 +83,19 @@ Authenticated:
 - `PUT /api/canvases/:id`
 - `DELETE /api/canvases/:id`
 - `POST /api/canvases/:id/snapshot`
+
+Admin:
+
+- `GET /api/admin/users`
+- `POST /api/admin/users`
+- `PATCH /api/admin/users/:id`
+- `DELETE /api/admin/users/:id`
+
+## Admin Account
+
+The first registered user becomes an admin automatically. After that, new users default to the `user` role unless their email is included in a comma-separated `ADMIN_EMAILS` Worker environment variable.
+
+Admins can open the Admin drawer in the app to create users, promote/demote users, and delete users. The API also enforces admin access server-side.
 
 ## Fluid Node Canvas Snapshot Shape
 

@@ -4,6 +4,8 @@ import InteractiveGallery from './components/InteractiveGallery';
 import CallToAction from './components/CallToAction';
 import Preloader from './components/Preloader';
 import AudioPlayer from './components/AudioPlayer';
+import AuthControls from './components/AuthControls';
+import { AuthProvider } from './components/AuthProvider';
 
 import Overhero from './components/Overhero';
 import CoreValues from './components/CoreValues';
@@ -13,9 +15,10 @@ const HeroCanvas = lazy(() => import('./components/HeroCanvas'));
 
 function App() {
   return (
-    <>
+    <AuthProvider>
       <Preloader />
       <AudioPlayer />
+      <AuthControls />
       <div className="app-background" style={{ zIndex: -4 }}></div>
       {/* Background Video */}
       <video
@@ -55,7 +58,7 @@ function App() {
         <InteractiveGallery />
         <CallToAction />
       </main>
-    </>
+    </AuthProvider>
   );
 }
 

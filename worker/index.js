@@ -59,6 +59,29 @@ async function routeApi(request, env, url) {
   const session = await requireSession(request, env);
   if (!session) return json({ error: 'Authentication required' }, 401);
 
+  if (path.startsWith('/admin/')) {
+    if (session.user.role !== 'admin') return json({ error: 'Admin access required' }, 403);
+
+    if (request.method === 'GET' && path === '/admin/users') {
+      return listUsers(env);
+    }
+
+    if (request.method === 'POST' && path === '/admin/users') {
+      return createUserAsAdmin(request, env);
+    }
+
+    const adminUserMatch = path.match(/^\/admin\/users\/([^/]+)$/);
+    if (adminUserMatch && request.method === 'PATCH') {
+      return updateUserAsAdmin(request, env, adminUserMatch[1], session.user.id);
+    }
+
+    if (adminUserMatch && request.method === 'DELETE') {
+      return deleteUserAsAdmin(env, adminUserMatch[1], session.user.id);
+    }
+
+    return json({ error: 'Admin route not found' }, 404);
+  }
+
   if (request.method === 'GET' && path === '/canvases') {
     return listCanvases(env, session.user.id);
   }
@@ -102,12 +125,13 @@ async function register(request, env) {
 
   const userId = crypto.randomUUID();
   const passwordHash = await hashPassword(password);
+  const role = await determineNewUserRole(env, email);
 
   await env.DB.prepare(
-    'INSERT INTO users (id, email, display_name, password_hash) VALUES (?, ?, ?, ?)'
-  ).bind(userId, email, displayName, passwordHash).run();
+    'INSERT INTO users (id, email, display_name, password_hash, role) VALUES (?, ?, ?, ?, ?)'
+  ).bind(userId, email, displayName, passwordHash, role).run();
 
-  const user = { id: userId, email, display_name: displayName };
+  const user = { id: userId, email, display_name: displayName, role };
   const { cookie } = await createSession(env, userId);
 
   return json({ user: publicUser(user) }, 201, cookie);
@@ -119,7 +143,7 @@ async function login(request, env) {
   const password = String(body.password || '');
 
   const user = await env.DB.prepare(
-    'SELECT id, email, display_name, password_hash FROM users WHERE email = ?'
+    'SELECT id, email, display_name, password_hash, role FROM users WHERE email = ?'
   ).bind(email).first();
 
   if (!user || !(await verifyPassword(password, user.password_hash))) {
@@ -128,6 +152,80 @@ async function login(request, env) {
 
   const { cookie } = await createSession(env, user.id);
   return json({ user: publicUser(user) }, 200, cookie);
+}
+
+async function listUsers(env) {
+  const result = await env.DB.prepare(
+    `SELECT users.id, users.email, users.display_name, users.role, users.created_at, users.updated_at,
+      COUNT(canvases.id) AS canvas_count
+     FROM users
+     LEFT JOIN canvases ON canvases.user_id = users.id
+     GROUP BY users.id
+     ORDER BY users.created_at DESC`
+  ).all();
+
+  return json({ users: result.results.map(publicAdminUser) });
+}
+
+async function createUserAsAdmin(request, env) {
+  const body = await readJson(request);
+  const email = normalizeEmail(body.email);
+  const password = String(body.password || '');
+  const displayName = cleanText(body.displayName, 120);
+  const role = body.role === 'admin' ? 'admin' : 'user';
+
+  if (!email || !email.includes('@')) return json({ error: 'Valid email is required' }, 400);
+  if (password.length < 10) return json({ error: 'Password must be at least 10 characters' }, 400);
+
+  const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+  if (existing) return json({ error: 'User already exists' }, 409);
+
+  const userId = crypto.randomUUID();
+  const passwordHash = await hashPassword(password);
+
+  await env.DB.prepare(
+    'INSERT INTO users (id, email, display_name, password_hash, role) VALUES (?, ?, ?, ?, ?)'
+  ).bind(userId, email, displayName, passwordHash, role).run();
+
+  return json({
+    user: publicAdminUser({
+      id: userId,
+      email,
+      display_name: displayName,
+      role,
+      canvas_count: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+  }, 201);
+}
+
+async function updateUserAsAdmin(request, env, userId, currentUserId) {
+  const body = await readJson(request);
+  const displayName = cleanText(body.displayName, 120);
+  const role = body.role === 'admin' ? 'admin' : 'user';
+
+  const target = await env.DB.prepare('SELECT id, role FROM users WHERE id = ?').bind(userId).first();
+  if (!target) return json({ error: 'User not found' }, 404);
+
+  if (userId === currentUserId && role !== 'admin') {
+    return json({ error: 'You cannot remove your own admin access' }, 400);
+  }
+
+  await env.DB.prepare(
+    'UPDATE users SET display_name = ?, role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+  ).bind(displayName, role, userId).run();
+
+  return json({ ok: true });
+}
+
+async function deleteUserAsAdmin(env, userId, currentUserId) {
+  if (userId === currentUserId) return json({ error: 'You cannot delete your own account' }, 400);
+
+  const result = await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
+  if (!result.meta || result.meta.changes === 0) return json({ error: 'User not found' }, 404);
+
+  return json({ ok: true });
 }
 
 async function listCanvases(env, userId) {
@@ -280,7 +378,7 @@ async function requireSession(request, env) {
 
   const tokenHash = await sha256Hex(token);
   const row = await env.DB.prepare(
-    `SELECT sessions.id, sessions.user_id, users.email, users.display_name
+    `SELECT sessions.id, sessions.user_id, users.email, users.display_name, users.role
      FROM sessions
      JOIN users ON users.id = sessions.user_id
      WHERE sessions.token_hash = ?
@@ -295,9 +393,22 @@ async function requireSession(request, env) {
     user: {
       id: row.user_id,
       email: row.email,
-      display_name: row.display_name
+      display_name: row.display_name,
+      role: row.role
     }
   };
+}
+
+async function determineNewUserRole(env, email) {
+  const firstUser = await env.DB.prepare('SELECT COUNT(*) AS count FROM users').first();
+  if (Number(firstUser?.count || 0) === 0) return 'admin';
+
+  const adminEmails = String(env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((value) => normalizeEmail(value))
+    .filter(Boolean);
+
+  return adminEmails.includes(email) ? 'admin' : 'user';
 }
 
 async function createSession(env, userId) {
@@ -404,7 +515,21 @@ function publicUser(user) {
   return {
     id: user.id,
     email: user.email,
-    displayName: user.display_name || user.displayName || ''
+    displayName: user.display_name || user.displayName || '',
+    role: user.role || 'user',
+    isAdmin: user.role === 'admin'
+  };
+}
+
+function publicAdminUser(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    displayName: user.display_name || user.displayName || '',
+    role: user.role || 'user',
+    canvasCount: Number(user.canvas_count || 0),
+    createdAt: user.created_at,
+    updatedAt: user.updated_at
   };
 }
 

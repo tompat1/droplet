@@ -35,3 +35,10 @@ export const canvasApi = {
   delete: (id) => apiRequest(`/canvases/${id}`, { method: 'DELETE' }),
   snapshot: (id) => apiRequest(`/canvases/${id}/snapshot`, { method: 'POST' })
 };
+
+export const adminApi = {
+  users: () => apiRequest('/admin/users'),
+  createUser: (input) => apiRequest('/admin/users', { method: 'POST', body: input }),
+  updateUser: (id, input) => apiRequest(`/admin/users/${id}`, { method: 'PATCH', body: input }),
+  deleteUser: (id) => apiRequest(`/admin/users/${id}`, { method: 'DELETE' })
+};
