@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useRef, useEffect } from 'react';
+import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import {
   ReactFlow,
   useNodesState,
@@ -843,11 +843,16 @@ const CanvasPersistencePanel = ({
   interactionMode,
   setInteractionMode,
   status,
-  setStatus
+  setStatus,
+  isCanvasDirty,
+  setIsCanvasDirty,
+  isVisible
 }) => {
   const { getViewport, setViewport, fitView } = useReactFlow();
   const [isBusy, setIsBusy] = useState(false);
   const [draftName, setDraftName] = useState(activeCanvasName || 'Fluid Node Canvas');
+  const isNameDirty = draftName.trim() !== (activeCanvasName || 'Fluid Node Canvas');
+  const canSave = user && !isBusy && (!activeCanvasId || isCanvasDirty || isNameDirty);
 
   useEffect(() => {
     setDraftName(activeCanvasName || 'Fluid Node Canvas');
@@ -883,13 +888,14 @@ const CanvasPersistencePanel = ({
     setActiveCanvasId(canvas.id);
     setActiveCanvasName(canvas.name || 'Fluid Node Canvas');
     setDraftName(canvas.name || 'Fluid Node Canvas');
+    setIsCanvasDirty(false);
 
     if (snapshot.viewport && Number.isFinite(snapshot.viewport.zoom)) {
       setViewport(snapshot.viewport, { duration: 250 });
     } else {
       window.requestAnimationFrame(() => fitView({ duration: 350, nodes: [{ id: '1' }, { id: '2' }], maxZoom: 0.5 }));
     }
-  }, [fitView, setActiveCanvasId, setActiveCanvasName, setCollapsedBranches, setEdges, setInteractionMode, setNodes, setViewport]);
+  }, [fitView, setActiveCanvasId, setActiveCanvasName, setCollapsedBranches, setEdges, setInteractionMode, setIsCanvasDirty, setNodes, setViewport]);
 
   const loadCanvas = async (canvasId) => {
     if (!canvasId) return;
@@ -906,7 +912,7 @@ const CanvasPersistencePanel = ({
     }
   };
 
-  const saveCanvas = async () => {
+  const saveCanvas = useCallback(async ({ silent = false } = {}) => {
     if (!user) {
       setStatus('Login to save canvases.');
       return;
@@ -923,7 +929,7 @@ const CanvasPersistencePanel = ({
     });
 
     setIsBusy(true);
-    setStatus(activeCanvasId ? 'Saving canvas...' : 'Creating canvas...');
+    setStatus(silent ? 'Autosaving canvas...' : activeCanvasId ? 'Saving canvas...' : 'Creating canvas...');
     try {
       const result = activeCanvasId
         ? await canvasApi.update(activeCanvasId, payload)
@@ -933,13 +939,24 @@ const CanvasPersistencePanel = ({
       setActiveCanvasName(saved.name);
       setDraftName(saved.name);
       await refreshCanvases();
-      setStatus('Canvas saved.');
+      setIsCanvasDirty(false);
+      setStatus(silent ? 'Autosaved.' : 'Canvas saved.');
     } catch (err) {
       setStatus(err.message);
     } finally {
       setIsBusy(false);
     }
-  };
+  }, [activeCanvasId, activeCanvasName, collapsedBranches, draftName, edges, getViewport, interactionMode, nodes, refreshCanvases, setActiveCanvasId, setActiveCanvasName, setIsCanvasDirty, setStatus, user]);
+
+  useEffect(() => {
+    if (!user || !activeCanvasId || !isCanvasDirty || isBusy) return undefined;
+
+    const timer = window.setTimeout(() => {
+      saveCanvas({ silent: true });
+    }, 1400);
+
+    return () => window.clearTimeout(timer);
+  }, [activeCanvasId, isBusy, isCanvasDirty, saveCanvas, user]);
 
   const createNewCanvas = async () => {
     if (!user) {
@@ -964,6 +981,7 @@ const CanvasPersistencePanel = ({
       const result = await canvasApi.create(payload);
       await refreshCanvases();
       applyCanvasSnapshot(result.canvas);
+      setIsCanvasDirty(false);
       setStatus('New canvas created.');
     } catch (err) {
       setStatus(err.message);
@@ -971,6 +989,8 @@ const CanvasPersistencePanel = ({
       setIsBusy(false);
     }
   };
+
+  if (!isVisible) return null;
 
   const panelStyle = {
     width: '260px',
@@ -1026,7 +1046,10 @@ const CanvasPersistencePanel = ({
 
           <input
             value={draftName}
-            onChange={(event) => setDraftName(event.target.value)}
+            onChange={(event) => {
+              setDraftName(event.target.value);
+              setStatus('');
+            }}
             disabled={isBusy}
             style={controlStyle}
             aria-label="Canvas name"
@@ -1035,16 +1058,17 @@ const CanvasPersistencePanel = ({
           <button
             type="button"
             onClick={saveCanvas}
-            disabled={isBusy}
+            disabled={!canSave}
             style={{
               ...controlStyle,
-              borderColor: 'rgba(75,94,250,0.72)',
-              background: 'linear-gradient(135deg, rgba(75,94,250,0.88), rgba(0,255,204,0.28))',
-              cursor: isBusy ? 'not-allowed' : 'pointer',
+              borderColor: canSave ? 'rgba(75,94,250,0.72)' : 'rgba(255,255,255,0.1)',
+              background: canSave ? 'linear-gradient(135deg, rgba(75,94,250,0.88), rgba(0,255,204,0.28))' : 'rgba(255,255,255,0.08)',
+              color: canSave ? '#fff' : 'rgba(255,255,255,0.45)',
+              cursor: canSave ? 'pointer' : 'not-allowed',
               fontWeight: 800
             }}
           >
-            {isBusy ? 'Working...' : activeCanvasId ? 'Save Canvas' : 'Create & Save'}
+            {isBusy ? 'Working...' : !canSave ? 'Saved' : activeCanvasId ? 'Save Canvas' : 'Create & Save'}
           </button>
         </>
       )}
@@ -1069,6 +1093,7 @@ export default function HeroCanvas() {
   const [activeCanvasId, setActiveCanvasId] = useState(null);
   const [activeCanvasName, setActiveCanvasName] = useState('');
   const [canvasStatus, setCanvasStatus] = useState('');
+  const [isCanvasDirty, setIsCanvasDirty] = useState(false);
   
   const containerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -1077,9 +1102,21 @@ export default function HeroCanvas() {
   
   const [interactionMode, setInteractionMode] = useState('pan');
 
+  const graphChangeTypes = useMemo(() => new Set(['position', 'dimensions', 'add', 'remove', 'replace']), []);
+  const edgeChangeTypes = useMemo(() => new Set(['add', 'remove', 'replace']), []);
+  const setPersistentNodes = useCallback((updater) => {
+    setIsCanvasDirty(true);
+    setNodes(updater);
+  }, [setNodes]);
+  const setPersistentEdges = useCallback((updater) => {
+    setIsCanvasDirty(true);
+    setEdges(updater);
+  }, [setEdges]);
+
   useEffect(() => {
     const handleToggle = (id) => {
       setCollapsedBranches(prev => ({ ...prev, [id]: !prev[id] }));
+      setIsCanvasDirty(true);
     };
 
     setNodes((nds) => {
@@ -1128,8 +1165,8 @@ export default function HeroCanvas() {
             parentOffsetX,
             parentOffsetY,
             onToggleCollapse: handleToggle,
-            setGlobalNodes: setNodes,
-            setGlobalEdges: setEdges,
+            setGlobalNodes: setPersistentNodes,
+            setGlobalEdges: setPersistentEdges,
             isEditMode
           }
         };
@@ -1153,7 +1190,7 @@ export default function HeroCanvas() {
         }
       };
     }));
-  }, [collapsedBranches, setNodes, setEdges, isEditMode]);
+  }, [collapsedBranches, setNodes, setEdges, isEditMode, setPersistentEdges, setPersistentNodes]);
 
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -1170,9 +1207,26 @@ export default function HeroCanvas() {
   };
 
   const onConnect = useCallback(
-    (params) => setEdges((eds) => addEdge({ ...params, animated: true, style: { stroke: 'rgba(255,255,255,0.5)', strokeWidth: 2 } }, eds)),
+    (params) => {
+      setIsCanvasDirty(true);
+      setEdges((eds) => addEdge({ ...params, animated: true, style: { stroke: 'rgba(255,255,255,0.5)', strokeWidth: 2 } }, eds));
+    },
     [setEdges]
   );
+
+  const handleNodesChange = useCallback((changes) => {
+    if (changes.some((change) => graphChangeTypes.has(change.type))) {
+      setIsCanvasDirty(true);
+    }
+    onNodesChange(changes);
+  }, [graphChangeTypes, onNodesChange]);
+
+  const handleEdgesChange = useCallback((changes) => {
+    if (changes.some((change) => edgeChangeTypes.has(change.type))) {
+      setIsCanvasDirty(true);
+    }
+    onEdgesChange(changes);
+  }, [edgeChangeTypes, onEdgesChange]);
 
   const onNodeClick = useCallback((event, node) => {
     const src = node.data.image || node.data.video || (node.data.colors ? 'palette-' + node.id : null);
@@ -1206,8 +1260,8 @@ export default function HeroCanvas() {
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        onNodesChange={handleNodesChange}
+        onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
@@ -1277,27 +1331,28 @@ export default function HeroCanvas() {
               </div>
             </div>
 
-            {isEditMode && (
-              <CanvasPersistencePanel
-                user={user}
-                canvases={canvases}
-                setCanvases={setCanvases}
-                activeCanvasId={activeCanvasId}
-                setActiveCanvasId={setActiveCanvasId}
-                activeCanvasName={activeCanvasName}
-                setActiveCanvasName={setActiveCanvasName}
-                nodes={nodes}
-                setNodes={setNodes}
-                edges={edges}
-                setEdges={setEdges}
-                collapsedBranches={collapsedBranches}
-                setCollapsedBranches={setCollapsedBranches}
-                interactionMode={interactionMode}
-                setInteractionMode={setInteractionMode}
-                status={canvasStatus}
-                setStatus={setCanvasStatus}
-              />
-            )}
+            <CanvasPersistencePanel
+              user={user}
+              canvases={canvases}
+              setCanvases={setCanvases}
+              activeCanvasId={activeCanvasId}
+              setActiveCanvasId={setActiveCanvasId}
+              activeCanvasName={activeCanvasName}
+              setActiveCanvasName={setActiveCanvasName}
+              nodes={nodes}
+              setNodes={setNodes}
+              edges={edges}
+              setEdges={setEdges}
+              collapsedBranches={collapsedBranches}
+              setCollapsedBranches={setCollapsedBranches}
+              interactionMode={interactionMode}
+              setInteractionMode={setInteractionMode}
+              status={canvasStatus}
+              setStatus={setCanvasStatus}
+              isCanvasDirty={isCanvasDirty}
+              setIsCanvasDirty={setIsCanvasDirty}
+              isVisible={isEditMode}
+            />
           </div>
         </Panel>
         <MultiSelectHint interactionMode={interactionMode} />
