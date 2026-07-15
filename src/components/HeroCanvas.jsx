@@ -18,6 +18,8 @@ import BrandCard from './BrandCard';
 import MediaModal from './MediaModal';
 import assetFiles from '../assetsData.json';
 import { defaultAssetTags } from '../defaultTags';
+import { useAuth } from './AuthContext';
+import { canvasApi } from '../lib/apiClient';
 
 const ZoomIndicator = () => {
   const { zoom } = useViewport();
@@ -765,12 +767,308 @@ const allCanvasMedias = initialNodes
     nodeGroup: node.data.nodeGroup
   }));
 
+const createDefaultCanvasSnapshot = () => ({
+  nodes: initialNodes.map(sanitizeNodeForSave),
+  edges: initialEdges.map(sanitizeEdgeForSave),
+  viewport: {},
+  settings: { interactionMode: 'pan' },
+  collapsedBranches: {}
+});
+
+const sanitizeNodeForSave = (node) => {
+  const data = { ...(node.data || {}) };
+  delete data.setGlobalNodes;
+  delete data.setGlobalEdges;
+  delete data.onToggleCollapse;
+  delete data.isHighlighted;
+  delete data.isParentCollapsed;
+  delete data.parentOffsetX;
+  delete data.parentOffsetY;
+  delete data.canCollapse;
+  delete data.isCollapsed;
+  delete data.isEditMode;
+
+  return {
+    id: String(node.id),
+    type: node.type,
+    position: node.position || { x: 0, y: 0 },
+    width: node.width,
+    height: node.height,
+    hidden: node.hidden === true,
+    zIndex: node.zIndex,
+    data,
+    style: node.style || {}
+  };
+};
+
+const sanitizeEdgeForSave = (edge) => ({
+  id: String(edge.id),
+  source: String(edge.source),
+  target: String(edge.target),
+  sourceHandle: edge.sourceHandle,
+  targetHandle: edge.targetHandle,
+  type: edge.type,
+  animated: edge.animated === true,
+  data: edge.data || {},
+  style: edge.style || {}
+});
+
+const buildCanvasPayload = ({ name, nodes, edges, viewport, collapsedBranches, interactionMode }) => ({
+  name,
+  viewport,
+  settings: { interactionMode, collapsedBranches },
+  snapshot: {
+    nodes: nodes.map(sanitizeNodeForSave),
+    edges: edges.map(sanitizeEdgeForSave),
+    viewport,
+    settings: { interactionMode, collapsedBranches },
+    collapsedBranches
+  }
+});
+
+const CanvasPersistencePanel = ({
+  user,
+  canvases,
+  setCanvases,
+  activeCanvasId,
+  setActiveCanvasId,
+  activeCanvasName,
+  setActiveCanvasName,
+  nodes,
+  setNodes,
+  edges,
+  setEdges,
+  collapsedBranches,
+  setCollapsedBranches,
+  interactionMode,
+  setInteractionMode,
+  status,
+  setStatus
+}) => {
+  const { getViewport, setViewport, fitView } = useReactFlow();
+  const [isBusy, setIsBusy] = useState(false);
+  const [draftName, setDraftName] = useState(activeCanvasName || 'Fluid Node Canvas');
+
+  useEffect(() => {
+    setDraftName(activeCanvasName || 'Fluid Node Canvas');
+  }, [activeCanvasName]);
+
+  const refreshCanvases = useCallback(async () => {
+    if (!user) {
+      setCanvases([]);
+      setActiveCanvasId(null);
+      setActiveCanvasName('');
+      return;
+    }
+
+    const payload = await canvasApi.list();
+    setCanvases(payload.canvases || []);
+  }, [setActiveCanvasId, setActiveCanvasName, setCanvases, user]);
+
+  useEffect(() => {
+    refreshCanvases().catch((err) => setStatus(err.message));
+  }, [refreshCanvases, setStatus]);
+
+  const applyCanvasSnapshot = useCallback((canvas) => {
+    const snapshot = canvas.snapshot || {};
+    const nextNodes = Array.isArray(snapshot.nodes) && snapshot.nodes.length > 0 ? snapshot.nodes : initialNodes;
+    const nextEdges = Array.isArray(snapshot.edges) ? snapshot.edges : initialEdges;
+    const nextCollapsedBranches = snapshot.collapsedBranches || snapshot.settings?.collapsedBranches || {};
+    const nextInteractionMode = snapshot.settings?.interactionMode || canvas.settings?.interactionMode || 'pan';
+
+    setNodes(nextNodes);
+    setEdges(nextEdges);
+    setCollapsedBranches(nextCollapsedBranches);
+    setInteractionMode(nextInteractionMode);
+    setActiveCanvasId(canvas.id);
+    setActiveCanvasName(canvas.name || 'Fluid Node Canvas');
+    setDraftName(canvas.name || 'Fluid Node Canvas');
+
+    if (snapshot.viewport && Number.isFinite(snapshot.viewport.zoom)) {
+      setViewport(snapshot.viewport, { duration: 250 });
+    } else {
+      window.requestAnimationFrame(() => fitView({ duration: 350, nodes: [{ id: '1' }, { id: '2' }], maxZoom: 0.5 }));
+    }
+  }, [fitView, setActiveCanvasId, setActiveCanvasName, setCollapsedBranches, setEdges, setInteractionMode, setNodes, setViewport]);
+
+  const loadCanvas = async (canvasId) => {
+    if (!canvasId) return;
+    setIsBusy(true);
+    setStatus('Loading canvas...');
+    try {
+      const payload = await canvasApi.get(canvasId);
+      applyCanvasSnapshot(payload.canvas);
+      setStatus('Canvas loaded.');
+    } catch (err) {
+      setStatus(err.message);
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const saveCanvas = async () => {
+    if (!user) {
+      setStatus('Login to save canvases.');
+      return;
+    }
+
+    const name = draftName.trim() || activeCanvasName || 'Fluid Node Canvas';
+    const payload = buildCanvasPayload({
+      name,
+      nodes,
+      edges,
+      viewport: getViewport(),
+      collapsedBranches,
+      interactionMode
+    });
+
+    setIsBusy(true);
+    setStatus(activeCanvasId ? 'Saving canvas...' : 'Creating canvas...');
+    try {
+      const result = activeCanvasId
+        ? await canvasApi.update(activeCanvasId, payload)
+        : await canvasApi.create(payload);
+      const saved = result.canvas;
+      setActiveCanvasId(saved.id);
+      setActiveCanvasName(saved.name);
+      setDraftName(saved.name);
+      await refreshCanvases();
+      setStatus('Canvas saved.');
+    } catch (err) {
+      setStatus(err.message);
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const createNewCanvas = async () => {
+    if (!user) {
+      setStatus('Login to create canvases.');
+      return;
+    }
+
+    const name = window.prompt('Name this new canvas:', 'New Fluid Node Canvas');
+    if (!name) return;
+
+    const snapshot = createDefaultCanvasSnapshot();
+    const payload = {
+      name: name.trim() || 'New Fluid Node Canvas',
+      viewport: snapshot.viewport,
+      settings: snapshot.settings,
+      snapshot
+    };
+
+    setIsBusy(true);
+    setStatus('Creating canvas...');
+    try {
+      const result = await canvasApi.create(payload);
+      await refreshCanvases();
+      applyCanvasSnapshot(result.canvas);
+      setStatus('New canvas created.');
+    } catch (err) {
+      setStatus(err.message);
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const panelStyle = {
+    width: '260px',
+    background: 'rgba(10,10,15,0.82)',
+    backdropFilter: 'blur(14px)',
+    border: '1px solid rgba(255,255,255,0.12)',
+    borderRadius: '10px',
+    padding: '12px',
+    color: '#fff',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    zIndex: 15,
+    boxShadow: '0 14px 40px rgba(0,0,0,0.35)'
+  };
+
+  const controlStyle = {
+    minHeight: '36px',
+    borderRadius: '8px',
+    border: '1px solid rgba(255,255,255,0.14)',
+    background: 'rgba(255,255,255,0.08)',
+    color: '#fff',
+    padding: '0 10px',
+    outline: 'none'
+  };
+
+  return (
+    <div style={panelStyle}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Canvas</div>
+          <div style={{ fontSize: '0.95rem', fontWeight: 800 }}>{user ? (activeCanvasName || 'Unsaved Canvas') : 'Login required'}</div>
+        </div>
+        <button type="button" onClick={createNewCanvas} disabled={!user || isBusy} style={{ ...controlStyle, cursor: user && !isBusy ? 'pointer' : 'not-allowed', opacity: user ? 1 : 0.5 }}>
+          New
+        </button>
+      </div>
+
+      {user && (
+        <>
+          <select
+            value={activeCanvasId || ''}
+            onChange={(event) => loadCanvas(event.target.value)}
+            disabled={isBusy}
+            style={controlStyle}
+            aria-label="Load saved canvas"
+          >
+            <option value="">Unsaved canvas</option>
+            {canvases.map((canvas) => (
+              <option key={canvas.id} value={canvas.id}>{canvas.name}</option>
+            ))}
+          </select>
+
+          <input
+            value={draftName}
+            onChange={(event) => setDraftName(event.target.value)}
+            disabled={isBusy}
+            style={controlStyle}
+            aria-label="Canvas name"
+          />
+
+          <button
+            type="button"
+            onClick={saveCanvas}
+            disabled={isBusy}
+            style={{
+              ...controlStyle,
+              borderColor: 'rgba(75,94,250,0.72)',
+              background: 'linear-gradient(135deg, rgba(75,94,250,0.88), rgba(0,255,204,0.28))',
+              cursor: isBusy ? 'not-allowed' : 'pointer',
+              fontWeight: 800
+            }}
+          >
+            {isBusy ? 'Working...' : activeCanvasId ? 'Save Canvas' : 'Create & Save'}
+          </button>
+        </>
+      )}
+
+      {status && (
+        <div style={{ fontSize: '0.78rem', color: status.includes('failed') || status.includes('required') || status.includes('Login') ? '#ffb4b4' : 'rgba(255,255,255,0.68)' }}>
+          {status}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function HeroCanvas() {
+  const { user } = useAuth();
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [activeIndex, setActiveIndex] = useState(null);
   const [activeGroupMedias, setActiveGroupMedias] = useState([]);
   const activeMedia = activeIndex !== null ? activeGroupMedias[activeIndex] : null;
+  const [canvases, setCanvases] = useState([]);
+  const [activeCanvasId, setActiveCanvasId] = useState(null);
+  const [activeCanvasName, setActiveCanvasName] = useState('');
+  const [canvasStatus, setCanvasStatus] = useState('');
   
   const containerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -978,6 +1276,28 @@ export default function HeroCanvas() {
                 <div style={{ width: '16px', height: '16px', background: 'white', borderRadius: '50%', position: 'absolute', top: '2px', left: interactionMode === 'pan' ? '18px' : '2px', transition: 'all 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
               </div>
             </div>
+
+            {isEditMode && (
+              <CanvasPersistencePanel
+                user={user}
+                canvases={canvases}
+                setCanvases={setCanvases}
+                activeCanvasId={activeCanvasId}
+                setActiveCanvasId={setActiveCanvasId}
+                activeCanvasName={activeCanvasName}
+                setActiveCanvasName={setActiveCanvasName}
+                nodes={nodes}
+                setNodes={setNodes}
+                edges={edges}
+                setEdges={setEdges}
+                collapsedBranches={collapsedBranches}
+                setCollapsedBranches={setCollapsedBranches}
+                interactionMode={interactionMode}
+                setInteractionMode={setInteractionMode}
+                status={canvasStatus}
+                setStatus={setCanvasStatus}
+              />
+            )}
           </div>
         </Panel>
         <MultiSelectHint interactionMode={interactionMode} />
