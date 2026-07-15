@@ -1,0 +1,23 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "droplet",
+	"main": "worker/index.js",
+	"compatibility_date": "2026-07-15",
+	"assets": {
+		"directory": "./dist",
+		"not_found_handling": "single-page-application"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "droplet-prod",
+			"database_id": "replace-with-cloudflare-d1-database-id"
+		},
+		{
+			"binding": "droplet_prod",
+			"database_name": "droplet-prod",
+			"database_id": "e9e21e3d-dc12-4083-958d-8f20eef19c55",
+			"remote": true
+		}
+	]
+}
