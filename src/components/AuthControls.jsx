@@ -46,6 +46,14 @@ export default function AuthControls() {
     return source.slice(0, 2).toUpperCase();
   }, [user]);
 
+  const isProfileDirty = useMemo(() => {
+    if (!user) return false;
+    return (
+      profileForm.displayName !== (user.displayName || '') ||
+      profileForm.avatarUrl !== (user.avatarUrl || '')
+    );
+  }, [profileForm.avatarUrl, profileForm.displayName, user]);
+
   useEffect(() => {
     if (user) {
       setProfileForm({
@@ -81,6 +89,7 @@ export default function AuthControls() {
 
   const handleProfileSubmit = async (event) => {
     event.preventDefault();
+    if (!isProfileDirty || isSubmitting) return;
     setProfileStatus('');
     setIsSubmitting(true);
     try {
@@ -234,9 +243,9 @@ export default function AuthControls() {
                 <input value={profileForm.displayName} onChange={(e) => setProfileForm({ ...profileForm, displayName: e.target.value })} autoComplete="name" />
               </label>
               {profileStatus && <div className={`drawer-status ${profileStatus.includes('updated') || profileStatus.includes('saved') || profileStatus.includes('cleared') ? 'success' : 'error'}`}>{profileStatus}</div>}
-              <button className="drawer-primary" type="submit" disabled={isSubmitting}>
+              <button className="drawer-primary" type="submit" disabled={isSubmitting || !isProfileDirty}>
                 <Save size={17} />
-                {isSubmitting ? 'Saving...' : 'Save Profile'}
+                {isSubmitting ? 'Saving...' : isProfileDirty ? 'Save Profile' : 'Saved'}
               </button>
             </form>
             <div className="account-meta">
