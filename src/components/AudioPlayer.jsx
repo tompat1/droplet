@@ -293,7 +293,7 @@ export default function AudioPlayer() {
   const [playlistOpen, setPlaylistOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [pos, setPos] = useState(null);       // { x, y } or null = default top-right
+  const [pos, setPos] = useState(null);       // { x, y } or null = default top-left
   const [docked, setDocked] = useState(null); // 'left'|'right'|'top'|'bottom'|null
 
   const audioRef = useRef(null);
@@ -439,7 +439,7 @@ export default function AudioPlayer() {
   /* ── Position ── */
   const posStyle = pos
     ? { left: pos.x, top: pos.y, right: 'auto' }
-    : { top: '28px', right: '28px' };
+    : { top: '28px', left: '28px', right: 'auto' };
 
   return (
     <>
