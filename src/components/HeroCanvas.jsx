@@ -32,6 +32,37 @@ const ExitFullscreenIcon = () => (
   </svg>
 );
 
+const UploadIcon = () => (
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 16V4" />
+    <path d="m7 9 5-5 5 5" />
+    <path d="M4 20h16" />
+  </svg>
+);
+
+const IMPORT_GRID_X = 380;
+const IMPORT_GRID_Y = 430;
+const MAX_IMPORT_FILES = 24;
+
+const titleFromFileName = (fileName = 'Imported Image') => {
+  const cleaned = String(fileName || 'Imported Image')
+    .split('/')
+    .pop()
+    .replace(/\.(webp|png|jpe?g|gif|svg)$/i, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned || /^image$/i.test(cleaned)) return 'Imported Image';
+  return cleaned.replace(/\b\w/g, (letter) => letter.toUpperCase());
+};
+
+const isEditableTarget = (target) => (
+  target instanceof HTMLElement &&
+  Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
+);
+
+const imageFilesFromList = (files) => Array.from(files || []).filter((file) => file?.type?.startsWith('image/'));
+
 const MultiSelectHint = ({ interactionMode }) => {
   const [isHovered, setIsHovered] = useState(false);
   const kbdStyle = { background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace' };
@@ -740,16 +771,6 @@ productShots.forEach((productFilename, index) => {
   });
 });
 
-const allCanvasMedias = initialNodes
-  .filter(node => node.data && (node.data.image || node.data.video || node.data.colors))
-  .map(node => ({
-    type: node.data.image ? 'image' : (node.data.video ? 'video' : 'palette'),
-    src: node.data.image || node.data.video || 'palette-' + node.id,
-    title: node.data.title,
-    colors: node.data.colors,
-    nodeGroup: node.data.nodeGroup
-  }));
-
 const createBrandGuideCanvasSnapshot = ({ brandName, guideUrl, guideNotes }) => {
   const title = `${brandName} Brand Guide`;
   const description = guideNotes || `Single source of truth for ${brandName}: logo, typography, colors, tone, layout rules, and all visual decisions used by generated branches.`;
@@ -1206,7 +1227,8 @@ const CanvasToolbox = ({
   undoStack,
   undoLastAction,
   isFullscreen,
-  toggleFullscreen
+  toggleFullscreen,
+  onImportImagesClick
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [toolboxPosition, setToolboxPosition] = useState(() => {
@@ -1426,6 +1448,9 @@ const CanvasToolbox = ({
                 <path d="M20 15v5h-5" />
               </svg>
             </button>
+            <button type="button" onClick={onImportImagesClick} style={iconButtonStyle} title="Upload images to canvas" aria-label="Upload images to canvas">
+              <UploadIcon />
+            </button>
             <button type="button" onClick={() => zoomTo(1, { duration: 350 })} style={{ ...iconButtonStyle, fontSize: '0.78rem', fontFamily: 'monospace' }} title="Zoom 1:1" aria-label="Zoom 1:1">1:1</button>
             <button type="button" onClick={toggleFullscreen} style={iconButtonStyle} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
               {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
@@ -1464,6 +1489,9 @@ const CanvasToolbox = ({
                   <path d="M4 15v5h5" />
                   <path d="M20 15v5h-5" />
                 </svg>
+              </button>
+              <button type="button" onClick={onImportImagesClick} style={iconButtonStyle} title="Upload images to canvas" aria-label="Upload images to canvas">
+                <UploadIcon />
               </button>
               <button type="button" onClick={() => zoomTo(1, { duration: 350 })} style={{ ...iconButtonStyle, fontSize: '0.78rem', fontFamily: 'monospace' }} title="Zoom 1:1" aria-label="Zoom 1:1">1:1</button>
               <button type="button" onClick={toggleFullscreen} style={iconButtonStyle} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
@@ -1579,6 +1607,11 @@ export default function HeroCanvas() {
   const [isEditMode, setIsEditMode] = useState(false);
   
   const [interactionMode, setInteractionMode] = useState('pan');
+  const [isImportDragActive, setIsImportDragActive] = useState(false);
+  const reactFlowInstanceRef = useRef(null);
+  const canvasUploadInputRef = useRef(null);
+  const dragDepthRef = useRef(0);
+  const lastCanvasPointerRef = useRef({ x: 0, y: 0 });
 
   const graphChangeTypes = useMemo(() => new Set(['position', 'dimensions', 'add', 'remove', 'replace']), []);
   const edgeChangeTypes = useMemo(() => new Set(['add', 'remove', 'replace']), []);
@@ -1592,6 +1625,133 @@ export default function HeroCanvas() {
   }, [setEdges]);
   const pushUndoAction = useCallback((action) => {
     setUndoStack((stack) => [action, ...stack].slice(0, 12));
+  }, []);
+
+  const canvasMedias = useMemo(() => nodes
+    .filter(node => node.data && (node.data.image || node.data.video || node.data.colors))
+    .map(node => ({
+      type: node.data.image ? 'image' : (node.data.video ? 'video' : 'palette'),
+      src: node.data.image || node.data.video || 'palette-' + node.id,
+      title: node.data.title,
+      colors: node.data.colors,
+      nodeGroup: node.data.nodeGroup || 'canvas'
+    })), [nodes]);
+
+  const clientPointToCanvasPoint = useCallback((clientX, clientY) => {
+    const instance = reactFlowInstanceRef.current;
+    if (instance?.screenToFlowPosition) {
+      return instance.screenToFlowPosition({ x: clientX, y: clientY });
+    }
+
+    const rect = containerRef.current?.getBoundingClientRect();
+    return {
+      x: clientX - (rect?.left || 0),
+      y: clientY - (rect?.top || 0)
+    };
+  }, []);
+
+  const containerCenterCanvasPoint = useCallback(() => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return clientPointToCanvasPoint(window.innerWidth / 2, window.innerHeight / 2);
+    return clientPointToCanvasPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  }, [clientPointToCanvasPoint]);
+
+  const createImportedImageCards = useCallback(async (files, originPoint, source = 'upload') => {
+    const imageFiles = imageFilesFromList(files).slice(0, MAX_IMPORT_FILES);
+    if (imageFiles.length === 0) return;
+
+    const skippedCount = imageFilesFromList(files).length - imageFiles.length;
+    setCanvasStatus(`Importing ${imageFiles.length} image${imageFiles.length === 1 ? '' : 's'}...`);
+
+    const importedNodes = [];
+    const failedNames = [];
+    for (let index = 0; index < imageFiles.length; index += 1) {
+      const file = imageFiles[index];
+      try {
+        const image = await readImageFileAsDataUrl(file);
+        const column = index % 3;
+        const row = Math.floor(index / 3);
+        importedNodes.push({
+          id: `import-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+          type: 'brandCard',
+          position: {
+            x: originPoint.x + column * IMPORT_GRID_X,
+            y: originPoint.y + row * IMPORT_GRID_Y
+          },
+          data: {
+            title: titleFromFileName(file.name),
+            subtitle: source === 'paste' ? 'Pasted Image' : 'Imported Asset',
+            image,
+            description: source === 'paste'
+              ? 'Pasted into the Fluid Node Canvas. Use it as a reference, branch from it, or fold it into the brand system.'
+              : `Uploaded from ${file.name || 'device'}. Use it as a reference, branch from it, or fold it into the brand system.`,
+            nodeGroup: 'imports',
+            isImported: true,
+            importedAt: new Date().toISOString()
+          }
+        });
+      } catch (error) {
+        failedNames.push(file.name || `image ${index + 1}`);
+        console.warn('Image import failed:', error);
+      }
+    }
+
+    if (importedNodes.length > 0) {
+      setNodes((nds) => [...nds, ...importedNodes]);
+      setIsCanvasDirty(true);
+      setIsEditMode(true);
+    }
+
+    const importedText = importedNodes.length === 1 ? 'Imported 1 image.' : `Imported ${importedNodes.length} images.`;
+    const skippedText = skippedCount > 0 ? ` Skipped ${skippedCount} over the ${MAX_IMPORT_FILES}-file limit.` : '';
+    const failedText = failedNames.length > 0 ? ` ${failedNames.length} could not be imported.` : '';
+    setCanvasStatus(importedNodes.length > 0 ? `${importedText}${skippedText}${failedText}` : `No images imported.${failedText}`);
+  }, [setNodes]);
+
+  const openCanvasUploadPicker = useCallback(() => {
+    canvasUploadInputRef.current?.click();
+  }, []);
+
+  const handleCanvasUpload = useCallback((event) => {
+    const files = event.target.files;
+    event.target.value = '';
+    createImportedImageCards(files, containerCenterCanvasPoint(), 'upload');
+  }, [containerCenterCanvasPoint, createImportedImageCards]);
+
+  const hasFileDrag = (event) => Array.from(event.dataTransfer?.types || []).includes('Files');
+
+  const handleCanvasDragEnter = useCallback((event) => {
+    if (!hasFileDrag(event)) return;
+    dragDepthRef.current += 1;
+    setIsImportDragActive(true);
+  }, []);
+
+  const handleCanvasDragLeave = useCallback((event) => {
+    if (!hasFileDrag(event)) return;
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setIsImportDragActive(false);
+  }, []);
+
+  const handleCanvasDragOver = useCallback((event) => {
+    if (!hasFileDrag(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handleCanvasDrop = useCallback((event) => {
+    if (!hasFileDrag(event)) return;
+    event.preventDefault();
+    dragDepthRef.current = 0;
+    setIsImportDragActive(false);
+    createImportedImageCards(event.dataTransfer.files, clientPointToCanvasPoint(event.clientX, event.clientY), 'drop');
+  }, [clientPointToCanvasPoint, createImportedImageCards]);
+
+  const handleCanvasPointerMove = useCallback((event) => {
+    lastCanvasPointerRef.current = { x: event.clientX, y: event.clientY };
+  }, []);
+
+  const handleCanvasPointerDown = useCallback(() => {
+    containerRef.current?.focus?.({ preventScroll: true });
   }, []);
 
   const undoLastAction = useCallback(() => {
@@ -1711,6 +1871,35 @@ export default function HeroCanvas() {
     return () => window.removeEventListener('openHeroCanvasEditor', handleOpenEditor);
   }, []);
 
+  useEffect(() => {
+    const handlePaste = (event) => {
+      if (isEditableTarget(event.target)) return;
+      const canvasElement = containerRef.current;
+      if (!canvasElement) return;
+      const isCanvasFocused = document.activeElement === canvasElement || canvasElement.contains(document.activeElement);
+      const isPointerOverCanvas = canvasElement.matches(':hover');
+      if (!isCanvasFocused && !isPointerOverCanvas && !isFullscreen) return;
+
+      const clipboardFiles = imageFilesFromList(event.clipboardData?.files);
+      const itemFiles = Array.from(event.clipboardData?.items || [])
+        .filter((item) => item.type?.startsWith('image/'))
+        .map((item) => item.getAsFile())
+        .filter(Boolean);
+      const files = clipboardFiles.length > 0 ? clipboardFiles : itemFiles;
+      if (files.length === 0) return;
+
+      event.preventDefault();
+      const lastPointer = lastCanvasPointerRef.current;
+      const originPoint = lastPointer.x || lastPointer.y
+        ? clientPointToCanvasPoint(lastPointer.x, lastPointer.y)
+        : containerCenterCanvasPoint();
+      createImportedImageCards(files, originPoint, 'paste');
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [clientPointToCanvasPoint, containerCenterCanvasPoint, createImportedImageCards, isFullscreen]);
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       containerRef.current?.requestFullscreen?.();
@@ -1783,14 +1972,14 @@ export default function HeroCanvas() {
   const onNodeClick = useCallback((event, node) => {
     const src = node.data.image || node.data.video || (node.data.colors ? 'palette-' + node.id : null);
     if (src) {
-      const groupMedias = allCanvasMedias.filter(m => m.nodeGroup === node.data.nodeGroup);
+      const groupMedias = canvasMedias.filter(m => m.nodeGroup === (node.data.nodeGroup || 'canvas'));
       const index = groupMedias.findIndex(m => m.src === src);
       if (index !== -1) {
         setActiveGroupMedias(groupMedias);
         setActiveIndex(index);
       }
     }
-  }, []);
+  }, [canvasMedias]);
 
   const handleNext = () => setActiveIndex(prev => (prev + 1) % activeGroupMedias.length);
   const handlePrev = () => setActiveIndex(prev => (prev - 1 + activeGroupMedias.length) % activeGroupMedias.length);
@@ -1808,10 +1997,29 @@ export default function HeroCanvas() {
         </div>
       )}
       
-      <div ref={containerRef} style={{ width: '100%', minHeight: '500px', height: isFullscreen ? '100vh' : 'calc(100vh - 120px)', position: 'relative', backgroundColor: isFullscreen ? '#050505' : 'transparent', marginTop: '20px' }}>
+      <div
+        ref={containerRef}
+        tabIndex={0}
+        onDragEnter={handleCanvasDragEnter}
+        onDragLeave={handleCanvasDragLeave}
+        onDragOver={handleCanvasDragOver}
+        onDrop={handleCanvasDrop}
+        onPointerMove={handleCanvasPointerMove}
+        onPointerDown={handleCanvasPointerDown}
+        style={{ width: '100%', minHeight: '500px', height: isFullscreen ? '100vh' : 'calc(100vh - 120px)', position: 'relative', backgroundColor: isFullscreen ? '#050505' : 'transparent', marginTop: '20px', outline: 'none' }}
+      >
+      <input
+        ref={canvasUploadInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        style={{ display: 'none' }}
+        onChange={handleCanvasUpload}
+      />
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        onInit={(instance) => { reactFlowInstanceRef.current = instance; }}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
@@ -1855,6 +2063,7 @@ export default function HeroCanvas() {
           undoLastAction={undoLastAction}
           isFullscreen={isFullscreen}
           toggleFullscreen={toggleFullscreen}
+          onImportImagesClick={openCanvasUploadPicker}
         />
         <MultiSelectHint interactionMode={interactionMode} />
         <NodeSearch />
@@ -1876,6 +2085,43 @@ export default function HeroCanvas() {
           zoomable={true}
         />
       </ReactFlow>
+
+      {isImportDragActive && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: '18px',
+            zIndex: 30,
+            pointerEvents: 'none',
+            border: '1px solid rgba(0,255,204,0.72)',
+            borderRadius: '18px',
+            background: 'rgba(2, 8, 12, 0.58)',
+            boxShadow: '0 0 0 1px rgba(75,94,250,0.35), 0 24px 90px rgba(0,0,0,0.45), inset 0 0 40px rgba(0,255,204,0.08)',
+            backdropFilter: 'blur(8px)',
+            display: 'grid',
+            placeItems: 'center'
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '14px 18px',
+              borderRadius: '14px',
+              border: '1px solid rgba(255,255,255,0.15)',
+              background: 'rgba(8,8,14,0.82)',
+              color: '#fff',
+              fontWeight: 900,
+              letterSpacing: '0.02em',
+              boxShadow: '0 14px 40px rgba(0,0,0,0.35)'
+            }}
+          >
+            <UploadIcon />
+            Drop images to create canvas cards
+          </div>
+        </div>
+      )}
       
       {activeMedia && (
         <MediaModal 
