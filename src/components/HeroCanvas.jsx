@@ -1123,9 +1123,76 @@ const CanvasToolbox = ({
   toggleFullscreen
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
+  const [toolboxPosition, setToolboxPosition] = useState(() => {
+    try {
+      const stored = localStorage.getItem('hero-canvas-toolbox-position');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Number.isFinite(parsed.x) && Number.isFinite(parsed.y)) return parsed;
+      }
+    } catch {
+      return { x: 16, y: 16 };
+    }
+    return { x: 16, y: 16 };
+  });
+  const dragRef = useRef(null);
   const { zoom } = useViewport();
   const { zoomIn, zoomOut, zoomTo, fitView } = useReactFlow();
   const zoomPercent = Math.round(zoom * 100);
+
+  const clampToolboxPosition = useCallback((position) => {
+    const width = isMinimized ? 58 : Math.min(360, window.innerWidth - 40);
+    const height = isMinimized ? 390 : 560;
+    const maxX = Math.max(8, window.innerWidth - width - 8);
+    const maxY = Math.max(8, window.innerHeight - height - 8);
+    return {
+      x: Math.min(Math.max(8, position.x), maxX),
+      y: Math.min(Math.max(8, position.y), maxY)
+    };
+  }, [isMinimized]);
+
+  useEffect(() => {
+    localStorage.setItem('hero-canvas-toolbox-position', JSON.stringify(toolboxPosition));
+  }, [toolboxPosition]);
+
+  useEffect(() => {
+    if (!dragRef.current) return undefined;
+
+    const handlePointerMove = (event) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      setToolboxPosition(clampToolboxPosition({
+        x: event.clientX - drag.offsetX,
+        y: event.clientY - drag.offsetY
+      }));
+    };
+
+    const handlePointerUp = () => {
+      dragRef.current = null;
+      document.body.style.userSelect = '';
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      document.body.style.userSelect = '';
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [clampToolboxPosition, toolboxPosition]);
+
+  const startToolboxDrag = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dragRef.current = {
+      offsetX: event.clientX - toolboxPosition.x,
+      offsetY: event.clientY - toolboxPosition.y
+    };
+    document.body.style.userSelect = 'none';
+  };
 
   const toolboxStyle = {
     width: isMinimized ? '58px' : 'min(360px, calc(100vw - 40px))',
@@ -1174,6 +1241,30 @@ const CanvasToolbox = ({
     pointerEvents: 'none'
   };
 
+  const fitViewButtonStyle = {
+    ...iconButtonStyle,
+    borderColor: 'rgba(255, 106, 0, 0.52)',
+    background: 'linear-gradient(135deg, rgba(255, 106, 0, 0.24), rgba(255, 179, 71, 0.08))',
+    color: '#ffb347',
+    boxShadow: '0 0 16px rgba(255, 106, 0, 0.18), inset 0 1px 0 rgba(255,255,255,0.1)'
+  };
+
+  const dragHandleStyle = {
+    minHeight: isMinimized ? '26px' : '30px',
+    borderRadius: '10px',
+    border: '1px solid rgba(255,255,255,0.08)',
+    background: 'rgba(255,255,255,0.045)',
+    color: 'rgba(255,255,255,0.42)',
+    cursor: 'grab',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    touchAction: 'none',
+    letterSpacing: '0.12em',
+    fontSize: isMinimized ? '0.86rem' : '0.9rem',
+    fontWeight: 900
+  };
+
   const modeButton = (active, accent) => ({
     minHeight: '58px',
     flex: 1,
@@ -1215,15 +1306,23 @@ const CanvasToolbox = ({
   });
 
   return (
-    <Panel position="top-left" style={{ margin: '16px', zIndex: 15 }}>
+    <Panel position="top-left" style={{ margin: 0, zIndex: 15, transform: `translate(${toolboxPosition.x}px, ${toolboxPosition.y}px)` }}>
       <div style={toolboxStyle}>
         {isMinimized ? (
           <>
+            <div
+              onPointerDown={startToolboxDrag}
+              style={dragHandleStyle}
+              title="Drag canvas tools"
+              aria-label="Drag canvas tools"
+            >
+              ⋮
+            </div>
             <button type="button" onClick={() => setIsMinimized(false)} style={iconButtonStyle} title="Expand canvas tools" aria-label="Expand canvas tools">›</button>
             <button type="button" onClick={() => zoomOut({ duration: 250 })} style={iconButtonStyle} title="Zoom out" aria-label="Zoom out">−</button>
             <div style={zoomChipStyle}>{zoomPercent}%</div>
             <button type="button" onClick={() => zoomIn({ duration: 250 })} style={iconButtonStyle} title="Zoom in" aria-label="Zoom in">+</button>
-            <button type="button" onClick={() => fitView({ duration: 350, padding: 0.18 })} style={iconButtonStyle} title="Fit view" aria-label="Fit view">
+            <button type="button" onClick={() => fitView({ duration: 350, padding: 0.18 })} style={fitViewButtonStyle} title="Fit view" aria-label="Fit view">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M4 9V4h5" />
                 <path d="M20 9V4h-5" />
@@ -1243,8 +1342,16 @@ const CanvasToolbox = ({
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-              <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.5)', fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-                Canvas Tools
+              <div
+                onPointerDown={startToolboxDrag}
+                style={{ ...dragHandleStyle, flex: 1, justifyContent: 'flex-start', padding: '0 10px', gap: '10px' }}
+                title="Drag canvas tools"
+                aria-label="Drag canvas tools"
+              >
+                <span style={{ color: 'rgba(255,255,255,0.34)', fontSize: '1rem', letterSpacing: '0.02em' }}>⋮⋮</span>
+                <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.52)', fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                  Canvas Tools
+                </span>
               </div>
               <button type="button" onClick={() => setIsMinimized(true)} style={{ ...iconButtonStyle, width: '40px', height: '36px' }} title="Minimize canvas tools" aria-label="Minimize canvas tools">‹</button>
             </div>
@@ -1252,7 +1359,7 @@ const CanvasToolbox = ({
               <button type="button" onClick={() => zoomOut({ duration: 250 })} style={iconButtonStyle} title="Zoom out" aria-label="Zoom out">−</button>
               <div style={zoomChipStyle}>{zoomPercent}%</div>
               <button type="button" onClick={() => zoomIn({ duration: 250 })} style={iconButtonStyle} title="Zoom in" aria-label="Zoom in">+</button>
-              <button type="button" onClick={() => fitView({ duration: 350, padding: 0.18 })} style={iconButtonStyle} title="Fit view" aria-label="Fit view">
+              <button type="button" onClick={() => fitView({ duration: 350, padding: 0.18 })} style={fitViewButtonStyle} title="Fit view" aria-label="Fit view">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M4 9V4h5" />
                   <path d="M20 9V4h-5" />
