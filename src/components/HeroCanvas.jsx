@@ -1155,15 +1155,21 @@ const CanvasToolbox = ({
     localStorage.setItem('hero-canvas-toolbox-position', JSON.stringify(toolboxPosition));
   }, [toolboxPosition]);
 
-  useEffect(() => {
-    if (!dragRef.current) return undefined;
+  const startToolboxDrag = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dragRef.current = {
+      offsetX: event.clientX - toolboxPosition.x,
+      offsetY: event.clientY - toolboxPosition.y
+    };
+    document.body.style.userSelect = 'none';
 
-    const handlePointerMove = (event) => {
+    const handlePointerMove = (moveEvent) => {
       const drag = dragRef.current;
       if (!drag) return;
       setToolboxPosition(clampToolboxPosition({
-        x: event.clientX - drag.offsetX,
-        y: event.clientY - drag.offsetY
+        x: moveEvent.clientX - drag.offsetX,
+        y: moveEvent.clientY - drag.offsetY
       }));
     };
 
@@ -1176,22 +1182,6 @@ const CanvasToolbox = ({
 
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
-
-    return () => {
-      document.body.style.userSelect = '';
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-    };
-  }, [clampToolboxPosition, toolboxPosition]);
-
-  const startToolboxDrag = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    dragRef.current = {
-      offsetX: event.clientX - toolboxPosition.x,
-      offsetY: event.clientY - toolboxPosition.y
-    };
-    document.body.style.userSelect = 'none';
   };
 
   const toolboxStyle = {
@@ -1250,20 +1240,27 @@ const CanvasToolbox = ({
   };
 
   const dragHandleStyle = {
-    minHeight: isMinimized ? '26px' : '30px',
-    borderRadius: '10px',
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: 'rgba(255,255,255,0.045)',
-    color: 'rgba(255,255,255,0.42)',
+    minHeight: isMinimized ? '32px' : '36px',
+    color: 'rgba(255,255,255,0.3)',
     cursor: 'grab',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     touchAction: 'none',
-    letterSpacing: '0.12em',
-    fontSize: isMinimized ? '0.86rem' : '0.9rem',
-    fontWeight: 900
+    padding: isMinimized ? '2px 0' : '4px',
+    transition: 'color 0.2s ease'
   };
+
+  const dragDots = (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="9" cy="5" r="2" />
+      <circle cx="15" cy="5" r="2" />
+      <circle cx="9" cy="12" r="2" />
+      <circle cx="15" cy="12" r="2" />
+      <circle cx="9" cy="19" r="2" />
+      <circle cx="15" cy="19" r="2" />
+    </svg>
+  );
 
   const modeButton = (active, accent) => ({
     minHeight: '58px',
@@ -1315,8 +1312,10 @@ const CanvasToolbox = ({
               style={dragHandleStyle}
               title="Drag canvas tools"
               aria-label="Drag canvas tools"
+              onMouseEnter={(event) => { event.currentTarget.style.color = 'rgba(255,255,255,0.8)'; }}
+              onMouseLeave={(event) => { event.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
             >
-              ⋮
+              {dragDots}
             </div>
             <button type="button" onClick={() => setIsMinimized(false)} style={iconButtonStyle} title="Expand canvas tools" aria-label="Expand canvas tools">›</button>
             <button type="button" onClick={() => zoomOut({ duration: 250 })} style={iconButtonStyle} title="Zoom out" aria-label="Zoom out">−</button>
@@ -1344,11 +1343,13 @@ const CanvasToolbox = ({
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
               <div
                 onPointerDown={startToolboxDrag}
-                style={{ ...dragHandleStyle, flex: 1, justifyContent: 'flex-start', padding: '0 10px', gap: '10px' }}
+                style={{ ...dragHandleStyle, flex: 1, justifyContent: 'flex-start', gap: '10px' }}
                 title="Drag canvas tools"
                 aria-label="Drag canvas tools"
+                onMouseEnter={(event) => { event.currentTarget.style.color = 'rgba(255,255,255,0.8)'; }}
+                onMouseLeave={(event) => { event.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
               >
-                <span style={{ color: 'rgba(255,255,255,0.34)', fontSize: '1rem', letterSpacing: '0.02em' }}>⋮⋮</span>
+                {dragDots}
                 <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.52)', fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
                   Canvas Tools
                 </span>
