@@ -19,6 +19,31 @@ const GENERATION_PROVIDERS = {
     defaultModel: 'veo-3.1-generate-preview'
   }
 };
+const OPENAI_IMAGE_PRICE_ESTIMATES_USD = {
+  'gpt-image-2': {
+    '1024x1024': { low: 0.006, medium: 0.053, high: 0.211 },
+    '1024x1536': { low: 0.005, medium: 0.041, high: 0.165 },
+    '1536x1024': { low: 0.005, medium: 0.041, high: 0.165 }
+  },
+  'gpt-image-1.5': {
+    '1024x1024': { low: 0.009, medium: 0.034, high: 0.133 },
+    '1024x1536': { low: 0.013, medium: 0.05, high: 0.2 },
+    '1536x1024': { low: 0.013, medium: 0.05, high: 0.2 }
+  },
+  'gpt-image-1': {
+    '1024x1024': { low: 0.011, medium: 0.042, high: 0.167 },
+    '1024x1536': { low: 0.016, medium: 0.063, high: 0.25 },
+    '1536x1024': { low: 0.016, medium: 0.063, high: 0.25 }
+  },
+  'gpt-image-1-mini': {
+    '1024x1024': { low: 0.005, medium: 0.011, high: 0.036 },
+    '1024x1536': { low: 0.006, medium: 0.015, high: 0.052 },
+    '1536x1024': { low: 0.006, medium: 0.015, high: 0.052 }
+  }
+};
+const DEFAULT_IMAGE_SIZE = '1024x1024';
+const DEFAULT_IMAGE_QUALITY = 'medium';
+const DEFAULT_VEO_SECONDS = 8;
 
 export default {
   async fetch(request, env) {
@@ -82,7 +107,11 @@ async function routeApi(request, env, url) {
   }
 
   if (request.method === 'POST' && path === '/generate/branch') {
-    return createGenerationBranch(request, env);
+    return createGenerationBranch(request, env, session.user.id);
+  }
+
+  if (request.method === 'GET' && path === '/usage/summary') {
+    return getUsageSummary(env, session.user.id);
   }
 
   if (path.startsWith('/admin/')) {
@@ -380,7 +409,7 @@ async function createCanvasVersion(env, userId, canvasId) {
   return json({ id: versionId }, 201);
 }
 
-async function createGenerationBranch(request, env) {
+async function createGenerationBranch(request, env, userId) {
   let input = { provider: 'unknown' };
   try {
     input = normalizeGenerationPayload(await readJson(request));
@@ -396,6 +425,9 @@ async function createGenerationBranch(request, env) {
       branch = await generateGoogleVeo(env, input);
     }
 
+    const usage = estimateGenerationUsage(input, branch, provider);
+    await recordGenerationUsage(env, userId, input, branch, provider, usage);
+
     return json({
       branch: {
         ...branch,
@@ -403,8 +435,10 @@ async function createGenerationBranch(request, env) {
         providerLabel: provider.label,
         pipeline: provider.pipeline,
         prompt: input.prompt,
-        refs: input.refs
+        refs: input.refs,
+        usage
       },
+      usage,
       generatedAt: new Date().toISOString()
     }, 201);
   } catch (error) {
@@ -412,6 +446,101 @@ async function createGenerationBranch(request, env) {
     console.error('Generation branch failed', { provider: input.provider, message });
     const status = /required|unsupported/i.test(message) ? 400 : 502;
     return json({ error: `Generation failed: ${message}` }, status);
+  }
+}
+
+async function getUsageSummary(env, userId) {
+  let totals;
+  let byProvider;
+  let recent;
+  try {
+    totals = await env.DB.prepare(
+      `SELECT COUNT(*) AS request_count,
+              COALESCE(SUM(estimated_usd), 0) AS estimated_usd,
+              COALESCE(SUM(CASE WHEN pipeline = 'image' THEN 1 ELSE 0 END), 0) AS image_count,
+              COALESCE(SUM(CASE WHEN pipeline = 'video' THEN 1 ELSE 0 END), 0) AS video_count
+       FROM generation_usage
+       WHERE user_id = ?`
+    ).bind(userId).first();
+
+    byProvider = await env.DB.prepare(
+      `SELECT provider, provider_label, pipeline, COUNT(*) AS request_count, COALESCE(SUM(estimated_usd), 0) AS estimated_usd
+       FROM generation_usage
+       WHERE user_id = ?
+       GROUP BY provider, provider_label, pipeline
+       ORDER BY estimated_usd DESC`
+    ).bind(userId).all();
+
+    recent = await env.DB.prepare(
+      `SELECT id, provider, provider_label, pipeline, model, status, output_size, output_quality, estimated_usd, estimate_basis, created_at
+       FROM generation_usage
+       WHERE user_id = ?
+       ORDER BY created_at DESC
+       LIMIT 8`
+    ).bind(userId).all();
+  } catch (error) {
+    console.warn('Generation usage summary unavailable', error instanceof Error ? error.message : String(error));
+    totals = { request_count: 0, estimated_usd: 0, image_count: 0, video_count: 0 };
+    byProvider = { results: [] };
+    recent = { results: [] };
+  }
+
+  return json({
+    currency: 'USD',
+    summary: {
+      requestCount: Number(totals?.request_count || 0),
+      estimatedUsd: roundMoney(totals?.estimated_usd || 0),
+      imageCount: Number(totals?.image_count || 0),
+      videoCount: Number(totals?.video_count || 0)
+    },
+    byProvider: byProvider.results.map((row) => ({
+      provider: row.provider,
+      providerLabel: row.provider_label,
+      pipeline: row.pipeline,
+      requestCount: Number(row.request_count || 0),
+      estimatedUsd: roundMoney(row.estimated_usd || 0)
+    })),
+    recent: recent.results.map((row) => ({
+      id: row.id,
+      provider: row.provider,
+      providerLabel: row.provider_label,
+      pipeline: row.pipeline,
+      model: row.model,
+      status: row.status,
+      outputSize: row.output_size,
+      outputQuality: row.output_quality,
+      estimatedUsd: roundMoney(row.estimated_usd || 0),
+      estimateBasis: row.estimate_basis,
+      createdAt: row.created_at
+    }))
+  });
+}
+
+async function recordGenerationUsage(env, userId, input, branch, provider, usage) {
+  if (!usage || usage.mock) return;
+  try {
+    await env.DB.prepare(
+      `INSERT INTO generation_usage
+       (id, user_id, provider, provider_label, pipeline, model, status, prompt_chars, reference_count, output_count, output_size, output_quality, estimated_usd, estimate_basis)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      crypto.randomUUID(),
+      userId,
+      input.provider,
+      provider.label,
+      provider.pipeline,
+      branch.model || usage.model || '',
+      usage.status || 'estimated',
+      input.prompt.length,
+      input.refs.length + (Array.isArray(input.brandGuide?.nodes) ? input.brandGuide.nodes.filter((node) => node.image).length : 0),
+      usage.outputCount || 1,
+      usage.size || '',
+      usage.quality || '',
+      usage.estimatedUsd || 0,
+      usage.estimateBasis || ''
+    ).run();
+  } catch (error) {
+    console.warn('Generation usage tracking failed', error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -430,7 +559,9 @@ async function generateOpenAiImage(env, input) {
     body: JSON.stringify({
       model,
       prompt,
-      n: 1
+      n: 1,
+      size: input.size,
+      quality: input.quality
     })
   });
 
@@ -533,6 +664,9 @@ function normalizeGenerationPayload(body) {
     provider,
     pipeline: body.pipeline === 'video' ? 'video' : 'image',
     prompt,
+    size: normalizeGenerationSize(body.size),
+    quality: normalizeGenerationQuality(body.quality),
+    durationSeconds: normalizeDurationSeconds(body.durationSeconds),
     refs: normalizeUrlList(body.refs),
     brandGuide: normalizeBrandGuidePayload(body.brandGuide),
     parent: {
@@ -559,6 +693,87 @@ function normalizeBrandGuidePayload(value) {
   };
 }
 
+function estimateGenerationUsage(input, branch, provider) {
+  const model = branch.model || GENERATION_PROVIDERS[input.provider]?.defaultModel || '';
+  if (branch.mock) {
+    return {
+      provider: input.provider,
+      providerLabel: provider.label,
+      pipeline: provider.pipeline,
+      model,
+      estimatedUsd: 0,
+      currency: 'USD',
+      status: 'mock',
+      mock: true,
+      estimateBasis: 'No provider API key configured; placeholder branch only.'
+    };
+  }
+
+  if (input.provider === 'openai_image') {
+    const normalizedModel = OPENAI_IMAGE_PRICE_ESTIMATES_USD[model] ? model : 'gpt-image-2';
+    const size = OPENAI_IMAGE_PRICE_ESTIMATES_USD[normalizedModel][input.size] ? input.size : DEFAULT_IMAGE_SIZE;
+    const quality = OPENAI_IMAGE_PRICE_ESTIMATES_USD[normalizedModel][size][input.quality] ? input.quality : DEFAULT_IMAGE_QUALITY;
+    const estimatedUsd = OPENAI_IMAGE_PRICE_ESTIMATES_USD[normalizedModel][size][quality];
+    return {
+      provider: input.provider,
+      providerLabel: provider.label,
+      pipeline: provider.pipeline,
+      model,
+      estimatedUsd,
+      currency: 'USD',
+      status: 'estimated',
+      outputCount: 1,
+      size,
+      quality,
+      estimateBasis: `OpenAI image calculator estimate for ${normalizedModel}, ${size}, ${quality}; excludes variable prompt/reference input token costs.`
+    };
+  }
+
+  if (input.provider === 'gemini_banana_pro') {
+    return {
+      provider: input.provider,
+      providerLabel: provider.label,
+      pipeline: provider.pipeline,
+      model,
+      estimatedUsd: 0.039,
+      currency: 'USD',
+      status: 'estimated',
+      outputCount: 1,
+      size: input.size,
+      quality: input.quality,
+      estimateBasis: 'Gemini image estimate using Google Gemini 2.5 Flash Image 1024px output equivalent; update when model-specific Banana Pro pricing is published.'
+    };
+  }
+
+  if (input.provider === 'google_veo') {
+    const seconds = input.durationSeconds || DEFAULT_VEO_SECONDS;
+    const pricePerSecond = model.includes('fast') ? 0.10 : model.includes('lite') ? 0.05 : 0.40;
+    return {
+      provider: input.provider,
+      providerLabel: provider.label,
+      pipeline: provider.pipeline,
+      model,
+      estimatedUsd: roundMoney(seconds * pricePerSecond),
+      currency: 'USD',
+      status: branch.status === 'processing' ? 'pending-estimate' : 'estimated',
+      outputCount: 1,
+      durationSeconds: seconds,
+      estimateBasis: `Google Veo estimate at $${pricePerSecond.toFixed(2)}/second for ${seconds}s; final charge applies only if provider completes the video.`
+    };
+  }
+
+  return {
+    provider: input.provider,
+    providerLabel: provider.label,
+    pipeline: provider.pipeline,
+    model,
+    estimatedUsd: 0,
+    currency: 'USD',
+    status: 'unknown',
+    estimateBasis: 'No pricing estimate available for this provider.'
+  };
+}
+
 function mockGenerationBranch(input, model, reason) {
   const provider = GENERATION_PROVIDERS[input.provider] || GENERATION_PROVIDERS.openai_image;
   return {
@@ -570,6 +785,24 @@ function mockGenerationBranch(input, model, reason) {
     mock: true,
     operationName: ''
   };
+}
+
+function normalizeGenerationSize(value) {
+  const size = cleanText(value, 20).toLowerCase().replace(/\s+/g, '');
+  if (['1024x1024', '1024x1536', '1536x1024'].includes(size)) return size;
+  return DEFAULT_IMAGE_SIZE;
+}
+
+function normalizeGenerationQuality(value) {
+  const quality = cleanText(value, 20).toLowerCase();
+  if (['low', 'medium', 'high'].includes(quality)) return quality;
+  return DEFAULT_IMAGE_QUALITY;
+}
+
+function normalizeDurationSeconds(value) {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds)) return DEFAULT_VEO_SECONDS;
+  return Math.min(30, Math.max(1, Math.round(seconds)));
 }
 
 function geminiInteractionInput(input) {
@@ -816,6 +1049,7 @@ function stripRuntimeCardData(data) {
   delete copy.setGlobalNodes;
   delete copy.setGlobalEdges;
   delete copy.onToggleCollapse;
+  delete copy.onGenerationUsageUpdate;
   delete copy.isHighlighted;
   delete copy.isParentCollapsed;
   delete copy.parentOffsetX;
@@ -946,6 +1180,10 @@ function normalizeEmail(value) {
 
 function cleanText(value, maxLength) {
   return String(value || '').trim().slice(0, maxLength);
+}
+
+function roundMoney(value) {
+  return Math.round(Number(value || 0) * 1000000) / 1000000;
 }
 
 function normalizeAvatarUrl(value) {

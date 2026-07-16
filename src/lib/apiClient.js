@@ -41,6 +41,10 @@ export const generationApi = {
   createBranch: (input) => apiRequest('/generate/branch', { method: 'POST', body: input })
 };
 
+export const usageApi = {
+  summary: () => apiRequest('/usage/summary')
+};
+
 export const adminApi = {
   users: () => apiRequest('/admin/users'),
   createUser: (input) => apiRequest('/admin/users', { method: 'POST', body: input }),

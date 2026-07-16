@@ -19,7 +19,7 @@ import MediaModal from './MediaModal';
 import assetFiles from '../assetsData.json';
 import { defaultAssetTags } from '../defaultTags';
 import { useAuth } from './AuthContext';
-import { canvasApi } from '../lib/apiClient';
+import { canvasApi, usageApi } from '../lib/apiClient';
 import { readImageFileAsDataUrl } from '../lib/mediaFiles';
 
 const FullscreenIcon = () => (
@@ -51,6 +51,14 @@ const LABEL_WIDTH = 230;
 const LABEL_HEIGHT = 86;
 const LABEL_CARD_GAP = 150;
 const LABEL_DROP_DISTANCE = 260;
+const DISPLAY_CURRENCIES = {
+  USD: { label: 'USD', symbol: '$', rate: 1 },
+  EUR: { label: 'EUR', symbol: '€', rate: 0.92 },
+  SEK: { label: 'SEK', symbol: 'kr', rate: 10.45 },
+  NOK: { label: 'NOK', symbol: 'kr', rate: 10.75 },
+  DKK: { label: 'DKK', symbol: 'kr', rate: 6.86 },
+  GBP: { label: 'GBP', symbol: '£', rate: 0.79 }
+};
 
 const titleFromFileName = (fileName = 'Imported Image') => {
   const cleaned = String(fileName || 'Imported Image')
@@ -70,6 +78,12 @@ const isEditableTarget = (target) => (
 );
 
 const imageFilesFromList = (files) => Array.from(files || []).filter((file) => file?.type?.startsWith('image/'));
+
+const formatSpend = (usdValue, currencyCode = 'USD') => {
+  const currency = DISPLAY_CURRENCIES[currencyCode] || DISPLAY_CURRENCIES.USD;
+  const value = Number(usdValue || 0) * currency.rate;
+  return `${currency.symbol}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
 
 const MultiSelectHint = ({ interactionMode }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -910,6 +924,7 @@ const sanitizeNodeForSave = (node) => {
   delete data.setGlobalNodes;
   delete data.setGlobalEdges;
   delete data.onToggleCollapse;
+  delete data.onGenerationUsageUpdate;
   delete data.isHighlighted;
   delete data.isParentCollapsed;
   delete data.parentOffsetX;
@@ -1296,6 +1311,107 @@ const CanvasPersistencePanel = ({
   );
 };
 
+const GenerationSpendPanel = ({
+  user,
+  usageSummary,
+  usageCurrency,
+  onUsageCurrencyChange,
+  isLoading,
+  onRefresh
+}) => {
+  const summary = usageSummary?.summary || {};
+  const providers = usageSummary?.byProvider || [];
+  const totalUsd = Number(summary.estimatedUsd || 0);
+
+  const panelStyle = {
+    width: '100%',
+    background: 'rgba(4,4,8,0.62)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '14px',
+    padding: '12px',
+    color: '#fff',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)'
+  };
+
+  const smallButtonStyle = {
+    minHeight: '32px',
+    borderRadius: '9px',
+    border: '1px solid rgba(255,255,255,0.12)',
+    background: 'rgba(255,255,255,0.07)',
+    color: '#fff',
+    padding: '0 9px',
+    fontSize: '0.74rem',
+    fontWeight: 850,
+    cursor: user ? 'pointer' : 'not-allowed'
+  };
+
+  return (
+    <div style={panelStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+        <div>
+          <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.48)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em' }}>API Spend</div>
+          <div style={{ fontSize: '1.25rem', lineHeight: 1.1, fontWeight: 950 }}>{formatSpend(totalUsd, usageCurrency)}</div>
+        </div>
+        <select
+          value={usageCurrency}
+          onChange={(event) => onUsageCurrencyChange(event.target.value)}
+          aria-label="Usage display currency"
+          style={{
+            minHeight: '32px',
+            borderRadius: '9px',
+            border: '1px solid rgba(255,255,255,0.13)',
+            background: 'rgba(255,255,255,0.08)',
+            color: '#fff',
+            outline: 'none',
+            fontSize: '0.74rem',
+            fontWeight: 850
+          }}
+        >
+          {Object.keys(DISPLAY_CURRENCIES).map((currency) => (
+            <option key={currency} value={currency}>{currency}</option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+        {[
+          ['Runs', summary.requestCount || 0],
+          ['Images', summary.imageCount || 0],
+          ['Videos', summary.videoCount || 0]
+        ].map(([label, value]) => (
+          <div key={label} style={{ minHeight: '42px', borderRadius: '10px', background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.08)', padding: '7px' }}>
+            <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.42)', fontWeight: 900, textTransform: 'uppercase' }}>{label}</div>
+            <div style={{ fontSize: '0.9rem', fontWeight: 900 }}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      {providers.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          {providers.slice(0, 3).map((provider) => (
+            <div key={`${provider.provider}-${provider.pipeline}`} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '0.72rem', color: 'rgba(255,255,255,0.64)' }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{provider.providerLabel || provider.provider}</span>
+              <strong style={{ color: 'rgba(255,255,255,0.88)' }}>{formatSpend(provider.estimatedUsd, usageCurrency)}</strong>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+        <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.42)', lineHeight: 1.35 }}>
+          Estimated from provider pricing; USD is billing basis.
+        </span>
+        <button type="button" onClick={onRefresh} disabled={!user || isLoading} style={{ ...smallButtonStyle, opacity: user ? 1 : 0.5 }} title="Refresh API spend" aria-label="Refresh API spend">
+          {isLoading ? '...' : 'Refresh'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const CanvasToolbox = ({
   user,
   canvases,
@@ -1326,7 +1442,12 @@ const CanvasToolbox = ({
   selectedCardCount,
   onAlignSelectedRow,
   onAlignSelectedColumn,
-  onCreateLabelGroup
+  onCreateLabelGroup,
+  usageSummary,
+  usageCurrency,
+  onUsageCurrencyChange,
+  isUsageLoading,
+  onRefreshUsage
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [toolboxPosition, setToolboxPosition] = useState(() => {
@@ -1724,6 +1845,16 @@ const CanvasToolbox = ({
               setIsCanvasDirty={setIsCanvasDirty}
               isVisible={isEditMode}
             />
+            {isEditMode && (
+              <GenerationSpendPanel
+                user={user}
+                usageSummary={usageSummary}
+                usageCurrency={usageCurrency}
+                onUsageCurrencyChange={onUsageCurrencyChange}
+                isLoading={isUsageLoading}
+                onRefresh={onRefreshUsage}
+              />
+            )}
           </>
         )}
       </div>
@@ -1742,6 +1873,16 @@ export default function HeroCanvas() {
   const [activeCanvasId, setActiveCanvasId] = useState(null);
   const [activeCanvasName, setActiveCanvasName] = useState('');
   const [canvasStatus, setCanvasStatus] = useState('');
+  const [usageSummary, setUsageSummary] = useState(null);
+  const [isUsageLoading, setIsUsageLoading] = useState(false);
+  const [usageCurrency, setUsageCurrency] = useState(() => {
+    try {
+      const stored = localStorage.getItem('droplet-usage-currency');
+      return DISPLAY_CURRENCIES[stored] ? stored : 'USD';
+    } catch {
+      return 'USD';
+    }
+  });
   const [isCanvasDirty, setIsCanvasDirty] = useState(false);
   const [undoStack, setUndoStack] = useState([]);
   
@@ -1774,6 +1915,28 @@ export default function HeroCanvas() {
   }, [setEdges]);
   const pushUndoAction = useCallback((action) => {
     setUndoStack((stack) => [action, ...stack].slice(0, 12));
+  }, []);
+
+  const loadUsageSummary = useCallback(async () => {
+    if (!user) {
+      setUsageSummary(null);
+      return;
+    }
+    setIsUsageLoading(true);
+    try {
+      const payload = await usageApi.summary();
+      setUsageSummary(payload);
+    } catch (error) {
+      setCanvasStatus(error instanceof Error ? error.message : 'Could not load API usage.');
+    } finally {
+      setIsUsageLoading(false);
+    }
+  }, [user]);
+
+  const handleUsageCurrencyChange = useCallback((currency) => {
+    const nextCurrency = DISPLAY_CURRENCIES[currency] ? currency : 'USD';
+    setUsageCurrency(nextCurrency);
+    localStorage.setItem('droplet-usage-currency', nextCurrency);
   }, []);
 
   const selectedCardIds = useMemo(() => {
@@ -2168,6 +2331,7 @@ export default function HeroCanvas() {
             onToggleCollapse: handleToggle,
             setGlobalNodes: setPersistentNodes,
             setGlobalEdges: setPersistentEdges,
+            onGenerationUsageUpdate: loadUsageSummary,
             pushUndoAction,
             isEditMode
           }
@@ -2192,13 +2356,17 @@ export default function HeroCanvas() {
         }
       };
     }));
-  }, [collapsedBranches, setNodes, setEdges, isEditMode, pushUndoAction, setPersistentEdges, setPersistentNodes]);
+  }, [collapsedBranches, setNodes, setEdges, isEditMode, loadUsageSummary, pushUndoAction, setPersistentEdges, setPersistentNodes]);
 
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
+
+  useEffect(() => {
+    loadUsageSummary();
+  }, [loadUsageSummary]);
 
   useEffect(() => {
     const handleOpenEditor = () => {
@@ -2407,6 +2575,11 @@ export default function HeroCanvas() {
           onAlignSelectedRow={() => alignSelectedCards('row')}
           onAlignSelectedColumn={() => alignSelectedCards('column')}
           onCreateLabelGroup={createLabelGroup}
+          usageSummary={usageSummary}
+          usageCurrency={usageCurrency}
+          onUsageCurrencyChange={handleUsageCurrencyChange}
+          isUsageLoading={isUsageLoading}
+          onRefreshUsage={loadUsageSummary}
         />
         <MultiSelectHint interactionMode={interactionMode} />
         <NodeSearch />

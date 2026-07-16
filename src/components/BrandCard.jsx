@@ -237,6 +237,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         generationStatus: result?.branch?.status || (result?.mock ? 'mock' : 'ready'),
         generationOperationName: result?.branch?.operationName || '',
         generationMock: result?.mock === true || result?.branch?.mock === true,
+        generationUsage: result?.usage || result?.branch?.usage || null,
         nodeGroup: `generated-${id}`,
         setGlobalNodes: data.setGlobalNodes,
         setGlobalEdges: data.setGlobalEdges
@@ -312,6 +313,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       setGenPipeline(null);
       setGenPrompt('');
       setGenRefs([]);
+      data.onGenerationUsageUpdate?.(result?.usage || result?.branch?.usage);
       window.requestAnimationFrame(() => {
         setCenter(newNode.position.x + 160, newNode.position.y + 180, { zoom: 0.9, duration: 700 });
       });
