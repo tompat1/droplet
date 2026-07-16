@@ -8,7 +8,9 @@ import {
   Panel,
   useViewport,
   MiniMap,
-  useReactFlow
+  useReactFlow,
+  Handle,
+  Position
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -43,6 +45,12 @@ const UploadIcon = () => (
 const IMPORT_GRID_X = 380;
 const IMPORT_GRID_Y = 430;
 const MAX_IMPORT_FILES = 24;
+const CARD_GRID_X = 380;
+const CARD_GRID_Y = 430;
+const LABEL_WIDTH = 230;
+const LABEL_HEIGHT = 86;
+const LABEL_CARD_GAP = 150;
+const LABEL_DROP_DISTANCE = 260;
 
 const titleFromFileName = (fileName = 'Imported Image') => {
   const cleaned = String(fileName || 'Imported Image')
@@ -491,8 +499,94 @@ const NodeSearch = () => {
   );
 };
 
+const LabelNode = ({ id, data, selected, isConnectable }) => {
+  const memberCount = Array.isArray(data.memberIds) ? data.memberIds.length : 0;
+
+  const renameLabel = (event) => {
+    event.stopPropagation();
+    const nextTitle = window.prompt('Label name:', data.title || 'Canvas Label');
+    if (nextTitle === null) return;
+    const title = nextTitle.trim();
+    if (!title) return;
+    data.setGlobalNodes?.((nds) => nds.map((node) => node.id === id ? {
+      ...node,
+      data: { ...node.data, title }
+    } : node));
+  };
+
+  const deleteLabel = (event) => {
+    event.stopPropagation();
+    data.setGlobalNodes?.((nds) => nds
+      .filter((node) => node.id !== id)
+      .map((node) => node.data?.labelGroupId === id ? {
+        ...node,
+        data: {
+          ...node.data,
+          labelGroupId: undefined,
+          labelTitle: undefined
+        }
+      } : node));
+    data.setGlobalEdges?.((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
+  };
+
+  return (
+    <div
+      className="glass-panel"
+      style={{
+        width: `${LABEL_WIDTH}px`,
+        minHeight: `${LABEL_HEIGHT}px`,
+        padding: '14px 16px',
+        borderRadius: '14px',
+        borderColor: selected ? 'rgba(0,255,204,0.86)' : 'rgba(0,255,204,0.28)',
+        background: 'linear-gradient(135deg, rgba(0,255,204,0.13), rgba(8,8,14,0.92))',
+        color: '#fff',
+        boxShadow: selected ? '0 0 28px rgba(0,255,204,0.32), inset 0 1px 0 rgba(255,255,255,0.08)' : '0 14px 38px rgba(0,0,0,0.22)',
+        cursor: 'grab'
+      }}
+      onDoubleClick={renameLabel}
+    >
+      <Handle type="target" position={Position.Left} isConnectable={isConnectable} style={{ background: '#050505', border: '2px solid rgba(0,255,204,0.75)' }} />
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(0,255,204,0.76)' }}>
+            Label Group
+          </div>
+          <div style={{ marginTop: '5px', fontSize: '1rem', lineHeight: 1.15, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {data.title || 'Canvas Label'}
+          </div>
+        </div>
+        {data.isEditMode && (
+          <button
+            type="button"
+            onClick={deleteLabel}
+            title="Delete label"
+            aria-label="Delete label"
+            style={{
+              width: '26px',
+              height: '26px',
+              borderRadius: '8px',
+              border: '1px solid rgba(255,80,80,0.28)',
+              background: 'rgba(255,50,50,0.12)',
+              color: '#ff9a9a',
+              cursor: 'pointer',
+              fontWeight: 900
+            }}
+          >
+            ×
+          </button>
+        )}
+      </div>
+      <div style={{ marginTop: '10px', fontSize: '0.76rem', color: 'rgba(255,255,255,0.58)' }}>
+        {memberCount === 1 ? '1 card connected' : `${memberCount} cards connected`}
+      </div>
+      <Handle type="source" position={Position.Right} isConnectable={isConnectable} style={{ background: '#050505', border: '2px solid rgba(0,255,204,0.75)' }} />
+    </div>
+  );
+};
+
 const nodeTypes = {
   brandCard: BrandCard,
+  labelNode: LabelNode,
 };
 
 // Pull the specific logo image and one dynamic image
@@ -1228,7 +1322,11 @@ const CanvasToolbox = ({
   undoLastAction,
   isFullscreen,
   toggleFullscreen,
-  onImportImagesClick
+  onImportImagesClick,
+  selectedCardCount,
+  onAlignSelectedRow,
+  onAlignSelectedColumn,
+  onCreateLabelGroup
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [toolboxPosition, setToolboxPosition] = useState(() => {
@@ -1421,6 +1519,20 @@ const CanvasToolbox = ({
     boxShadow: '0 2px 8px rgba(0,0,0,0.28)'
   });
 
+  const selectionActionStyle = (disabled = false) => ({
+    minHeight: '36px',
+    flex: 1,
+    borderRadius: '10px',
+    border: disabled ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,255,204,0.32)',
+    background: disabled ? 'rgba(255,255,255,0.045)' : 'rgba(0,255,204,0.11)',
+    color: disabled ? 'rgba(255,255,255,0.34)' : '#fff',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    fontSize: '0.72rem',
+    fontWeight: 900,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em'
+  });
+
   return (
     <Panel position="top-left" style={{ margin: 0, zIndex: 15, transform: `translate(${toolboxPosition.x}px, ${toolboxPosition.y}px)` }}>
       <div style={toolboxStyle}>
@@ -1530,28 +1642,64 @@ const CanvasToolbox = ({
             </div>
 
             {isEditMode && (
-              <button
-                type="button"
-                onClick={undoLastAction}
-                disabled={undoStack.length === 0}
-                title={undoStack[0]?.label || 'Nothing to restore'}
-                aria-label={undoStack[0]?.label || 'Nothing to restore'}
-                style={{
-                  minHeight: '42px',
-                  width: '100%',
-                  borderRadius: '12px',
-                  border: undoStack.length > 0 ? '1px solid rgba(255, 106, 0, 0.48)' : '1px solid rgba(255,255,255,0.1)',
-                  background: undoStack.length > 0 ? 'rgba(255, 106, 0, 0.16)' : 'rgba(255,255,255,0.055)',
-                  color: undoStack.length > 0 ? '#fff' : 'rgba(255,255,255,0.38)',
-                  cursor: undoStack.length > 0 ? 'pointer' : 'not-allowed',
-                  fontSize: '0.78rem',
-                  fontWeight: 900,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em'
-                }}
-              >
-                ↶ {undoStack[0]?.label || 'Undo Delete'}
-              </button>
+              <>
+                {selectedCardCount > 0 && (
+                  <div
+                    style={{
+                      padding: '10px',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(0,255,204,0.18)',
+                      background: 'rgba(0,255,204,0.055)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.48)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                        Selection
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: 'rgba(0,255,204,0.72)', fontWeight: 900 }}>
+                        {selectedCardCount} card{selectedCardCount === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button type="button" onClick={onAlignSelectedRow} disabled={selectedCardCount < 2} style={selectionActionStyle(selectedCardCount < 2)} title="Align selected cards into a row" aria-label="Align selected cards into a row">
+                        Row
+                      </button>
+                      <button type="button" onClick={onAlignSelectedColumn} disabled={selectedCardCount < 2} style={selectionActionStyle(selectedCardCount < 2)} title="Align selected cards into a column" aria-label="Align selected cards into a column">
+                        Column
+                      </button>
+                      <button type="button" onClick={onCreateLabelGroup} style={selectionActionStyle(false)} title="Create a label group from selected cards" aria-label="Create a label group from selected cards">
+                        Label
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={undoLastAction}
+                  disabled={undoStack.length === 0}
+                  title={undoStack[0]?.label || 'Nothing to restore'}
+                  aria-label={undoStack[0]?.label || 'Nothing to restore'}
+                  style={{
+                    minHeight: '42px',
+                    width: '100%',
+                    borderRadius: '12px',
+                    border: undoStack.length > 0 ? '1px solid rgba(255, 106, 0, 0.48)' : '1px solid rgba(255,255,255,0.1)',
+                    background: undoStack.length > 0 ? 'rgba(255, 106, 0, 0.16)' : 'rgba(255,255,255,0.055)',
+                    color: undoStack.length > 0 ? '#fff' : 'rgba(255,255,255,0.38)',
+                    cursor: undoStack.length > 0 ? 'pointer' : 'not-allowed',
+                    fontSize: '0.78rem',
+                    fontWeight: 900,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em'
+                  }}
+                >
+                  ↶ {undoStack[0]?.label || 'Undo Delete'}
+                </button>
+              </>
             )}
 
             <CanvasPersistencePanel
@@ -1608,6 +1756,7 @@ export default function HeroCanvas() {
   
   const [interactionMode, setInteractionMode] = useState('pan');
   const [isImportDragActive, setIsImportDragActive] = useState(false);
+  const [selectedNodeIds, setSelectedNodeIds] = useState([]);
   const reactFlowInstanceRef = useRef(null);
   const canvasUploadInputRef = useRef(null);
   const dragDepthRef = useRef(0);
@@ -1626,6 +1775,13 @@ export default function HeroCanvas() {
   const pushUndoAction = useCallback((action) => {
     setUndoStack((stack) => [action, ...stack].slice(0, 12));
   }, []);
+
+  const selectedCardIds = useMemo(() => {
+    const selectedSet = new Set(selectedNodeIds);
+    return nodes
+      .filter((node) => selectedSet.has(node.id) && node.type === 'brandCard' && node.id !== 'padding-node')
+      .map((node) => node.id);
+  }, [nodes, selectedNodeIds]);
 
   const canvasMedias = useMemo(() => nodes
     .filter(node => node.data && (node.data.image || node.data.video || node.data.colors))
@@ -1753,6 +1909,187 @@ export default function HeroCanvas() {
   const handleCanvasPointerDown = useCallback(() => {
     containerRef.current?.focus?.({ preventScroll: true });
   }, []);
+
+  const alignSelectedCards = useCallback((direction) => {
+    const selectedSet = new Set(selectedCardIds);
+    const selectedCards = nodes
+      .filter((node) => selectedSet.has(node.id) && node.type === 'brandCard')
+      .sort((a, b) => direction === 'row'
+        ? (a.position.x - b.position.x || a.position.y - b.position.y)
+        : (a.position.y - b.position.y || a.position.x - b.position.x));
+
+    if (selectedCards.length < 2) {
+      setCanvasStatus('Select at least two cards to align.');
+      return;
+    }
+
+    const anchorX = Math.min(...selectedCards.map((node) => node.position.x));
+    const anchorY = Math.min(...selectedCards.map((node) => node.position.y));
+    const nextPositions = new Map(selectedCards.map((node, index) => [
+      node.id,
+      direction === 'row'
+        ? { x: anchorX + index * CARD_GRID_X, y: anchorY }
+        : { x: anchorX, y: anchorY + index * CARD_GRID_Y }
+    ]));
+
+    setNodes((nds) => nds.map((node) => nextPositions.has(node.id) ? {
+      ...node,
+      position: nextPositions.get(node.id)
+    } : node));
+    setIsCanvasDirty(true);
+    setCanvasStatus(direction === 'row' ? 'Selected cards aligned in a row.' : 'Selected cards aligned in a column.');
+  }, [nodes, selectedCardIds, setNodes]);
+
+  const connectCardsToLabel = useCallback((labelId, cardIds, fallbackTitle = '') => {
+    const uniqueCardIds = [...new Set(cardIds)].filter(Boolean);
+    if (uniqueCardIds.length === 0) return;
+
+    const knownLabel = nodes.find((node) => node.id === labelId);
+    let labelTitle = fallbackTitle || knownLabel?.data?.title || 'Canvas Label';
+    setNodes((nds) => {
+      const labelNode = nds.find((node) => node.id === labelId);
+      if (!labelNode) return nds;
+      labelTitle = labelNode.data?.title || labelTitle;
+
+      const existingMemberIds = Array.isArray(labelNode.data?.memberIds) ? labelNode.data.memberIds : [];
+      const nextMemberIds = [...new Set([...existingMemberIds, ...uniqueCardIds])];
+      const orderedMembers = nds
+        .filter((node) => nextMemberIds.includes(node.id) && node.type === 'brandCard')
+        .sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
+      const positions = new Map(orderedMembers.map((node, index) => {
+        const column = index % 3;
+        const row = Math.floor(index / 3);
+        return [node.id, {
+          x: labelNode.position.x + LABEL_WIDTH + LABEL_CARD_GAP + column * CARD_GRID_X,
+          y: labelNode.position.y + row * CARD_GRID_Y
+        }];
+      }));
+
+      return nds.map((node) => {
+        if (node.type === 'labelNode') {
+          const memberIds = node.id === labelId
+            ? nextMemberIds
+            : (Array.isArray(node.data?.memberIds) ? node.data.memberIds.filter((memberId) => !uniqueCardIds.includes(memberId)) : []);
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              memberIds
+            }
+          };
+        }
+
+        if (positions.has(node.id)) {
+          return {
+            ...node,
+            position: positions.get(node.id),
+            data: {
+              ...node.data,
+              labelGroupId: labelId,
+              labelTitle
+            }
+          };
+        }
+
+        if (uniqueCardIds.includes(node.id)) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              labelGroupId: labelId,
+              labelTitle
+            }
+          };
+        }
+
+        return node;
+      });
+    });
+
+    setEdges((eds) => {
+      const withoutOldLabelLinks = eds.filter((edge) => !(edge.data?.isLabelLink && uniqueCardIds.includes(edge.target)));
+      const existingIds = new Set(withoutOldLabelLinks.map((edge) => edge.id));
+      const labelEdges = uniqueCardIds
+        .map((cardId) => ({
+          id: `label-${labelId}-${cardId}`,
+          source: labelId,
+          target: cardId,
+          type: 'smoothstep',
+          animated: true,
+          data: { isLabelLink: true, labelId },
+          style: { stroke: 'rgba(0,255,204,0.72)', strokeWidth: 3 }
+        }))
+        .filter((edge) => !existingIds.has(edge.id));
+      return [...withoutOldLabelLinks, ...labelEdges];
+    });
+    setIsCanvasDirty(true);
+    setCanvasStatus(`Added ${uniqueCardIds.length} card${uniqueCardIds.length === 1 ? '' : 's'} to "${labelTitle}".`);
+  }, [nodes, setEdges, setNodes]);
+
+  const createLabelGroup = useCallback(() => {
+    if (selectedCardIds.length === 0) {
+      setCanvasStatus('Select cards before creating a label.');
+      return;
+    }
+
+    const titleInput = window.prompt('Label name for selected cards:', 'Reference Set');
+    if (titleInput === null) return;
+    const title = titleInput.trim() || 'Reference Set';
+    const selectedSet = new Set(selectedCardIds);
+    const selectedCards = nodes.filter((node) => selectedSet.has(node.id) && node.type === 'brandCard');
+    if (selectedCards.length === 0) return;
+
+    const minX = Math.min(...selectedCards.map((node) => node.position.x));
+    const minY = Math.min(...selectedCards.map((node) => node.position.y));
+    const labelId = `label-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const labelNode = {
+      id: labelId,
+      type: 'labelNode',
+      position: { x: minX - LABEL_WIDTH - LABEL_CARD_GAP, y: minY },
+      data: {
+        title,
+        memberIds: selectedCardIds,
+        nodeGroup: 'labels'
+      },
+      selected: true
+    };
+
+    setNodes((nds) => [...nds.map((node) => ({ ...node, selected: selectedSet.has(node.id) })), labelNode]);
+    window.requestAnimationFrame(() => connectCardsToLabel(labelId, selectedCardIds, title));
+    setSelectedNodeIds([labelId, ...selectedCardIds]);
+  }, [connectCardsToLabel, nodes, selectedCardIds, setNodes]);
+
+  const handleSelectionChange = useCallback(({ nodes: selectedNodes }) => {
+    setSelectedNodeIds(selectedNodes.map((node) => node.id));
+  }, []);
+
+  const handleNodeDragStop = useCallback((event, node) => {
+    if (node.type === 'labelNode') return;
+    const draggedCardIds = selectedCardIds.includes(node.id) ? selectedCardIds : [node.id];
+    const cards = nodes.filter((candidate) => draggedCardIds.includes(candidate.id) && candidate.type === 'brandCard');
+    if (cards.length === 0) return;
+
+    const labels = nodes.filter((candidate) => candidate.type === 'labelNode');
+    const nearestLabel = labels
+      .map((label) => {
+        const labelCenter = {
+          x: label.position.x + LABEL_WIDTH / 2,
+          y: label.position.y + LABEL_HEIGHT / 2
+        };
+        const distance = Math.min(...cards.map((card) => Math.hypot(
+          card.position.x + 160 - labelCenter.x,
+          card.position.y + 220 - labelCenter.y
+        )));
+        return {
+          label,
+          distance
+        };
+      })
+      .sort((a, b) => a.distance - b.distance)[0];
+
+    if (!nearestLabel || nearestLabel.distance > LABEL_DROP_DISTANCE) return;
+    connectCardsToLabel(nearestLabel.label.id, draggedCardIds);
+  }, [connectCardsToLabel, nodes, selectedCardIds]);
 
   const undoLastAction = useCallback(() => {
     setUndoStack((stack) => {
@@ -2024,6 +2361,8 @@ export default function HeroCanvas() {
         onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
+        onSelectionChange={handleSelectionChange}
+        onNodeDragStop={handleNodeDragStop}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ nodes: [{ id: '1' }, { id: '2' }], maxZoom: 0.5, minZoom: 0.5 }}
@@ -2064,6 +2403,10 @@ export default function HeroCanvas() {
           isFullscreen={isFullscreen}
           toggleFullscreen={toggleFullscreen}
           onImportImagesClick={openCanvasUploadPicker}
+          selectedCardCount={selectedCardIds.length}
+          onAlignSelectedRow={() => alignSelectedCards('row')}
+          onAlignSelectedColumn={() => alignSelectedCards('column')}
+          onCreateLabelGroup={createLabelGroup}
         />
         <MultiSelectHint interactionMode={interactionMode} />
         <NodeSearch />
@@ -2076,6 +2419,7 @@ export default function HeroCanvas() {
             if (n.id.startsWith('wild-') || n.id === '7') return '#ff00ff';
             if (n.id.startsWith('shot-') || n.id === '9') return '#f5a623';
             if (n.id.startsWith('video-') || n.id === '3') return '#00ffcc';
+            if (n.type === 'labelNode') return '#00ffcc';
             return 'rgba(255,255,255,0.2)';
           }}
           maskColor="rgba(0, 0, 0, 0.7)"
