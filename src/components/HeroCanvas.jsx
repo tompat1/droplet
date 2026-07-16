@@ -5,8 +5,6 @@ import {
   useEdgesState,
   addEdge,
   Background,
-  Controls,
-  ControlButton,
   Panel,
   useViewport,
   MiniMap,
@@ -21,32 +19,14 @@ import { defaultAssetTags } from '../defaultTags';
 import { useAuth } from './AuthContext';
 import { canvasApi } from '../lib/apiClient';
 
-const ZoomIndicator = () => {
-  const { zoom } = useViewport();
-  return (
-    <div style={{ color: '#fff', fontWeight: 'bold', fontFamily: 'monospace', fontSize: '0.9rem', pointerEvents: 'none', textShadow: '0 2px 4px rgba(0,0,0,0.8)', textAlign: 'center', marginBottom: '8px' }}>
-      {Math.round(zoom * 100)}%
-    </div>
-  );
-};
-
-const ZoomToOneButton = () => {
-  const { zoomTo } = useReactFlow();
-  return (
-    <ControlButton onClick={() => zoomTo(1, { duration: 400 })} title="Zoom 1:1">
-      <span style={{ fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace' }}>1:1</span>
-    </ControlButton>
-  );
-};
-
 const FullscreenIcon = () => (
-  <svg viewBox="2 2 20 20">
+  <svg viewBox="2 2 20 20" width="18" height="18" aria-hidden="true">
     <path d="M3 3h7v2H5v5H3V3zm18 0h-7v2h5v5h2V3zM3 21h7v-2H5v-5H3v7zm18 0h-7v-2h5v-5h2v7z" />
   </svg>
 );
 
 const ExitFullscreenIcon = () => (
-  <svg viewBox="2 2 20 20">
+  <svg viewBox="2 2 20 20" width="18" height="18" aria-hidden="true">
     <path d="M10 10H3V8h5V3h2v7zm4 0h7V8h-5V3h-2v7zm-4 4H3v2h5v5h2v-7zm4 0h7v2h-5v5h-2v-7z" />
   </svg>
 );
@@ -1023,38 +1003,37 @@ const CanvasPersistencePanel = ({
   if (!isVisible) return null;
 
   const panelStyle = {
-    width: '260px',
-    background: 'rgba(10,10,15,0.82)',
-    backdropFilter: 'blur(14px)',
-    border: '1px solid rgba(255,255,255,0.12)',
-    borderRadius: '10px',
-    padding: '12px',
+    width: '100%',
+    background: 'rgba(4,4,8,0.62)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '14px',
+    padding: '14px',
     color: '#fff',
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
-    zIndex: 15,
-    boxShadow: '0 14px 40px rgba(0,0,0,0.35)'
+    gap: '10px',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)'
   };
 
   const controlStyle = {
-    minHeight: '36px',
-    borderRadius: '8px',
-    border: '1px solid rgba(255,255,255,0.14)',
-    background: 'rgba(255,255,255,0.08)',
+    minHeight: '40px',
+    borderRadius: '10px',
+    border: '1px solid rgba(255,255,255,0.13)',
+    background: 'rgba(255,255,255,0.07)',
     color: '#fff',
-    padding: '0 10px',
-    outline: 'none'
+    padding: '0 12px',
+    outline: 'none',
+    fontSize: '0.88rem'
   };
 
   return (
     <div style={panelStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
         <div>
-          <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Canvas</div>
-          <div style={{ fontSize: '0.95rem', fontWeight: 800 }}>{user ? displayCanvasName : 'Login required'}</div>
+          <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.48)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Canvas</div>
+          <div style={{ fontSize: '0.98rem', fontWeight: 850, lineHeight: 1.15 }}>{user ? displayCanvasName : 'Login required'}</div>
         </div>
-        <button type="button" onClick={createNewCanvas} disabled={!user || isBusy} style={{ ...controlStyle, cursor: user && !isBusy ? 'pointer' : 'not-allowed', opacity: user ? 1 : 0.5 }}>
+        <button type="button" onClick={createNewCanvas} disabled={!user || isBusy} style={{ ...controlStyle, minWidth: '70px', cursor: user && !isBusy ? 'pointer' : 'not-allowed', opacity: user ? 1 : 0.5, fontWeight: 850 }}>
           New
         </button>
       </div>
@@ -1109,6 +1088,217 @@ const CanvasPersistencePanel = ({
         </div>
       )}
     </div>
+  );
+};
+
+const CanvasToolbox = ({
+  user,
+  canvases,
+  setCanvases,
+  activeCanvasId,
+  setActiveCanvasId,
+  activeCanvasName,
+  setActiveCanvasName,
+  nodes,
+  setNodes,
+  edges,
+  setEdges,
+  collapsedBranches,
+  setCollapsedBranches,
+  interactionMode,
+  setInteractionMode,
+  canvasStatus,
+  setCanvasStatus,
+  isCanvasDirty,
+  setIsCanvasDirty,
+  isEditMode,
+  setIsEditMode,
+  undoStack,
+  undoLastAction,
+  isFullscreen,
+  toggleFullscreen
+}) => {
+  const { zoom } = useViewport();
+  const { zoomIn, zoomOut, zoomTo, fitView } = useReactFlow();
+  const zoomPercent = Math.round(zoom * 100);
+
+  const toolboxStyle = {
+    width: 'min(360px, calc(100vw - 40px))',
+    background: 'linear-gradient(145deg, rgba(30,30,38,0.86), rgba(9,9,14,0.9))',
+    backdropFilter: 'blur(18px)',
+    WebkitBackdropFilter: 'blur(18px)',
+    border: '1px solid rgba(255,255,255,0.14)',
+    borderRadius: '18px',
+    padding: '14px',
+    color: '#fff',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    boxShadow: '0 22px 70px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.08)'
+  };
+
+  const iconButtonStyle = {
+    width: '42px',
+    height: '40px',
+    borderRadius: '12px',
+    border: '1px solid rgba(255,255,255,0.14)',
+    background: 'rgba(255,255,255,0.075)',
+    color: '#fff',
+    display: 'grid',
+    placeItems: 'center',
+    cursor: 'pointer',
+    fontWeight: 900,
+    fontSize: '1.2rem',
+    lineHeight: 1,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)'
+  };
+
+  const modeButton = (active, accent) => ({
+    minHeight: '58px',
+    flex: 1,
+    borderRadius: '14px',
+    border: active ? `1px solid ${accent}` : '1px solid rgba(255,255,255,0.1)',
+    background: active
+      ? `linear-gradient(135deg, ${accent}33, rgba(255,255,255,0.055))`
+      : 'rgba(5,5,10,0.55)',
+    color: active ? '#fff' : 'rgba(255,255,255,0.56)',
+    cursor: 'pointer',
+    padding: '9px 10px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    gap: '4px',
+    boxShadow: active ? `0 0 18px ${accent}22` : 'none'
+  });
+
+  const toggleStyle = (active, accent) => ({
+    width: '34px',
+    height: '18px',
+    borderRadius: '999px',
+    background: active ? accent : 'rgba(255,255,255,0.18)',
+    position: 'relative',
+    flexShrink: 0
+  });
+
+  const toggleKnobStyle = (active) => ({
+    width: '14px',
+    height: '14px',
+    borderRadius: '999px',
+    background: '#fff',
+    position: 'absolute',
+    top: '2px',
+    left: active ? '18px' : '2px',
+    transition: 'left 0.2s ease',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.28)'
+  });
+
+  return (
+    <Panel position="top-left" style={{ margin: '16px', zIndex: 15 }}>
+      <div style={toolboxStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <div>
+            <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.5)', fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+              Canvas Tools
+            </div>
+            <div style={{ fontSize: '1.08rem', fontWeight: 900, lineHeight: 1.1 }}>
+              {zoomPercent}% View
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button type="button" onClick={() => zoomOut({ duration: 250 })} style={iconButtonStyle} title="Zoom out" aria-label="Zoom out">−</button>
+            <button type="button" onClick={() => zoomIn({ duration: 250 })} style={iconButtonStyle} title="Zoom in" aria-label="Zoom in">+</button>
+            <button type="button" onClick={() => fitView({ duration: 350, padding: 0.18 })} style={iconButtonStyle} title="Fit view" aria-label="Fit view">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 9V4h5" />
+                <path d="M20 9V4h-5" />
+                <path d="M4 15v5h5" />
+                <path d="M20 15v5h-5" />
+              </svg>
+            </button>
+            <button type="button" onClick={() => zoomTo(1, { duration: 350 })} style={{ ...iconButtonStyle, fontSize: '0.78rem', fontFamily: 'monospace' }} title="Zoom 1:1" aria-label="Zoom 1:1">1:1</button>
+            <button type="button" onClick={toggleFullscreen} style={iconButtonStyle} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
+              {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={() => setIsEditMode((value) => !value)}
+            style={modeButton(isEditMode, '#4B5EFA')}
+            title="Toggle edit mode"
+          >
+            <span style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Edit</span>
+              <span style={toggleStyle(isEditMode, '#4B5EFA')}><span style={toggleKnobStyle(isEditMode)} /></span>
+            </span>
+            <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.48)' }}>{isEditMode ? 'Cards unlocked' : 'View only'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setInteractionMode((prev) => prev === 'pan' ? 'select' : 'pan')}
+            style={modeButton(interactionMode === 'pan', '#00ffcc')}
+            title={interactionMode === 'pan' ? 'Pan mode is on' : 'Selection mode is on'}
+          >
+            <span style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{interactionMode === 'pan' ? 'Pan' : 'Select'}</span>
+              <span style={toggleStyle(interactionMode === 'pan', '#00ffcc')}><span style={toggleKnobStyle(interactionMode === 'pan')} /></span>
+            </span>
+            <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.48)' }}>{interactionMode === 'pan' ? 'Drag moves view' : 'Drag selects'}</span>
+          </button>
+        </div>
+
+        {isEditMode && (
+          <button
+            type="button"
+            onClick={undoLastAction}
+            disabled={undoStack.length === 0}
+            title={undoStack[0]?.label || 'Nothing to restore'}
+            style={{
+              minHeight: '42px',
+              width: '100%',
+              borderRadius: '12px',
+              border: undoStack.length > 0 ? '1px solid rgba(255, 106, 0, 0.48)' : '1px solid rgba(255,255,255,0.1)',
+              background: undoStack.length > 0 ? 'rgba(255, 106, 0, 0.16)' : 'rgba(255,255,255,0.055)',
+              color: undoStack.length > 0 ? '#fff' : 'rgba(255,255,255,0.38)',
+              cursor: undoStack.length > 0 ? 'pointer' : 'not-allowed',
+              fontSize: '0.78rem',
+              fontWeight: 900,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em'
+            }}
+          >
+            ↶ {undoStack[0]?.label || 'Undo Delete'}
+          </button>
+        )}
+
+        <CanvasPersistencePanel
+          user={user}
+          canvases={canvases}
+          setCanvases={setCanvases}
+          activeCanvasId={activeCanvasId}
+          setActiveCanvasId={setActiveCanvasId}
+          activeCanvasName={activeCanvasName}
+          setActiveCanvasName={setActiveCanvasName}
+          nodes={nodes}
+          setNodes={setNodes}
+          edges={edges}
+          setEdges={setEdges}
+          collapsedBranches={collapsedBranches}
+          setCollapsedBranches={setCollapsedBranches}
+          interactionMode={interactionMode}
+          setInteractionMode={setInteractionMode}
+          status={canvasStatus}
+          setStatus={setCanvasStatus}
+          isCanvasDirty={isCanvasDirty}
+          setIsCanvasDirty={setIsCanvasDirty}
+          isVisible={isEditMode}
+        />
+      </div>
+    </Panel>
   );
 };
 
