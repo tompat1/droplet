@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import gsap from 'gsap';
 import assetFiles from '../assetsData.json';
 import audioTracks from '../audioData.json';
+import DropletLoader from './DropletLoader';
 
 export default function Preloader() {
   const [progress, setProgress] = useState(0);
@@ -97,6 +98,10 @@ export default function Preloader() {
         {audioTracks.map((t, i) => (
           <audio key={i} src={t.src} preload="auto" />
         ))}
+      </div>
+
+      <div style={{ zIndex: 2, position: 'relative', marginBottom: '120px' }}>
+        <DropletLoader label="Droplet initializing" size={220} />
       </div>
 
       {/* Loading Bar & Progress */}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
 import { generationApi } from '../lib/apiClient';
+import DropletLoader from './DropletLoader';
 
 const GENERATION_PROVIDERS = {
   openai_image: {
@@ -555,10 +556,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
         {genState === 'generating' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-neon)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1.5s linear infinite' }}>
-              <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
-            </svg>
-            <span style={{ fontSize: '13px', color: 'var(--accent-neon)', fontWeight: 'bold' }}>Generating with {GENERATION_PROVIDERS[genProvider]?.shortLabel || 'AI'}...</span>
+            <DropletLoader label={`Generating with ${GENERATION_PROVIDERS[genProvider]?.shortLabel || 'AI'}`} size={118} compact />
           </div>
         )}
       </div>

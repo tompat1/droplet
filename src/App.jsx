@@ -6,6 +6,7 @@ import Preloader from './components/Preloader';
 import AudioPlayer from './components/AudioPlayer';
 import AuthControls from './components/AuthControls';
 import { AuthProvider } from './components/AuthProvider';
+import DropletLoader from './components/DropletLoader';
 
 import Overhero from './components/Overhero';
 import CoreValues from './components/CoreValues';
@@ -51,7 +52,7 @@ function App() {
         <ConnectorLine targetId="core-values" />
         <CoreValues />
         <ConnectorLine targetId="hero-canvas-section" />
-        <Suspense fallback={<div style={{ width: '100%', height: 'calc(100vh - 120px)', minHeight: '500px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '1rem', fontFamily: 'monospace', background: 'rgba(20,20,25,0.2)', borderRadius: '16px', margin: '20px auto', maxWidth: '1600px' }}>Loading Canvas...</div>}>
+        <Suspense fallback={<div style={{ width: '100%', height: 'calc(100vh - 120px)', minHeight: '500px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(20,20,25,0.2)', borderRadius: '16px', margin: '20px auto', maxWidth: '1600px' }}><DropletLoader label="Loading canvas" size={180} /></div>}>
           <HeroCanvas />
         </Suspense>
         <ConnectorLine targetId="asset-gallery" />
