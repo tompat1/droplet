@@ -236,6 +236,8 @@ const NodeSearch = () => {
         {searchTerm && (
           <button 
             onClick={() => { setSearchTerm(''); setSuggestions([]); setShowSuggestions(false); }}
+            title="Clear search"
+            aria-label="Clear search"
             style={{
               position: 'absolute',
               right: '12px',
@@ -1033,7 +1035,7 @@ const CanvasPersistencePanel = ({
           <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.48)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Canvas</div>
           <div style={{ fontSize: '0.98rem', fontWeight: 850, lineHeight: 1.15 }}>{user ? displayCanvasName : 'Login required'}</div>
         </div>
-        <button type="button" onClick={createNewCanvas} disabled={!user || isBusy} style={{ ...controlStyle, minWidth: '70px', cursor: user && !isBusy ? 'pointer' : 'not-allowed', opacity: user ? 1 : 0.5, fontWeight: 850 }}>
+        <button type="button" onClick={createNewCanvas} disabled={!user || isBusy} title={user ? 'Create a new Fluid Node Canvas' : 'Login to create a canvas'} aria-label="Create new canvas" style={{ ...controlStyle, minWidth: '70px', cursor: user && !isBusy ? 'pointer' : 'not-allowed', opacity: user ? 1 : 0.5, fontWeight: 850 }}>
           New
         </button>
       </div>
@@ -1068,6 +1070,8 @@ const CanvasPersistencePanel = ({
             type="button"
             onClick={saveCanvas}
             disabled={!canSave}
+            title={!user ? 'Login to save canvases' : !canSave ? 'Canvas is already saved' : activeCanvasId ? 'Save canvas changes' : 'Create and save this canvas'}
+            aria-label={!canSave ? 'Canvas saved' : activeCanvasId ? 'Save canvas' : 'Create and save canvas'}
             style={{
               ...controlStyle,
               borderColor: canSave ? 'rgba(75,94,250,0.72)' : 'rgba(255,255,255,0.1)',
@@ -1268,6 +1272,7 @@ const CanvasToolbox = ({
                 onClick={() => setIsEditMode((value) => !value)}
                 style={modeButton(isEditMode, '#4B5EFA')}
                 title="Toggle edit mode"
+                aria-label="Toggle edit mode"
               >
                 <span style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '0.78rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Edit</span>
@@ -1281,6 +1286,7 @@ const CanvasToolbox = ({
                 onClick={() => setInteractionMode((prev) => prev === 'pan' ? 'select' : 'pan')}
                 style={modeButton(interactionMode === 'pan', '#00ffcc')}
                 title={interactionMode === 'pan' ? 'Pan mode is on' : 'Selection mode is on'}
+                aria-label="Toggle pan and selection mode"
               >
                 <span style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '0.78rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{interactionMode === 'pan' ? 'Pan' : 'Select'}</span>
@@ -1296,6 +1302,7 @@ const CanvasToolbox = ({
                 onClick={undoLastAction}
                 disabled={undoStack.length === 0}
                 title={undoStack[0]?.label || 'Nothing to restore'}
+                aria-label={undoStack[0]?.label || 'Nothing to restore'}
                 style={{
                   minHeight: '42px',
                   width: '100%',
