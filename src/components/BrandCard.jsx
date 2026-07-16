@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
 import { generationApi } from '../lib/apiClient';
+import { downloadMediaSource, mediaFilename, readImageFileAsDataUrl } from '../lib/mediaFiles';
 import DropletLoader from './DropletLoader';
 
 const GENERATION_PROVIDERS = {
@@ -52,6 +53,8 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [isHoveringHandle, setIsHoveringHandle] = useState(false);
   const cardRef = React.useRef(null);
+  const imageInputRef = React.useRef(null);
+  const referenceInputRef = React.useRef(null);
 
   const handleMouseMove = (e) => {
     if (!cardRef.current || isHoveringHandle) return;
@@ -137,12 +140,52 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
     deleteNodeAndEdges();
   };
 
+  const updateCardImage = useCallback((imageUrl) => {
+    const updater = data.setGlobalNodes || setNodes;
+    updater((nds) => nds.map(n => n.id === id ? { ...n, data: { ...n.data, image: imageUrl } } : n));
+  }, [data, id, setNodes]);
+
   const handleChangeImage = (e) => {
     e.stopPropagation();
+    imageInputRef.current?.click();
+  };
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      const dataUrl = await readImageFileAsDataUrl(file);
+      updateCardImage(dataUrl);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not upload that image.');
+    }
+  };
+
+  const handleImageUrlChange = (e) => {
+    e.stopPropagation();
     const newUrl = window.prompt("Enter new image URL:", data.image);
-    if (newUrl) {
-      const updater = data.setGlobalNodes || setNodes;
-      updater((nds) => nds.map(n => n.id === id ? { ...n, data: { ...n.data, image: newUrl } } : n));
+    if (newUrl) updateCardImage(newUrl);
+  };
+
+  const handleDownloadMedia = (event, source, type = 'image') => {
+    event.stopPropagation();
+    const extension = type === 'video' ? 'mp4' : (source?.startsWith('data:image/png') ? 'png' : 'webp');
+    downloadMediaSource(source, mediaFilename(data.title || `${type}-${id}`, extension));
+  };
+
+  const handleReferenceUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      const dataUrl = await readImageFileAsDataUrl(file);
+      setGenRefs((refs) => [...refs, dataUrl]);
+      setGenError('');
+    } catch (error) {
+      setGenError(error instanceof Error ? error.message : 'Could not upload that reference image.');
     }
   };
 
@@ -303,6 +346,20 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       }}
     >
       <Handle type="target" position={Position.Left} isConnectable={isConnectable} style={{ background: 'var(--bg-color)', border: '2px solid var(--accent-neon)' }} />
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleImageUpload}
+      />
+      <input
+        ref={referenceInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleReferenceUpload}
+      />
       
       <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ flexGrow: 1, paddingRight: '10px' }}>
@@ -409,20 +466,42 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           style={{ width: '100%', height: '180px', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px', position: 'relative' }}
         >
           <img src={data.image} alt={data.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <button
+            type="button"
+            onClick={(event) => handleDownloadMedia(event, data.image, 'image')}
+            title="Download image"
+            aria-label="Download image"
+            style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 3, width: '32px', height: '32px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.22)', background: 'rgba(0,0,0,0.52)', color: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer', opacity: isHoveringImage || data.isGenerated ? 1 : 0, transition: 'opacity 0.2s', backdropFilter: 'blur(6px)' }}
+          >
+            ↓
+          </button>
           {isEditMode && (
-            <div 
-              onClick={handleChangeImage}
-              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isHoveringImage ? 1 : 0, transition: 'opacity 0.2s', cursor: 'pointer', color: 'white', fontWeight: 'bold', backdropFilter: 'blur(2px)' }}
+            <div
+              style={{ position: 'absolute', inset: 0, zIndex: 2, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: isHoveringImage ? 1 : 0, transition: 'opacity 0.2s', color: 'white', fontWeight: 'bold', backdropFilter: 'blur(2px)' }}
             >
-              Change Image
+              <button type="button" onClick={handleChangeImage} style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.22)', background: 'rgba(75,94,250,0.72)', color: '#fff', cursor: 'pointer', fontWeight: 800 }}>
+                Upload
+              </button>
+              <button type="button" onClick={handleImageUrlChange} style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.22)', background: 'rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', fontWeight: 800 }}>
+                URL
+              </button>
             </div>
           )}
         </div>
       )}
 
       {data.video && (
-        <div style={{ width: '100%', height: '180px', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px' }}>
+        <div style={{ width: '100%', height: '180px', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px', position: 'relative' }}>
           <video src={data.video} autoPlay muted loop playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <button
+            type="button"
+            onClick={(event) => handleDownloadMedia(event, data.video, 'video')}
+            title="Download video"
+            aria-label="Download video"
+            style={{ position: 'absolute', top: '8px', right: '8px', width: '32px', height: '32px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.22)', background: 'rgba(0,0,0,0.52)', color: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer', backdropFilter: 'blur(6px)' }}
+          >
+            ↓
+          </button>
         </div>
       )}
 
@@ -556,14 +635,20 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               </div>
             )}
             
-            <button 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                const url = window.prompt("Enter reference image URL:");
-                if (url) setGenRefs([...genRefs, url]);
-              }}
-              style={{ padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: '4px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '11px', textAlign: 'left' }}
-            >+ Add Reference Image</button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); referenceInputRef.current?.click(); }}
+                style={{ padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: '4px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '11px', textAlign: 'left' }}
+              >+ Upload Ref</button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const url = window.prompt("Enter reference image URL:");
+                  if (url) setGenRefs([...genRefs, url]);
+                }}
+                style={{ padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: '4px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '11px', textAlign: 'left' }}
+              >+ Ref URL</button>
+            </div>
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
               <button 

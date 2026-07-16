@@ -18,6 +18,7 @@ import assetFiles from '../assetsData.json';
 import { defaultAssetTags } from '../defaultTags';
 import { useAuth } from './AuthContext';
 import { canvasApi } from '../lib/apiClient';
+import { readImageFileAsDataUrl } from '../lib/mediaFiles';
 
 const FullscreenIcon = () => (
   <svg viewBox="2 2 20 20" width="18" height="18" fill="currentColor" aria-hidden="true">
@@ -867,6 +868,8 @@ const CanvasPersistencePanel = ({
   const [isBusy, setIsBusy] = useState(false);
   const [draftName, setDraftName] = useState(activeCanvasName || 'Fluid Node Canvas');
   const hasAutoLoadedCanvas = useRef(false);
+  const brandGuideInputRef = useRef(null);
+  const brandGuideResolverRef = useRef(null);
   const activeCanvasFromList = canvases.find((canvas) => canvas.id === activeCanvasId);
   const displayCanvasName = activeCanvasName || activeCanvasFromList?.name || 'Unsaved Canvas';
   const isNameDirty = draftName.trim() !== (activeCanvasName || 'Fluid Node Canvas');
@@ -1016,11 +1019,12 @@ const CanvasPersistencePanel = ({
       return;
     }
 
-    const guideUrlInput = window.prompt('Branding guide image URL for the first source-of-truth card:', '');
-    if (guideUrlInput === null) return;
-    const guideUrl = guideUrlInput.trim();
-    if (!guideUrl) {
-      setStatus('Branding guide image URL is required for new brand canvases.');
+    setStatus('Choose a branding guide image from your device...');
+    let guideUrl = '';
+    try {
+      guideUrl = await chooseBrandGuideImage();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Branding guide upload failed.');
       return;
     }
 
@@ -1053,6 +1057,30 @@ const CanvasPersistencePanel = ({
     }
   };
 
+  const chooseBrandGuideImage = () => new Promise((resolve, reject) => {
+    brandGuideResolverRef.current = { resolve, reject };
+    brandGuideInputRef.current?.click();
+  });
+
+  const handleBrandGuideUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    const resolver = brandGuideResolverRef.current;
+    brandGuideResolverRef.current = null;
+    if (!resolver) return;
+    if (!file) {
+      resolver.reject(new Error('Branding guide image is required for new brand canvases.'));
+      return;
+    }
+
+    try {
+      const dataUrl = await readImageFileAsDataUrl(file);
+      resolver.resolve(dataUrl);
+    } catch (error) {
+      resolver.reject(error);
+    }
+  };
+
   if (!isVisible) return null;
 
   const panelStyle = {
@@ -1081,6 +1109,13 @@ const CanvasPersistencePanel = ({
 
   return (
     <div style={panelStyle}>
+      <input
+        ref={brandGuideInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleBrandGuideUpload}
+      />
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.48)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Canvas</div>

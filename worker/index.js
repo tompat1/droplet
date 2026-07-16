@@ -1,6 +1,6 @@
 const SESSION_COOKIE = 'droplet_session';
 const SESSION_DAYS = 30;
-const MAX_JSON_BYTES = 1_500_000;
+const MAX_JSON_BYTES = 8_000_000;
 const PBKDF2_ITERATIONS = 100000;
 const GENERATION_PROVIDERS = {
   openai_image: {
