@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
 
 export default function BrandCard({ id, data, isConnectable, selected }) {
   const isEditMode = data.isEditMode === true; // defaults to false
 
-  const { setNodes, setEdges, getNode } = useReactFlow();
+  const { setNodes, setEdges, getNode, getNodes, getEdges, setCenter } = useReactFlow();
   
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState(data.title || '');
@@ -68,16 +68,33 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteCountdown, setDeleteCountdown] = useState(5);
 
+  const deleteNodeAndEdges = useCallback(() => {
+    const deletedNode = getNode(id);
+    const deletedEdges = getEdges().filter(edge => edge.source === id || edge.target === id);
+    if (deletedNode) {
+      data.pushUndoAction?.({
+        type: 'delete-node',
+        label: `Restore ${deletedNode.data?.title || 'node'}`,
+        node: deletedNode,
+        edges: deletedEdges
+      });
+    }
+
+    const nodeUpdater = data.setGlobalNodes || setNodes;
+    const edgeUpdater = data.setGlobalEdges || setEdges;
+    nodeUpdater((nds) => nds.filter(n => n.id !== id));
+    edgeUpdater((eds) => eds.filter(edge => edge.source !== id && edge.target !== id));
+  }, [data, getEdges, getNode, id, setEdges, setNodes]);
+
   useEffect(() => {
     let timer;
     if (isDeleting && deleteCountdown > 0) {
       timer = setTimeout(() => setDeleteCountdown(c => c - 1), 1000);
     } else if (isDeleting && deleteCountdown === 0) {
-      const updater = data.setGlobalNodes || setNodes;
-      updater((nds) => nds.filter(n => n.id !== id));
+      deleteNodeAndEdges();
     }
     return () => clearTimeout(timer);
-  }, [isDeleting, deleteCountdown, id, setNodes, data]);
+  }, [deleteCountdown, deleteNodeAndEdges, isDeleting]);
 
   const handleDeleteInitiate = (e) => {
     e.stopPropagation();
@@ -92,8 +109,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
   const handleConfirmDelete = (e) => {
     e.stopPropagation();
-    const updater = data.setGlobalNodes || setNodes;
-    updater((nds) => nds.filter(n => n.id !== id));
+    deleteNodeAndEdges();
   };
 
   const handleChangeImage = (e) => {
@@ -105,29 +121,52 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
     }
   };
 
+  const branchOffsetForIndex = (index) => {
+    if (index === 0) return 0;
+    const row = Math.ceil(index / 2);
+    return row * 330 * (index % 2 === 0 ? -1 : 1);
+  };
+
+  const makeGeneratedPlaceholder = ({ isVideo, title, prompt }) => {
+    const escapedTitle = title.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    const escapedPrompt = prompt.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${isVideo ? '#002b24' : '#111318'}"/><stop offset="1" stop-color="${isVideo ? '#00ffcc' : '#4B5EFA'}" stop-opacity=".42"/></linearGradient><filter id="s"><feDropShadow dx="0" dy="16" stdDeviation="12" flood-color="#000" flood-opacity=".35"/></filter></defs><rect width="640" height="420" rx="26" fill="url(#g)"/><g filter="url(#s)" transform="translate(320 176)"><circle r="82" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.28)" stroke-width="2"/><path d="${isVideo ? 'M-24-36l72 36-72 36z' : 'M0-48l14 34h37L21 8l11 36L0 23l-32 21 11-36-30-22h37z'}" fill="white" opacity=".92"/></g><text x="320" y="300" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" fill="white">${escapedTitle}</text><text x="320" y="334" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="15" fill="rgba(255,255,255,.68)">${escapedPrompt.slice(0, 64)}</text></svg>`)}`;
+  };
+
   const handleGenerateRun = () => {
     setGenState('generating');
     
     setTimeout(() => {
       const parentNode = getNode(id);
+      if (!parentNode) {
+        setGenState('idle');
+        return;
+      }
+
+      const existingNodes = getNodes();
+      const branchIndex = existingNodes.filter((node) => node.data?.generatedFromNodeId === id).length;
       const newId = `generated-${Date.now()}`;
       
       const isVideo = genPipeline === 'video';
-      const aiImagePlaceholder = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="#111318"/><g transform="translate(300,200)"><circle r="70" fill="rgba(75,94,250,0.12)" stroke="rgba(75,94,250,0.3)" stroke-width="1.5"/><g fill="none" stroke="#4B5EFA" stroke-width="2.5" stroke-linecap="round"><line x1="0" y1="-38" x2="0" y2="-28"/><line x1="0" y1="28" x2="0" y2="38"/><line x1="-38" y1="0" x2="-28" y2="0"/><line x1="28" y1="0" x2="38" y2="0"/><line x1="-26" y1="-26" x2="-20" y2="-20"/><line x1="20" y1="20" x2="26" y2="26"/><line x1="26" y1="-26" x2="20" y2="-20"/><line x1="-20" y1="20" x2="-26" y2="26"/></g><path d="M0,-18 L5,0 L18,0 L8,10 L12,24 L0,14 L-12,24 L-8,10 L-18,0 L-5,0 Z" fill="#4B5EFA" opacity="0.9"/></g><text x="300" y="318" font-family="Inter, sans-serif" font-size="13" fill="rgba(255,255,255,0.4)" text-anchor="middle">AI Image Placeholder</text></svg>`)}`;
-      const placeholderImg = isVideo ? null : aiImagePlaceholder;
-      const placeholderVideo = isVideo ? 'https://www.w3schools.com/html/mov_bbb.mp4' : null;
+      const branchTitle = `${isVideo ? 'Video' : 'Image'} Branch ${branchIndex + 1}`;
+      const prompt = genPrompt.trim() || `Generate a ${genPipeline} branch from ${data.title}`;
+      const placeholderImg = makeGeneratedPlaceholder({ isVideo, title: branchTitle, prompt });
 
       const newNode = {
         id: newId,
         type: 'brandCard',
-        position: { x: parentNode.position.x + 400, y: parentNode.position.y },
+        position: { x: parentNode.position.x + 430, y: parentNode.position.y + branchOffsetForIndex(branchIndex) },
         data: { 
-          title: isVideo ? 'New AI Video' : 'New AI Image', 
-          subtitle: `Pipeline: ${genPipeline}`,
-          description: genPrompt || `Generated from ${data.title}`,
+          title: branchTitle, 
+          subtitle: `${isVideo ? 'Video' : 'Image'} branch from ${data.title || 'node'}`,
+          description: prompt,
           image: placeholderImg,
-          video: placeholderVideo,
           isGenerated: true,
+          generatedFromNodeId: id,
+          generationPipeline: genPipeline,
+          generationPrompt: prompt,
+          generationRefs: genRefs,
+          nodeGroup: `generated-${id}`,
           setGlobalNodes: data.setGlobalNodes,
           setGlobalEdges: data.setGlobalEdges
         }
@@ -144,6 +183,9 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       setGenState('idle');
       setGenPrompt('');
       setGenRefs([]);
+      window.requestAnimationFrame(() => {
+        setCenter(newNode.position.x + 160, newNode.position.y + 180, { zoom: 0.9, duration: 700 });
+      });
     }, 2000);
   };
   const isParentCollapsed = data.isParentCollapsed === true;

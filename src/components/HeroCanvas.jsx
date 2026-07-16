@@ -787,6 +787,7 @@ const sanitizeNodeForSave = (node) => {
   delete data.canCollapse;
   delete data.isCollapsed;
   delete data.isEditMode;
+  delete data.pushUndoAction;
 
   return {
     id: String(node.id),
@@ -1123,6 +1124,7 @@ export default function HeroCanvas() {
   const [activeCanvasName, setActiveCanvasName] = useState('');
   const [canvasStatus, setCanvasStatus] = useState('');
   const [isCanvasDirty, setIsCanvasDirty] = useState(false);
+  const [undoStack, setUndoStack] = useState([]);
   
   const containerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -1141,6 +1143,32 @@ export default function HeroCanvas() {
     setIsCanvasDirty(true);
     setEdges(updater);
   }, [setEdges]);
+  const pushUndoAction = useCallback((action) => {
+    setUndoStack((stack) => [action, ...stack].slice(0, 12));
+  }, []);
+
+  const undoLastAction = useCallback(() => {
+    setUndoStack((stack) => {
+      const [action, ...rest] = stack;
+      if (!action) return stack;
+
+      if (action.type === 'delete-node') {
+        setNodes((nds) => {
+          const withoutDuplicate = nds.filter((node) => node.id !== action.node.id);
+          return [...withoutDuplicate, action.node];
+        });
+        setEdges((eds) => {
+          const restoredEdgeIds = new Set(action.edges.map((edge) => edge.id));
+          const withoutDuplicates = eds.filter((edge) => !restoredEdgeIds.has(edge.id));
+          return [...withoutDuplicates, ...action.edges];
+        });
+        setIsCanvasDirty(true);
+        setCanvasStatus('Restored deleted node.');
+      }
+
+      return rest;
+    });
+  }, [setEdges, setNodes]);
 
   useEffect(() => {
     const handleToggle = (id) => {
@@ -1196,6 +1224,7 @@ export default function HeroCanvas() {
             onToggleCollapse: handleToggle,
             setGlobalNodes: setPersistentNodes,
             setGlobalEdges: setPersistentEdges,
+            pushUndoAction,
             isEditMode
           }
         };
@@ -1219,7 +1248,7 @@ export default function HeroCanvas() {
         }
       };
     }));
-  }, [collapsedBranches, setNodes, setEdges, isEditMode, setPersistentEdges, setPersistentNodes]);
+  }, [collapsedBranches, setNodes, setEdges, isEditMode, pushUndoAction, setPersistentEdges, setPersistentNodes]);
 
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -1367,6 +1396,30 @@ export default function HeroCanvas() {
                 <div style={{ width: '16px', height: '16px', background: 'white', borderRadius: '50%', position: 'absolute', top: '2px', left: interactionMode === 'pan' ? '18px' : '2px', transition: 'all 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
               </div>
             </div>
+
+            {isEditMode && (
+              <button
+                type="button"
+                onClick={undoLastAction}
+                disabled={undoStack.length === 0}
+                title={undoStack[0]?.label || 'Nothing to restore'}
+                style={{
+                  minHeight: '36px',
+                  width: '100%',
+                  borderRadius: '8px',
+                  border: undoStack.length > 0 ? '1px solid rgba(255, 106, 0, 0.45)' : '1px solid rgba(255,255,255,0.1)',
+                  background: undoStack.length > 0 ? 'rgba(255, 106, 0, 0.16)' : 'rgba(255,255,255,0.06)',
+                  color: undoStack.length > 0 ? '#fff' : 'rgba(255,255,255,0.4)',
+                  cursor: undoStack.length > 0 ? 'pointer' : 'not-allowed',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em'
+                }}
+              >
+                ↶ Undo Delete
+              </button>
+            )}
 
             <CanvasPersistencePanel
               user={user}
