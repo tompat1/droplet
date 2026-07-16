@@ -2,6 +2,23 @@ const SESSION_COOKIE = 'droplet_session';
 const SESSION_DAYS = 30;
 const MAX_JSON_BYTES = 1_500_000;
 const PBKDF2_ITERATIONS = 100000;
+const GENERATION_PROVIDERS = {
+  openai_image: {
+    label: 'ChatGPT Images',
+    pipeline: 'image',
+    defaultModel: 'gpt-image-2'
+  },
+  gemini_banana_pro: {
+    label: 'Gemini Banana Pro',
+    pipeline: 'image',
+    defaultModel: 'gemini-3-pro-image'
+  },
+  google_veo: {
+    label: 'Google Veo',
+    pipeline: 'video',
+    defaultModel: 'veo-3.1-generate-preview'
+  }
+};
 
 export default {
   async fetch(request, env) {
@@ -62,6 +79,10 @@ async function routeApi(request, env, url) {
 
   if (request.method === 'PATCH' && path === '/auth/profile') {
     return updateProfile(request, env, session.user.id);
+  }
+
+  if (request.method === 'POST' && path === '/generate/branch') {
+    return createGenerationBranch(request, env);
   }
 
   if (path.startsWith('/admin/')) {
@@ -357,6 +378,242 @@ async function createCanvasVersion(env, userId, canvasId) {
   ).bind(versionId, canvasId, userId, row.snapshot_json).run();
 
   return json({ id: versionId }, 201);
+}
+
+async function createGenerationBranch(request, env) {
+  let input = { provider: 'unknown' };
+  try {
+    input = normalizeGenerationPayload(await readJson(request));
+    const provider = GENERATION_PROVIDERS[input.provider];
+    if (!provider) return json({ error: 'Unsupported generation provider' }, 400);
+
+    let branch;
+    if (input.provider === 'openai_image') {
+      branch = await generateOpenAiImage(env, input);
+    } else if (input.provider === 'gemini_banana_pro') {
+      branch = await generateGeminiImage(env, input);
+    } else if (input.provider === 'google_veo') {
+      branch = await generateGoogleVeo(env, input);
+    }
+
+    return json({
+      branch: {
+        ...branch,
+        provider: input.provider,
+        providerLabel: provider.label,
+        pipeline: provider.pipeline,
+        prompt: input.prompt,
+        refs: input.refs
+      },
+      generatedAt: new Date().toISOString()
+    }, 201);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Generation branch failed', { provider: input.provider, message });
+    const status = /required|unsupported/i.test(message) ? 400 : 502;
+    return json({ error: `Generation failed: ${message}` }, status);
+  }
+}
+
+async function generateOpenAiImage(env, input) {
+  const apiKey = String(env.OPENAI_API_KEY || '');
+  const model = String(env.OPENAI_IMAGE_MODEL || GENERATION_PROVIDERS.openai_image.defaultModel);
+  if (!apiKey) return mockGenerationBranch(input, model, 'OPENAI_API_KEY is not configured');
+
+  const prompt = withReferenceContext(input);
+  const response = await fetch('https://api.openai.com/v1/images/generations', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model,
+      prompt,
+      n: 1
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(providerError(payload, response.status));
+
+  const imageBase64 = payload?.data?.[0]?.b64_json;
+  if (!imageBase64) throw new Error('OpenAI did not return image data');
+
+  return {
+    title: 'ChatGPT Image Branch',
+    subtitle: `Generated with ${model}`,
+    description: input.prompt,
+    imageDataUrl: `data:image/png;base64,${imageBase64}`,
+    model,
+    status: 'ready'
+  };
+}
+
+async function generateGeminiImage(env, input) {
+  const apiKey = String(env.GEMINI_API_KEY || env.GOOGLE_AI_API_KEY || '');
+  const model = String(env.GEMINI_IMAGE_MODEL || GENERATION_PROVIDERS.gemini_banana_pro.defaultModel);
+  if (!apiKey) return mockGenerationBranch(input, model, 'GEMINI_API_KEY is not configured');
+
+  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+    method: 'POST',
+    headers: {
+      'x-goog-api-key': apiKey,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model,
+      input: geminiInteractionInput(input),
+      response_format: {
+        type: 'image',
+        mime_type: 'image/png',
+        aspect_ratio: '1:1',
+        image_size: '1K'
+      }
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(providerError(payload, response.status));
+
+  const outputImage = payload?.output_image || payload?.outputImage;
+  const imageBlock = findGeminiImageBlock(payload);
+  const imageBase64 = outputImage?.data || imageBlock?.data;
+  const mimeType = outputImage?.mime_type || outputImage?.mimeType || imageBlock?.mime_type || imageBlock?.mimeType || 'image/png';
+  if (!imageBase64) throw new Error('Gemini did not return image data');
+
+  return {
+    title: 'Banana Pro Image Branch',
+    subtitle: `Generated with ${model}`,
+    description: payload?.output_text || payload?.outputText || input.prompt,
+    imageDataUrl: `data:${mimeType};base64,${imageBase64}`,
+    model,
+    status: 'ready'
+  };
+}
+
+async function generateGoogleVeo(env, input) {
+  const apiKey = String(env.GEMINI_API_KEY || env.GOOGLE_AI_API_KEY || '');
+  const model = String(env.VEO_VIDEO_MODEL || GENERATION_PROVIDERS.google_veo.defaultModel);
+  if (!apiKey) return mockGenerationBranch(input, model, 'GEMINI_API_KEY is not configured');
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:predictLongRunning`, {
+    method: 'POST',
+    headers: {
+      'x-goog-api-key': apiKey,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      instances: [{
+        prompt: withReferenceContext(input)
+      }]
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(providerError(payload, response.status));
+
+  return {
+    title: 'Veo Video Branch',
+    subtitle: `Generating with ${model}`,
+    description: input.prompt,
+    model,
+    operationName: payload.name || '',
+    status: payload.done ? 'ready' : 'processing'
+  };
+}
+
+function normalizeGenerationPayload(body) {
+  const provider = cleanText(body.provider, 80);
+  const prompt = cleanText(body.prompt, 4000);
+  const parent = body.parent && typeof body.parent === 'object' ? body.parent : {};
+  if (!prompt) throw new Error('Generation prompt is required');
+
+  return {
+    provider,
+    pipeline: body.pipeline === 'video' ? 'video' : 'image',
+    prompt,
+    refs: normalizeUrlList(body.refs),
+    parent: {
+      id: cleanText(parent.id, 160),
+      title: cleanText(parent.title, 160),
+      subtitle: cleanText(parent.subtitle, 160),
+      description: cleanText(parent.description, 500),
+      image: normalizeReferenceUrl(parent.image)
+    }
+  };
+}
+
+function mockGenerationBranch(input, model, reason) {
+  const provider = GENERATION_PROVIDERS[input.provider] || GENERATION_PROVIDERS.openai_image;
+  return {
+    title: `${provider.pipeline === 'video' ? 'Video' : 'Image'} Branch`,
+    subtitle: `${provider.label} setup placeholder`,
+    description: `${input.prompt}\n\n${reason}`,
+    model,
+    status: 'mock',
+    mock: true,
+    operationName: ''
+  };
+}
+
+function geminiInteractionInput(input) {
+  if (input.refs.length === 0) return input.prompt;
+  return [
+    ...input.refs.map((uri) => ({ type: 'image', uri, mime_type: inferImageMimeType(uri) })),
+    { type: 'text', text: input.prompt }
+  ];
+}
+
+function findGeminiImageBlock(payload) {
+  const steps = Array.isArray(payload?.steps) ? payload.steps : [];
+  for (const step of steps) {
+    const blocks = Array.isArray(step?.content) ? step.content : Array.isArray(step?.summary) ? step.summary : [];
+    const image = blocks.find((block) => block?.type === 'image' && block?.data);
+    if (image) return image;
+  }
+  return null;
+}
+
+function withReferenceContext(input) {
+  if (input.refs.length === 0) return input.prompt;
+  return `${input.prompt}\n\nReference image URLs:\n${input.refs.map((ref, index) => `${index + 1}. ${ref}`).join('\n')}`;
+}
+
+function normalizeUrlList(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map(normalizeReferenceUrl).filter(Boolean).slice(0, 3);
+}
+
+function normalizeReferenceUrl(value) {
+  const url = cleanText(value, 2000);
+  if (!url) return '';
+
+  if (/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(url) && url.length <= 750000) {
+    return url;
+  }
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return parsed.toString();
+  } catch {
+    return '';
+  }
+
+  return '';
+}
+
+function inferImageMimeType(uri) {
+  if (/^data:image\/jpeg/i.test(uri) || /\.jpe?g($|\?)/i.test(uri)) return 'image/jpeg';
+  if (/^data:image\/webp/i.test(uri) || /\.webp($|\?)/i.test(uri)) return 'image/webp';
+  if (/^data:image\/gif/i.test(uri) || /\.gif($|\?)/i.test(uri)) return 'image/gif';
+  return 'image/png';
+}
+
+function providerError(payload, status) {
+  if (payload?.error?.message) return payload.error.message;
+  if (typeof payload?.error === 'string') return payload.error;
+  return `Provider request failed with ${status}`;
 }
 
 async function syncCanvasParts(env, canvasId, snapshot) {

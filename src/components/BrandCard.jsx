@@ -1,5 +1,27 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
+import { generationApi } from '../lib/apiClient';
+
+const GENERATION_PROVIDERS = {
+  openai_image: {
+    label: 'ChatGPT Images',
+    shortLabel: 'ChatGPT',
+    pipeline: 'image',
+    accent: '#4B5EFA'
+  },
+  gemini_banana_pro: {
+    label: 'Gemini Banana Pro',
+    shortLabel: 'Banana Pro',
+    pipeline: 'image',
+    accent: '#ff9f1c'
+  },
+  google_veo: {
+    label: 'Google Veo',
+    shortLabel: 'Veo',
+    pipeline: 'video',
+    accent: '#00ffcc'
+  }
+};
 
 export default function BrandCard({ id, data, isConnectable, selected }) {
   const isEditMode = data.isEditMode === true; // defaults to false
@@ -20,8 +42,10 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
   // Generative UI State
   const [genState, setGenState] = useState('idle'); // idle | pipeline | prompt | generating
   const [genPipeline, setGenPipeline] = useState(null); // 'image' | 'video'
+  const [genProvider, setGenProvider] = useState(null);
   const [genPrompt, setGenPrompt] = useState('');
   const [genRefs, setGenRefs] = useState([]);
+  const [genError, setGenError] = useState('');
 
   // 3D Parallax Tilt State
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
@@ -127,16 +151,62 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
     return row * 330 * (index % 2 === 0 ? -1 : 1);
   };
 
-  const makeGeneratedPlaceholder = ({ isVideo, title, prompt }) => {
+  const makeGeneratedPlaceholder = ({ isVideo, title, prompt, providerLabel = '' }) => {
     const escapedTitle = title.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
     const escapedPrompt = prompt.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
-    return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${isVideo ? '#002b24' : '#111318'}"/><stop offset="1" stop-color="${isVideo ? '#00ffcc' : '#4B5EFA'}" stop-opacity=".42"/></linearGradient><filter id="s"><feDropShadow dx="0" dy="16" stdDeviation="12" flood-color="#000" flood-opacity=".35"/></filter></defs><rect width="640" height="420" rx="26" fill="url(#g)"/><g filter="url(#s)" transform="translate(320 176)"><circle r="82" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.28)" stroke-width="2"/><path d="${isVideo ? 'M-24-36l72 36-72 36z' : 'M0-48l14 34h37L21 8l11 36L0 23l-32 21 11-36-30-22h37z'}" fill="white" opacity=".92"/></g><text x="320" y="300" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" fill="white">${escapedTitle}</text><text x="320" y="334" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="15" fill="rgba(255,255,255,.68)">${escapedPrompt.slice(0, 64)}</text></svg>`)}`;
+    const escapedProvider = providerLabel.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${isVideo ? '#002b24' : '#111318'}"/><stop offset="1" stop-color="${isVideo ? '#00ffcc' : '#4B5EFA'}" stop-opacity=".42"/></linearGradient><filter id="s"><feDropShadow dx="0" dy="16" stdDeviation="12" flood-color="#000" flood-opacity=".35"/></filter></defs><rect width="640" height="420" rx="26" fill="url(#g)"/><g filter="url(#s)" transform="translate(320 176)"><circle r="82" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.28)" stroke-width="2"/><path d="${isVideo ? 'M-24-36l72 36-72 36z' : 'M0-48l14 34h37L21 8l11 36L0 23l-32 21 11-36-30-22h37z'}" fill="white" opacity=".92"/></g><text x="320" y="286" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="800" fill="rgba(255,255,255,.72)">${escapedProvider}</text><text x="320" y="318" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" fill="white">${escapedTitle}</text><text x="320" y="352" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="15" fill="rgba(255,255,255,.68)">${escapedPrompt.slice(0, 64)}</text></svg>`)}`;
   };
 
-  const handleGenerateRun = () => {
+  const buildGeneratedNode = ({ providerKey, prompt, branchIndex, parentNode, result }) => {
+    const provider = GENERATION_PROVIDERS[providerKey] || GENERATION_PROVIDERS.openai_image;
+    const isVideo = provider.pipeline === 'video';
+    const branchTitle = result?.branch?.title || `${isVideo ? 'Video' : 'Image'} Branch ${branchIndex + 1}`;
+    const mediaUrl = result?.branch?.imageDataUrl || result?.branch?.imageUrl || result?.branch?.posterUrl || '';
+    const placeholderImg = mediaUrl || makeGeneratedPlaceholder({
+      isVideo,
+      title: branchTitle,
+      prompt,
+      providerLabel: provider.shortLabel
+    });
+    const newId = `generated-${Date.now()}`;
+
+    return {
+      id: newId,
+      type: 'brandCard',
+      position: { x: parentNode.position.x + 430, y: parentNode.position.y + branchOffsetForIndex(branchIndex) },
+      data: {
+        title: branchTitle,
+        subtitle: result?.branch?.subtitle || `${provider.label} branch from ${data.title || 'node'}`,
+        description: result?.branch?.description || prompt,
+        image: placeholderImg,
+        video: result?.branch?.videoUrl || undefined,
+        isGenerated: true,
+        generatedFromNodeId: id,
+        generationPipeline: provider.pipeline,
+        generationProvider: providerKey,
+        generationProviderLabel: provider.label,
+        generationModel: result?.branch?.model || '',
+        generationPrompt: prompt,
+        generationRefs: genRefs,
+        generationStatus: result?.branch?.status || (result?.mock ? 'mock' : 'ready'),
+        generationOperationName: result?.branch?.operationName || '',
+        generationMock: result?.mock === true || result?.branch?.mock === true,
+        nodeGroup: `generated-${id}`,
+        setGlobalNodes: data.setGlobalNodes,
+        setGlobalEdges: data.setGlobalEdges
+      }
+    };
+  };
+
+  const handleGenerateRun = async () => {
+    const providerKey = genProvider || (genPipeline === 'video' ? 'google_veo' : 'openai_image');
+    const provider = GENERATION_PROVIDERS[providerKey] || GENERATION_PROVIDERS.openai_image;
+    const prompt = genPrompt.trim() || `Generate a ${provider.pipeline} branch from ${data.title}`;
+    setGenError('');
     setGenState('generating');
-    
-    setTimeout(() => {
+
+    try {
       const parentNode = getNode(id);
       if (!parentNode) {
         setGenState('idle');
@@ -145,34 +215,23 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
       const existingNodes = getNodes();
       const branchIndex = existingNodes.filter((node) => node.data?.generatedFromNodeId === id).length;
-      const newId = `generated-${Date.now()}`;
-      
-      const isVideo = genPipeline === 'video';
-      const branchTitle = `${isVideo ? 'Video' : 'Image'} Branch ${branchIndex + 1}`;
-      const prompt = genPrompt.trim() || `Generate a ${genPipeline} branch from ${data.title}`;
-      const placeholderImg = makeGeneratedPlaceholder({ isVideo, title: branchTitle, prompt });
-
-      const newNode = {
-        id: newId,
-        type: 'brandCard',
-        position: { x: parentNode.position.x + 430, y: parentNode.position.y + branchOffsetForIndex(branchIndex) },
-        data: { 
-          title: branchTitle, 
-          subtitle: `${isVideo ? 'Video' : 'Image'} branch from ${data.title || 'node'}`,
-          description: prompt,
-          image: placeholderImg,
-          isGenerated: true,
-          generatedFromNodeId: id,
-          generationPipeline: genPipeline,
-          generationPrompt: prompt,
-          generationRefs: genRefs,
-          nodeGroup: `generated-${id}`,
-          setGlobalNodes: data.setGlobalNodes,
-          setGlobalEdges: data.setGlobalEdges
+      const result = await generationApi.createBranch({
+        provider: providerKey,
+        pipeline: provider.pipeline,
+        prompt,
+        refs: genRefs,
+        parent: {
+          id,
+          title: data.title || '',
+          subtitle: data.subtitle || '',
+          description: data.description || '',
+          image: data.image || ''
         }
-      };
+      });
+      const newNode = buildGeneratedNode({ providerKey, prompt, branchIndex, parentNode, result });
+
       const newEdge = { 
-        id: `e-${id}-${newId}`, source: String(id), target: String(newId), type: 'smoothstep', animated: true, style: { stroke: isVideo ? '#00ffcc' : '#4B5EFA', strokeWidth: 4 } 
+        id: `e-${id}-${newNode.id}`, source: String(id), target: String(newNode.id), type: 'smoothstep', animated: true, style: { stroke: provider.accent, strokeWidth: 4 } 
       };
       
       const nodeUpdater = data.setGlobalNodes || setNodes;
@@ -181,12 +240,17 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       edgeUpdater(eds => [...eds, newEdge]);
       
       setGenState('idle');
+      setGenProvider(null);
+      setGenPipeline(null);
       setGenPrompt('');
       setGenRefs([]);
       window.requestAnimationFrame(() => {
         setCenter(newNode.position.x + 160, newNode.position.y + 180, { zoom: 0.9, duration: 700 });
       });
-    }, 2000);
+    } catch (error) {
+      setGenState('prompt');
+      setGenError(error instanceof Error ? error.message : 'Generation failed');
+    }
   };
   const isParentCollapsed = data.isParentCollapsed === true;
 
@@ -420,18 +484,22 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         {genState === 'pipeline' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
             <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 'bold' }}>Select AI Pipeline:</span>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
               <button 
-                onClick={(e) => { e.stopPropagation(); setGenPipeline('image'); setGenState('prompt'); }}
-                style={{ flex: 1, padding: '8px', background: 'rgba(75, 94, 250, 0.2)', border: '1px solid rgba(75, 94, 250, 0.5)', borderRadius: '6px', color: 'white', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold' }}
-              >🖼️ Image</button>
+                onClick={(e) => { e.stopPropagation(); setGenProvider('openai_image'); setGenPipeline('image'); setGenState('prompt'); }}
+                style={{ padding: '8px', background: 'rgba(75, 94, 250, 0.2)', border: '1px solid rgba(75, 94, 250, 0.5)', borderRadius: '6px', color: 'white', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold', textAlign: 'left' }}
+              >🖼️ ChatGPT Images</button>
               <button 
-                onClick={(e) => { e.stopPropagation(); setGenPipeline('video'); setGenState('prompt'); }}
-                style={{ flex: 1, padding: '8px', background: 'rgba(0, 255, 204, 0.2)', border: '1px solid rgba(0, 255, 204, 0.5)', borderRadius: '6px', color: 'white', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold' }}
-              >🎥 Video</button>
+                onClick={(e) => { e.stopPropagation(); setGenProvider('gemini_banana_pro'); setGenPipeline('image'); setGenState('prompt'); }}
+                style={{ padding: '8px', background: 'rgba(255, 159, 28, 0.18)', border: '1px solid rgba(255, 159, 28, 0.48)', borderRadius: '6px', color: 'white', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold', textAlign: 'left' }}
+              >🍌 Gemini Banana Pro</button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setGenProvider('google_veo'); setGenPipeline('video'); setGenState('prompt'); }}
+                style={{ padding: '8px', background: 'rgba(0, 255, 204, 0.2)', border: '1px solid rgba(0, 255, 204, 0.5)', borderRadius: '6px', color: 'white', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold', textAlign: 'left' }}
+              >🎥 Google Veo</button>
             </div>
             <button 
-              onClick={(e) => { e.stopPropagation(); setGenState('idle'); }}
+              onClick={(e) => { e.stopPropagation(); setGenState('idle'); setGenProvider(null); setGenPipeline(null); setGenError(''); }}
               style={{ padding: '6px', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '12px' }}
             >Cancel</button>
           </div>
@@ -439,14 +507,19 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
         {genState === 'prompt' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
-            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 'bold' }}>{genPipeline === 'image' ? '🖼️ Image Prompt' : '🎥 Video Prompt'}:</span>
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 'bold' }}>{genPipeline === 'image' ? '🖼️' : '🎥'} {GENERATION_PROVIDERS[genProvider]?.label || 'AI'} Prompt:</span>
             <textarea 
               autoFocus
               placeholder="Describe what you want to generate..."
               value={genPrompt}
-              onChange={(e) => setGenPrompt(e.target.value)}
+              onChange={(e) => { setGenPrompt(e.target.value); setGenError(''); }}
               style={{ width: '100%', minHeight: '60px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', color: 'white', padding: '8px', fontSize: '12px', resize: 'vertical', outline: 'none' }}
             />
+            {genError && (
+              <div style={{ padding: '7px 8px', border: '1px solid rgba(255, 99, 99, 0.35)', background: 'rgba(255, 70, 70, 0.12)', borderRadius: '6px', color: '#ff9c9c', fontSize: '11px', lineHeight: 1.35 }}>
+                {genError}
+              </div>
+            )}
             
             {genRefs.length > 0 && (
               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -473,7 +546,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
                 style={{ flex: 1, padding: '8px', background: 'var(--accent-neon)', border: 'none', borderRadius: '6px', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}
               >✨ Run</button>
               <button 
-                onClick={(e) => { e.stopPropagation(); setGenState('idle'); setGenPrompt(''); setGenRefs([]); }}
+                onClick={(e) => { e.stopPropagation(); setGenState('idle'); setGenProvider(null); setGenPipeline(null); setGenPrompt(''); setGenRefs([]); setGenError(''); }}
                 style={{ padding: '8px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', color: 'white', cursor: 'pointer' }}
               >Cancel</button>
             </div>
@@ -485,7 +558,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-neon)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1.5s linear infinite' }}>
               <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
             </svg>
-            <span style={{ fontSize: '13px', color: 'var(--accent-neon)', fontWeight: 'bold' }}>Generating AI Asset...</span>
+            <span style={{ fontSize: '13px', color: 'var(--accent-neon)', fontWeight: 'bold' }}>Generating with {GENERATION_PROVIDERS[genProvider]?.shortLabel || 'AI'}...</span>
           </div>
         )}
       </div>

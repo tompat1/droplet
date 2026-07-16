@@ -84,6 +84,10 @@ Authenticated:
 - `DELETE /api/canvases/:id`
 - `POST /api/canvases/:id/snapshot`
 
+Generation:
+
+- `POST /api/generate/branch`
+
 Admin:
 
 - `GET /api/admin/users`

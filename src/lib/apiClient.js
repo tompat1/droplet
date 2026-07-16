@@ -37,6 +37,10 @@ export const canvasApi = {
   snapshot: (id) => apiRequest(`/canvases/${id}/snapshot`, { method: 'POST' })
 };
 
+export const generationApi = {
+  createBranch: (input) => apiRequest('/generate/branch', { method: 'POST', body: input })
+};
+
 export const adminApi = {
   users: () => apiRequest('/admin/users'),
   createUser: (input) => apiRequest('/admin/users', { method: 'POST', body: input }),
