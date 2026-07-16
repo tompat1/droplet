@@ -24,6 +24,35 @@ const GENERATION_PROVIDERS = {
     accent: '#00ffcc'
   }
 };
+const PROMPT_HELP_SECTIONS = [
+  {
+    title: 'Creative brief',
+    text: 'Name the subject, audience, use case, and campaign feeling.'
+  },
+  {
+    title: 'Composition',
+    text: 'Call out framing, angle, placement, negative space, and exact text.'
+  },
+  {
+    title: 'Lighting + style',
+    text: 'Specify lighting, material texture, realism level, and mood.'
+  },
+  {
+    title: 'Brand lock',
+    text: 'Mention colors naturally; Droplet will map them to brand-guide colors.'
+  },
+  {
+    title: 'Preserve refs',
+    text: 'Say what must stay unchanged when using reference images.'
+  }
+];
+const PROMPT_STARTERS = [
+  'Create a polished campaign image for...',
+  'Use the brand guide as the source of truth and generate...',
+  'Keep the product identity unchanged while changing...',
+  'Compose a premium studio shot with...',
+  'Make a social ad with exact copy: "..."'
+];
 
 export default function BrandCard({ id, data, isConnectable, selected }) {
   const isEditMode = data.isEditMode === true; // defaults to false
@@ -48,6 +77,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
   const [genPrompt, setGenPrompt] = useState('');
   const [genRefs, setGenRefs] = useState([]);
   const [genError, setGenError] = useState('');
+  const [isPromptHelpOpen, setIsPromptHelpOpen] = useState(false);
 
   // 3D Parallax Tilt State
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
@@ -189,6 +219,14 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
     }
   };
 
+  const applyPromptStarter = (starter) => {
+    setGenPrompt((current) => {
+      const trimmed = current.trim();
+      return trimmed ? `${trimmed}\n${starter}` : starter;
+    });
+    setGenError('');
+  };
+
   const branchOffsetForIndex = (index) => {
     if (index === 0) return 0;
     const row = Math.ceil(index / 2);
@@ -263,7 +301,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       const branchIndex = existingNodes.filter((node) => node.data?.generatedFromNodeId === id).length;
       const brandGuideNodes = existingNodes.filter((node) => {
         const nodeData = node.data || {};
-        return nodeData.isBrandGuideSource === true || nodeData.sourceOfTruth === true || nodeData.referenceRole === 'brand-guide';
+        return nodeData.isBrandGuideSource === true || nodeData.sourceOfTruth === true || nodeData.referenceRole === 'brand-guide' || Array.isArray(nodeData.colors);
       });
       const brandGuideRefs = brandGuideNodes
         .map((node) => node.data?.image)
@@ -276,7 +314,8 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           subtitle: node.data?.subtitle || '',
           description: node.data?.description || '',
           image: node.data?.image || '',
-          brandName: node.data?.brandName || ''
+          brandName: node.data?.brandName || '',
+          colors: Array.isArray(node.data?.colors) ? node.data.colors : []
         }))
       };
       const result = await generationApi.createBranch({
@@ -613,7 +652,48 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
         {genState === 'prompt' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
-            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 'bold' }}>{genPipeline === 'image' ? '🖼️' : '🎥'} {GENERATION_PROVIDERS[genProvider]?.label || 'AI'} Prompt:</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+              <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 'bold' }}>{genPipeline === 'image' ? '🖼️' : '🎥'} {GENERATION_PROVIDERS[genProvider]?.label || 'AI'} Prompt:</span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setIsPromptHelpOpen((open) => !open); }}
+                style={{ padding: '5px 8px', background: isPromptHelpOpen ? 'rgba(0,255,204,0.18)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '999px', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 900, letterSpacing: '0.04em', textTransform: 'uppercase' }}
+                title="Open prompt helper"
+                aria-label="Open prompt helper"
+              >
+                Guide
+              </button>
+            </div>
+            {isPromptHelpOpen && (
+              <div style={{ padding: '9px', border: '1px solid rgba(0,255,204,0.22)', borderRadius: '8px', background: 'rgba(0,255,204,0.06)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.78)', lineHeight: 1.35 }}>
+                  Write it like a compact creative brief: subject, composition, lighting, style, exact copy, and what must stay unchanged from references.
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '5px' }}>
+                  {PROMPT_HELP_SECTIONS.map((section) => (
+                    <div key={section.title} style={{ display: 'grid', gridTemplateColumns: '86px 1fr', gap: '7px', fontSize: '10px', lineHeight: 1.3 }}>
+                      <strong style={{ color: 'rgba(0,255,204,0.82)' }}>{section.title}</strong>
+                      <span style={{ color: 'rgba(255,255,255,0.6)' }}>{section.text}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                  {PROMPT_STARTERS.map((starter) => (
+                    <button
+                      type="button"
+                      key={starter}
+                      onClick={(e) => { e.stopPropagation(); applyPromptStarter(starter); }}
+                      style={{ padding: '5px 7px', borderRadius: '999px', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.055)', color: 'rgba(255,255,255,0.72)', cursor: 'pointer', fontSize: '10px', textAlign: 'left' }}
+                    >
+                      {starter}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.48)', lineHeight: 1.35 }}>
+                  Color words are brand-locked at generation time: if you write "orange", Droplet asks the provider to use the closest brand-guide color and exact hex when available.
+                </div>
+              </div>
+            )}
             <textarea 
               autoFocus
               placeholder="Describe what you want to generate..."

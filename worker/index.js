@@ -44,6 +44,32 @@ const OPENAI_IMAGE_PRICE_ESTIMATES_USD = {
 const DEFAULT_IMAGE_SIZE = '1024x1024';
 const DEFAULT_IMAGE_QUALITY = 'medium';
 const DEFAULT_VEO_SECONDS = 8;
+const COLOR_WORD_ALIASES = {
+  red: ['red', 'crimson', 'scarlet'],
+  orange: ['orange', 'ember', 'tangerine'],
+  yellow: ['yellow', 'gold', 'golden'],
+  green: ['green', 'moss', 'emerald'],
+  blue: ['blue', 'cobalt', 'navy', 'azure'],
+  purple: ['purple', 'violet', 'lavender'],
+  pink: ['pink', 'magenta', 'fuchsia'],
+  brown: ['brown', 'tan', 'beige', 'terra', 'root'],
+  black: ['black', 'midnight'],
+  white: ['white', 'bone', 'cream'],
+  gray: ['gray', 'grey', 'silver', 'chrome']
+};
+const COLOR_REFERENCE_HEX = {
+  red: '#FF0000',
+  orange: '#FF7A00',
+  yellow: '#FFD400',
+  green: '#00A85A',
+  blue: '#1E5BFF',
+  purple: '#7A3FF2',
+  pink: '#FF4FB8',
+  brown: '#7A4A28',
+  black: '#050505',
+  white: '#FFFFFF',
+  gray: '#A0A0A0'
+};
 
 export default {
   async fetch(request, env) {
@@ -688,7 +714,8 @@ function normalizeBrandGuidePayload(value) {
       subtitle: cleanText(node.subtitle, 180),
       description: cleanText(node.description, 1200),
       image: normalizeReferenceUrl(node.image),
-      brandName: cleanText(node.brandName, 180)
+      brandName: cleanText(node.brandName, 180),
+      colors: normalizeBrandColors(node.colors)
     }))
   };
 }
@@ -823,6 +850,118 @@ function findGeminiImageBlock(payload) {
   return null;
 }
 
+function normalizeBrandColors(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((color) => ({
+      name: cleanText(color?.name, 80),
+      hex: normalizeHexColor(color?.hex)
+    }))
+    .filter((color) => color.name || color.hex)
+    .slice(0, 24);
+}
+
+function normalizeHexColor(value) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!match) return '';
+  const hex = match[1].length === 3
+    ? match[1].split('').map((char) => char + char).join('')
+    : match[1];
+  return `#${hex.toUpperCase()}`;
+}
+
+function extractBrandColors(input) {
+  const guideNodes = Array.isArray(input.brandGuide?.nodes) ? input.brandGuide.nodes : [];
+  const structuredColors = guideNodes.flatMap((node) => Array.isArray(node.colors) ? node.colors : []);
+  const textColors = guideNodes.flatMap((node) => extractHexColorsFromText([node.title, node.subtitle, node.description, node.brandName].filter(Boolean).join(' ')));
+  const colorsByKey = new Map();
+  [...structuredColors, ...textColors].forEach((color) => {
+    const hex = normalizeHexColor(color.hex);
+    const name = cleanText(color.name, 80);
+    if (!hex && !name) return;
+    const key = hex || name.toLowerCase();
+    if (!colorsByKey.has(key)) colorsByKey.set(key, { name, hex });
+  });
+  return [...colorsByKey.values()];
+}
+
+function extractHexColorsFromText(text) {
+  const matches = String(text || '').match(/#[0-9a-f]{3,6}\b/gi) || [];
+  return matches.map((hex) => ({ name: '', hex }));
+}
+
+function detectRequestedColorWords(prompt) {
+  const lowerPrompt = String(prompt || '').toLowerCase();
+  return Object.entries(COLOR_WORD_ALIASES)
+    .filter(([, aliases]) => aliases.some((alias) => new RegExp(`\\b${escapeRegExp(alias)}\\b`, 'i').test(lowerPrompt)))
+    .map(([color]) => color);
+}
+
+function mapPromptColorsToBrand(input) {
+  const requestedColors = detectRequestedColorWords(input.prompt);
+  const brandColors = extractBrandColors(input);
+  if (requestedColors.length === 0 || brandColors.length === 0) return [];
+
+  return requestedColors.map((requested) => {
+    const aliases = COLOR_WORD_ALIASES[requested] || [requested];
+    const matched = brandColors.find((color) => {
+      const name = String(color.name || '').toLowerCase();
+      return aliases.some((alias) => name.includes(alias));
+    }) || nearestBrandColor(requested, brandColors) || brandColors[0];
+    return { requested, ...matched };
+  });
+}
+
+function nearestBrandColor(requested, brandColors) {
+  const reference = hexToRgb(COLOR_REFERENCE_HEX[requested]);
+  if (!reference) return null;
+  return brandColors
+    .map((color) => ({
+      color,
+      distance: color.hex ? colorDistance(reference, hexToRgb(color.hex)) : Number.POSITIVE_INFINITY
+    }))
+    .filter((entry) => Number.isFinite(entry.distance))
+    .sort((a, b) => a.distance - b.distance)[0]?.color || null;
+}
+
+function hexToRgb(hex) {
+  const normalized = normalizeHexColor(hex).slice(1);
+  if (!normalized) return null;
+  const value = Number.parseInt(normalized, 16);
+  return {
+    r: (value >> 16) & 255,
+    g: (value >> 8) & 255,
+    b: value & 255
+  };
+}
+
+function colorDistance(a, b) {
+  if (!a || !b) return Number.POSITIVE_INFINITY;
+  return Math.sqrt(
+    ((a.r - b.r) ** 2) +
+    ((a.g - b.g) ** 2) +
+    ((a.b - b.b) ** 2)
+  );
+}
+
+function brandColorPromptSection(input) {
+  const brandColors = extractBrandColors(input);
+  const colorMappings = mapPromptColorsToBrand(input);
+  if (brandColors.length === 0) {
+    return 'Brand color rule: If the user asks for any color, resolve it against the visible branding guide image and brand rules instead of inventing a generic color.';
+  }
+
+  const palette = brandColors
+    .map((color, index) => `${index + 1}. ${[color.name, color.hex].filter(Boolean).join(' ')}`)
+    .join('\n');
+  const mappings = colorMappings.length > 0
+    ? `\nRequested color mapping:\n${colorMappings.map((color) => `- "${color.requested}" must use ${[color.name, color.hex].filter(Boolean).join(' ')}`).join('\n')}`
+    : '';
+
+  return `Brand color rule: Match all prompt color requests to the brand palette below. Use exact hex values when available; do not substitute generic colors.\nBrand palette:\n${palette}${mappings}`;
+}
+
 function withReferenceContext(input) {
   const guideNodes = Array.isArray(input.brandGuide?.nodes) ? input.brandGuide.nodes : [];
   const guideContext = guideNodes
@@ -838,6 +977,7 @@ function withReferenceContext(input) {
   if (guideContext) {
     sections.push(`Brand source of truth. Treat this as the governing reference for all style, typography, color, logo, layout, and tone decisions:\n${guideContext}`);
   }
+  sections.push(brandColorPromptSection(input));
   if (input.refs.length > 0) {
     sections.push(`Reference image URLs:\n${input.refs.map((ref, index) => `${index + 1}. ${ref}`).join('\n')}`);
   }
@@ -873,6 +1013,10 @@ function inferImageMimeType(uri) {
   if (/^data:image\/webp/i.test(uri) || /\.webp($|\?)/i.test(uri)) return 'image/webp';
   if (/^data:image\/gif/i.test(uri) || /\.gif($|\?)/i.test(uri)) return 'image/gif';
   return 'image/png';
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function providerError(payload, status) {
