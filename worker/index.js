@@ -534,6 +534,7 @@ function normalizeGenerationPayload(body) {
     pipeline: body.pipeline === 'video' ? 'video' : 'image',
     prompt,
     refs: normalizeUrlList(body.refs),
+    brandGuide: normalizeBrandGuidePayload(body.brandGuide),
     parent: {
       id: cleanText(parent.id, 160),
       title: cleanText(parent.title, 160),
@@ -541,6 +542,20 @@ function normalizeGenerationPayload(body) {
       description: cleanText(parent.description, 500),
       image: normalizeReferenceUrl(parent.image)
     }
+  };
+}
+
+function normalizeBrandGuidePayload(value) {
+  const nodes = Array.isArray(value?.nodes) ? value.nodes : [];
+  return {
+    nodes: nodes.slice(0, 5).map((node) => ({
+      id: cleanText(node.id, 160),
+      title: cleanText(node.title, 180),
+      subtitle: cleanText(node.subtitle, 180),
+      description: cleanText(node.description, 1200),
+      image: normalizeReferenceUrl(node.image),
+      brandName: cleanText(node.brandName, 180)
+    }))
   };
 }
 
@@ -576,8 +591,25 @@ function findGeminiImageBlock(payload) {
 }
 
 function withReferenceContext(input) {
-  if (input.refs.length === 0) return input.prompt;
-  return `${input.prompt}\n\nReference image URLs:\n${input.refs.map((ref, index) => `${index + 1}. ${ref}`).join('\n')}`;
+  const guideNodes = Array.isArray(input.brandGuide?.nodes) ? input.brandGuide.nodes : [];
+  const guideContext = guideNodes
+    .filter((node) => node.title || node.description || node.brandName)
+    .map((node, index) => [
+      `${index + 1}. ${node.title || node.brandName || 'Brand guide'}`,
+      node.subtitle ? `Role: ${node.subtitle}` : '',
+      node.description ? `Rules: ${node.description}` : ''
+    ].filter(Boolean).join('\n'))
+    .join('\n\n');
+
+  const sections = [input.prompt];
+  if (guideContext) {
+    sections.push(`Brand source of truth. Treat this as the governing reference for all style, typography, color, logo, layout, and tone decisions:\n${guideContext}`);
+  }
+  if (input.refs.length > 0) {
+    sections.push(`Reference image URLs:\n${input.refs.map((ref, index) => `${index + 1}. ${ref}`).join('\n')}`);
+  }
+
+  return sections.join('\n\n');
 }
 
 function normalizeUrlList(value) {

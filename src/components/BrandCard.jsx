@@ -189,7 +189,8 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         generationProviderLabel: provider.label,
         generationModel: result?.branch?.model || '',
         generationPrompt: prompt,
-        generationRefs: genRefs,
+        generationRefs: result?.branch?.refs || genRefs,
+        generationBrandGuideNodeIds: result?.branch?.brandGuideNodeIds || [],
         generationStatus: result?.branch?.status || (result?.mock ? 'mock' : 'ready'),
         generationOperationName: result?.branch?.operationName || '',
         generationMock: result?.mock === true || result?.branch?.mock === true,
@@ -216,11 +217,30 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
       const existingNodes = getNodes();
       const branchIndex = existingNodes.filter((node) => node.data?.generatedFromNodeId === id).length;
+      const brandGuideNodes = existingNodes.filter((node) => {
+        const nodeData = node.data || {};
+        return nodeData.isBrandGuideSource === true || nodeData.sourceOfTruth === true || nodeData.referenceRole === 'brand-guide';
+      });
+      const brandGuideRefs = brandGuideNodes
+        .map((node) => node.data?.image)
+        .filter(Boolean);
+      const mergedRefs = Array.from(new Set([...brandGuideRefs, ...genRefs]));
+      const brandGuide = {
+        nodes: brandGuideNodes.map((node) => ({
+          id: node.id,
+          title: node.data?.title || '',
+          subtitle: node.data?.subtitle || '',
+          description: node.data?.description || '',
+          image: node.data?.image || '',
+          brandName: node.data?.brandName || ''
+        }))
+      };
       const result = await generationApi.createBranch({
         provider: providerKey,
         pipeline: provider.pipeline,
         prompt,
-        refs: genRefs,
+        refs: mergedRefs,
+        brandGuide,
         parent: {
           id,
           title: data.title || '',
@@ -229,6 +249,10 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           image: data.image || ''
         }
       });
+      if (result?.branch) {
+        result.branch.refs = mergedRefs;
+        result.branch.brandGuideNodeIds = brandGuide.nodes.map((node) => node.id);
+      }
       const newNode = buildGeneratedNode({ providerKey, prompt, branchIndex, parentNode, result });
 
       const newEdge = { 

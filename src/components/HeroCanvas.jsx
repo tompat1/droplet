@@ -749,13 +749,45 @@ const allCanvasMedias = initialNodes
     nodeGroup: node.data.nodeGroup
   }));
 
-const createDefaultCanvasSnapshot = () => ({
-  nodes: initialNodes.map(sanitizeNodeForSave),
-  edges: initialEdges.map(sanitizeEdgeForSave),
-  viewport: {},
-  settings: { interactionMode: 'pan' },
-  collapsedBranches: {}
-});
+const createBrandGuideCanvasSnapshot = ({ brandName, guideUrl, guideNotes }) => {
+  const title = `${brandName} Brand Guide`;
+  const description = guideNotes || `Single source of truth for ${brandName}: logo, typography, colors, tone, layout rules, and all visual decisions used by generated branches.`;
+
+  return {
+    nodes: [
+      {
+        id: 'padding-node',
+        position: { x: -500, y: 0 },
+        style: { opacity: 0, pointerEvents: 'none', border: 'none', background: 'transparent', width: 1, height: 1 },
+        data: { label: '' }
+      },
+      {
+        id: 'brand-guide-source',
+        type: 'brandCard',
+        position: { x: 80, y: 120 },
+        data: {
+          title,
+          subtitle: 'Single Source of Truth',
+          image: guideUrl,
+          description,
+          brandName,
+          isBrandGuideSource: true,
+          sourceOfTruth: true,
+          referenceRole: 'brand-guide',
+          nodeGroup: 'brand-guide'
+        }
+      }
+    ].map(sanitizeNodeForSave),
+    edges: [],
+    viewport: { x: 180, y: 90, zoom: 0.9 },
+    settings: {
+      interactionMode: 'pan',
+      sourceOfTruthNodeId: 'brand-guide-source',
+      brandName
+    },
+    collapsedBranches: {}
+  };
+};
 
 const sanitizeNodeForSave = (node) => {
   const data = { ...(node.data || {}) };
@@ -976,12 +1008,31 @@ const CanvasPersistencePanel = ({
       return;
     }
 
-    const name = window.prompt('Name this new canvas:', 'New Fluid Node Canvas');
+    const brandNameInput = window.prompt('Brand name for this new canvas:', 'New Brand');
+    if (brandNameInput === null) return;
+    const brandName = brandNameInput.trim();
+    if (!brandName) {
+      setStatus('Brand name is required to create a canvas.');
+      return;
+    }
+
+    const guideUrlInput = window.prompt('Branding guide image URL for the first source-of-truth card:', '');
+    if (guideUrlInput === null) return;
+    const guideUrl = guideUrlInput.trim();
+    if (!guideUrl) {
+      setStatus('Branding guide image URL is required for new brand canvases.');
+      return;
+    }
+
+    const guideNotesInput = window.prompt('Optional: add key brand rules, fonts, colors, tone, or usage notes:', '');
+    if (guideNotesInput === null) return;
+    const guideNotes = guideNotesInput.trim();
+    const name = window.prompt('Name this new canvas:', `${brandName} Fluid Node Canvas`);
     if (!name) return;
 
-    const snapshot = createDefaultCanvasSnapshot();
+    const snapshot = createBrandGuideCanvasSnapshot({ brandName, guideUrl, guideNotes });
     const payload = {
-      name: name.trim() || 'New Fluid Node Canvas',
+      name: name.trim() || `${brandName} Fluid Node Canvas`,
       viewport: snapshot.viewport,
       settings: snapshot.settings,
       snapshot
