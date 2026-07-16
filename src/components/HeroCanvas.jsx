@@ -1118,27 +1118,28 @@ const CanvasToolbox = ({
   isFullscreen,
   toggleFullscreen
 }) => {
+  const [isMinimized, setIsMinimized] = useState(false);
   const { zoom } = useViewport();
   const { zoomIn, zoomOut, zoomTo, fitView } = useReactFlow();
   const zoomPercent = Math.round(zoom * 100);
 
   const toolboxStyle = {
-    width: 'min(360px, calc(100vw - 40px))',
+    width: isMinimized ? '58px' : 'min(360px, calc(100vw - 40px))',
     background: 'linear-gradient(145deg, rgba(30,30,38,0.86), rgba(9,9,14,0.9))',
     backdropFilter: 'blur(18px)',
     WebkitBackdropFilter: 'blur(18px)',
     border: '1px solid rgba(255,255,255,0.14)',
-    borderRadius: '18px',
-    padding: '14px',
+    borderRadius: isMinimized ? '18px' : '18px',
+    padding: isMinimized ? '8px' : '14px',
     color: '#fff',
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: isMinimized ? '7px' : '12px',
     boxShadow: '0 22px 70px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.08)'
   };
 
   const iconButtonStyle = {
-    width: '42px',
+    width: isMinimized ? '40px' : '42px',
     height: '40px',
     borderRadius: '12px',
     border: '1px solid rgba(255,255,255,0.14)',
@@ -1151,6 +1152,22 @@ const CanvasToolbox = ({
     fontSize: '1.2rem',
     lineHeight: 1,
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)'
+  };
+
+  const zoomChipStyle = {
+    minWidth: isMinimized ? '40px' : '58px',
+    height: '40px',
+    borderRadius: '12px',
+    border: '1px solid rgba(75, 94, 250, 0.28)',
+    background: 'rgba(75, 94, 250, 0.16)',
+    color: '#fff',
+    display: 'grid',
+    placeItems: 'center',
+    fontFamily: 'monospace',
+    fontSize: isMinimized ? '0.72rem' : '0.86rem',
+    fontWeight: 900,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+    pointerEvents: 'none'
   };
 
   const modeButton = (active, accent) => ({
@@ -1196,17 +1213,11 @@ const CanvasToolbox = ({
   return (
     <Panel position="top-left" style={{ margin: '16px', zIndex: 15 }}>
       <div style={toolboxStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-          <div>
-            <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.5)', fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-              Canvas Tools
-            </div>
-            <div style={{ fontSize: '1.08rem', fontWeight: 900, lineHeight: 1.1 }}>
-              {zoomPercent}% View
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '6px' }}>
+        {isMinimized ? (
+          <>
+            <button type="button" onClick={() => setIsMinimized(false)} style={iconButtonStyle} title="Expand canvas tools" aria-label="Expand canvas tools">›</button>
             <button type="button" onClick={() => zoomOut({ duration: 250 })} style={iconButtonStyle} title="Zoom out" aria-label="Zoom out">−</button>
+            <div style={zoomChipStyle}>{zoomPercent}%</div>
             <button type="button" onClick={() => zoomIn({ duration: 250 })} style={iconButtonStyle} title="Zoom in" aria-label="Zoom in">+</button>
             <button type="button" onClick={() => fitView({ duration: 350, padding: 0.18 })} style={iconButtonStyle} title="Fit view" aria-label="Fit view">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1220,83 +1231,113 @@ const CanvasToolbox = ({
             <button type="button" onClick={toggleFullscreen} style={iconButtonStyle} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
               {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
             </button>
-          </div>
-        </div>
+            <button type="button" onClick={() => setIsEditMode((value) => !value)} style={{ ...iconButtonStyle, borderColor: isEditMode ? 'rgba(75,94,250,0.75)' : iconButtonStyle.border, color: isEditMode ? '#fff' : 'rgba(255,255,255,0.62)', background: isEditMode ? 'rgba(75,94,250,0.24)' : iconButtonStyle.background, fontSize: '0.72rem' }} title="Toggle edit mode" aria-label="Toggle edit mode">ED</button>
+            <button type="button" onClick={() => setInteractionMode((prev) => prev === 'pan' ? 'select' : 'pan')} style={{ ...iconButtonStyle, borderColor: interactionMode === 'pan' ? 'rgba(0,255,204,0.62)' : iconButtonStyle.border, color: interactionMode === 'pan' ? '#fff' : 'rgba(255,255,255,0.62)', background: interactionMode === 'pan' ? 'rgba(0,255,204,0.18)' : iconButtonStyle.background, fontSize: '0.68rem' }} title={interactionMode === 'pan' ? 'Pan mode is on' : 'Selection mode is on'} aria-label="Toggle pan mode">
+              {interactionMode === 'pan' ? 'PAN' : 'SEL'}
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.5)', fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                Canvas Tools
+              </div>
+              <button type="button" onClick={() => setIsMinimized(true)} style={{ ...iconButtonStyle, width: '40px', height: '36px' }} title="Minimize canvas tools" aria-label="Minimize canvas tools">‹</button>
+            </div>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <button type="button" onClick={() => zoomOut({ duration: 250 })} style={iconButtonStyle} title="Zoom out" aria-label="Zoom out">−</button>
+              <div style={zoomChipStyle}>{zoomPercent}%</div>
+              <button type="button" onClick={() => zoomIn({ duration: 250 })} style={iconButtonStyle} title="Zoom in" aria-label="Zoom in">+</button>
+              <button type="button" onClick={() => fitView({ duration: 350, padding: 0.18 })} style={iconButtonStyle} title="Fit view" aria-label="Fit view">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M4 9V4h5" />
+                  <path d="M20 9V4h-5" />
+                  <path d="M4 15v5h5" />
+                  <path d="M20 15v5h-5" />
+                </svg>
+              </button>
+              <button type="button" onClick={() => zoomTo(1, { duration: 350 })} style={{ ...iconButtonStyle, fontSize: '0.78rem', fontFamily: 'monospace' }} title="Zoom 1:1" aria-label="Zoom 1:1">1:1</button>
+              <button type="button" onClick={toggleFullscreen} style={iconButtonStyle} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
+                {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
+              </button>
+            </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            type="button"
-            onClick={() => setIsEditMode((value) => !value)}
-            style={modeButton(isEditMode, '#4B5EFA')}
-            title="Toggle edit mode"
-          >
-            <span style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.78rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Edit</span>
-              <span style={toggleStyle(isEditMode, '#4B5EFA')}><span style={toggleKnobStyle(isEditMode)} /></span>
-            </span>
-            <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.48)' }}>{isEditMode ? 'Cards unlocked' : 'View only'}</span>
-          </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setIsEditMode((value) => !value)}
+                style={modeButton(isEditMode, '#4B5EFA')}
+                title="Toggle edit mode"
+              >
+                <span style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Edit</span>
+                  <span style={toggleStyle(isEditMode, '#4B5EFA')}><span style={toggleKnobStyle(isEditMode)} /></span>
+                </span>
+                <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.48)' }}>{isEditMode ? 'Cards unlocked' : 'View only'}</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setInteractionMode((prev) => prev === 'pan' ? 'select' : 'pan')}
-            style={modeButton(interactionMode === 'pan', '#00ffcc')}
-            title={interactionMode === 'pan' ? 'Pan mode is on' : 'Selection mode is on'}
-          >
-            <span style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.78rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{interactionMode === 'pan' ? 'Pan' : 'Select'}</span>
-              <span style={toggleStyle(interactionMode === 'pan', '#00ffcc')}><span style={toggleKnobStyle(interactionMode === 'pan')} /></span>
-            </span>
-            <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.48)' }}>{interactionMode === 'pan' ? 'Drag moves view' : 'Drag selects'}</span>
-          </button>
-        </div>
+              <button
+                type="button"
+                onClick={() => setInteractionMode((prev) => prev === 'pan' ? 'select' : 'pan')}
+                style={modeButton(interactionMode === 'pan', '#00ffcc')}
+                title={interactionMode === 'pan' ? 'Pan mode is on' : 'Selection mode is on'}
+              >
+                <span style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{interactionMode === 'pan' ? 'Pan' : 'Select'}</span>
+                  <span style={toggleStyle(interactionMode === 'pan', '#00ffcc')}><span style={toggleKnobStyle(interactionMode === 'pan')} /></span>
+                </span>
+                <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.48)' }}>{interactionMode === 'pan' ? 'Drag moves view' : 'Drag selects'}</span>
+              </button>
+            </div>
 
-        {isEditMode && (
-          <button
-            type="button"
-            onClick={undoLastAction}
-            disabled={undoStack.length === 0}
-            title={undoStack[0]?.label || 'Nothing to restore'}
-            style={{
-              minHeight: '42px',
-              width: '100%',
-              borderRadius: '12px',
-              border: undoStack.length > 0 ? '1px solid rgba(255, 106, 0, 0.48)' : '1px solid rgba(255,255,255,0.1)',
-              background: undoStack.length > 0 ? 'rgba(255, 106, 0, 0.16)' : 'rgba(255,255,255,0.055)',
-              color: undoStack.length > 0 ? '#fff' : 'rgba(255,255,255,0.38)',
-              cursor: undoStack.length > 0 ? 'pointer' : 'not-allowed',
-              fontSize: '0.78rem',
-              fontWeight: 900,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em'
-            }}
-          >
-            ↶ {undoStack[0]?.label || 'Undo Delete'}
-          </button>
+            {isEditMode && (
+              <button
+                type="button"
+                onClick={undoLastAction}
+                disabled={undoStack.length === 0}
+                title={undoStack[0]?.label || 'Nothing to restore'}
+                style={{
+                  minHeight: '42px',
+                  width: '100%',
+                  borderRadius: '12px',
+                  border: undoStack.length > 0 ? '1px solid rgba(255, 106, 0, 0.48)' : '1px solid rgba(255,255,255,0.1)',
+                  background: undoStack.length > 0 ? 'rgba(255, 106, 0, 0.16)' : 'rgba(255,255,255,0.055)',
+                  color: undoStack.length > 0 ? '#fff' : 'rgba(255,255,255,0.38)',
+                  cursor: undoStack.length > 0 ? 'pointer' : 'not-allowed',
+                  fontSize: '0.78rem',
+                  fontWeight: 900,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em'
+                }}
+              >
+                ↶ {undoStack[0]?.label || 'Undo Delete'}
+              </button>
+            )}
+
+            <CanvasPersistencePanel
+              user={user}
+              canvases={canvases}
+              setCanvases={setCanvases}
+              activeCanvasId={activeCanvasId}
+              setActiveCanvasId={setActiveCanvasId}
+              activeCanvasName={activeCanvasName}
+              setActiveCanvasName={setActiveCanvasName}
+              nodes={nodes}
+              setNodes={setNodes}
+              edges={edges}
+              setEdges={setEdges}
+              collapsedBranches={collapsedBranches}
+              setCollapsedBranches={setCollapsedBranches}
+              interactionMode={interactionMode}
+              setInteractionMode={setInteractionMode}
+              status={canvasStatus}
+              setStatus={setCanvasStatus}
+              isCanvasDirty={isCanvasDirty}
+              setIsCanvasDirty={setIsCanvasDirty}
+              isVisible={isEditMode}
+            />
+          </>
         )}
-
-        <CanvasPersistencePanel
-          user={user}
-          canvases={canvases}
-          setCanvases={setCanvases}
-          activeCanvasId={activeCanvasId}
-          setActiveCanvasId={setActiveCanvasId}
-          activeCanvasName={activeCanvasName}
-          setActiveCanvasName={setActiveCanvasName}
-          nodes={nodes}
-          setNodes={setNodes}
-          edges={edges}
-          setEdges={setEdges}
-          collapsedBranches={collapsedBranches}
-          setCollapsedBranches={setCollapsedBranches}
-          interactionMode={interactionMode}
-          setInteractionMode={setInteractionMode}
-          status={canvasStatus}
-          setStatus={setCanvasStatus}
-          isCanvasDirty={isCanvasDirty}
-          setIsCanvasDirty={setIsCanvasDirty}
-          isVisible={isEditMode}
-        />
       </div>
     </Panel>
   );
