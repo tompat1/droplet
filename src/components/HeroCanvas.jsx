@@ -1240,7 +1240,7 @@ const CanvasToolbox = ({
   };
 
   const dragHandleStyle = {
-    minHeight: isMinimized ? '32px' : '36px',
+    minHeight: isMinimized ? '30px' : '36px',
     color: 'rgba(255,255,255,0.3)',
     cursor: 'grab',
     display: 'flex',
@@ -1259,6 +1259,17 @@ const CanvasToolbox = ({
       <circle cx="15" cy="12" r="2" />
       <circle cx="9" cy="19" r="2" />
       <circle cx="15" cy="19" r="2" />
+    </svg>
+  );
+
+  const horizontalDragDots = (
+    <svg width="32" height="18" viewBox="0 0 32 18" fill="currentColor" aria-hidden="true">
+      <circle cx="6" cy="6" r="2" />
+      <circle cx="16" cy="6" r="2" />
+      <circle cx="26" cy="6" r="2" />
+      <circle cx="6" cy="12" r="2" />
+      <circle cx="16" cy="12" r="2" />
+      <circle cx="26" cy="12" r="2" />
     </svg>
   );
 
@@ -1315,7 +1326,7 @@ const CanvasToolbox = ({
               onMouseEnter={(event) => { event.currentTarget.style.color = 'rgba(255,255,255,0.8)'; }}
               onMouseLeave={(event) => { event.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
             >
-              {dragDots}
+              {horizontalDragDots}
             </div>
             <button type="button" onClick={() => setIsMinimized(false)} style={iconButtonStyle} title="Expand canvas tools" aria-label="Expand canvas tools">›</button>
             <button type="button" onClick={() => zoomOut({ duration: 250 })} style={iconButtonStyle} title="Zoom out" aria-label="Zoom out">−</button>
