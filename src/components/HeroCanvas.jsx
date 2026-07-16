@@ -20,13 +20,13 @@ import { useAuth } from './AuthContext';
 import { canvasApi } from '../lib/apiClient';
 
 const FullscreenIcon = () => (
-  <svg viewBox="2 2 20 20" width="18" height="18" aria-hidden="true">
+  <svg viewBox="2 2 20 20" width="18" height="18" fill="currentColor" aria-hidden="true">
     <path d="M3 3h7v2H5v5H3V3zm18 0h-7v2h5v5h2V3zM3 21h7v-2H5v-5H3v7zm18 0h-7v-2h5v-5h2v7z" />
   </svg>
 );
 
 const ExitFullscreenIcon = () => (
-  <svg viewBox="2 2 20 20" width="18" height="18" aria-hidden="true">
+  <svg viewBox="2 2 20 20" width="18" height="18" fill="currentColor" aria-hidden="true">
     <path d="M10 10H3V8h5V3h2v7zm4 0h7V8h-5V3h-2v7zm-4 4H3v2h5v5h2v-7zm4 0h7v2h-5v5h-2v-7z" />
   </svg>
 );
@@ -1533,108 +1533,33 @@ export default function HeroCanvas() {
         maxZoom={2}
       >
         <Background color="#ffffff" gap={24} size={1} opacity={0.05} />
-        <Panel position="top-left" style={{ margin: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', zIndex: 10 }}>
-          <ZoomIndicator />
-          <Controls 
-            showInteractive={false} 
-            showFitView={false}
-            className="custom-flow-controls"
-            style={{ position: 'relative', margin: 0, left: 'auto', right: 'auto', bottom: 'auto', top: 'auto' }}
-          >
-            <ControlButton onClick={toggleFullscreen} title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}>
-              {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
-            </ControlButton>
-            <ZoomToOneButton />
-          </Controls>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
-            <div 
-              onClick={() => setIsEditMode(!isEditMode)}
-              style={{ 
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', 
-                background: 'rgba(20,20,25,0.8)', border: '1px solid rgba(255,255,255,0.1)', 
-                padding: '8px', borderRadius: '8px', cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                boxShadow: isEditMode ? '0 0 10px rgba(75, 94, 250, 0.2)' : 'none'
-              }}
-              title="Toggle Edit Mode"
-            >
-              <span style={{ color: isEditMode ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Edit Mode
-              </span>
-              <div style={{ width: '36px', height: '20px', background: isEditMode ? 'var(--accent-neon)' : 'rgba(255,255,255,0.2)', borderRadius: '10px', position: 'relative', transition: 'all 0.3s' }}>
-                <div style={{ width: '16px', height: '16px', background: 'white', borderRadius: '50%', position: 'absolute', top: '2px', left: isEditMode ? '18px' : '2px', transition: 'all 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
-              </div>
-            </div>
-
-            <div 
-              onClick={() => setInteractionMode(prev => prev === 'pan' ? 'select' : 'pan')}
-              style={{ 
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', 
-                background: 'rgba(20,20,25,0.8)', border: '1px solid rgba(255,255,255,0.1)', 
-                padding: '8px', borderRadius: '8px', cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                boxShadow: interactionMode === 'pan' ? '0 0 10px rgba(0, 255, 204, 0.2)' : 'none'
-              }}
-              title={interactionMode === 'pan' 
-                ? "Pan Mode is ON. Drag to pan. Tip: Hold Shift, Cmd, or Ctrl to draw a selection box or click individual nodes to multi-select." 
-                : "Pan Mode is OFF. Drag to select. Tip: Hold Spacebar to pan the canvas."}
-            >
-              <span style={{ color: interactionMode === 'pan' ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Pan Mode
-              </span>
-              <div style={{ width: '36px', height: '20px', background: interactionMode === 'pan' ? '#00ffcc' : 'rgba(255,255,255,0.2)', borderRadius: '10px', position: 'relative', transition: 'all 0.3s' }}>
-                <div style={{ width: '16px', height: '16px', background: 'white', borderRadius: '50%', position: 'absolute', top: '2px', left: interactionMode === 'pan' ? '18px' : '2px', transition: 'all 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
-              </div>
-            </div>
-
-            {isEditMode && (
-              <button
-                type="button"
-                onClick={undoLastAction}
-                disabled={undoStack.length === 0}
-                title={undoStack[0]?.label || 'Nothing to restore'}
-                style={{
-                  minHeight: '36px',
-                  width: '100%',
-                  borderRadius: '8px',
-                  border: undoStack.length > 0 ? '1px solid rgba(255, 106, 0, 0.45)' : '1px solid rgba(255,255,255,0.1)',
-                  background: undoStack.length > 0 ? 'rgba(255, 106, 0, 0.16)' : 'rgba(255,255,255,0.06)',
-                  color: undoStack.length > 0 ? '#fff' : 'rgba(255,255,255,0.4)',
-                  cursor: undoStack.length > 0 ? 'pointer' : 'not-allowed',
-                  fontSize: '11px',
-                  fontWeight: 800,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em'
-                }}
-              >
-                ↶ Undo Delete
-              </button>
-            )}
-
-            <CanvasPersistencePanel
-              user={user}
-              canvases={canvases}
-              setCanvases={setCanvases}
-              activeCanvasId={activeCanvasId}
-              setActiveCanvasId={setActiveCanvasId}
-              activeCanvasName={activeCanvasName}
-              setActiveCanvasName={setActiveCanvasName}
-              nodes={nodes}
-              setNodes={setNodes}
-              edges={edges}
-              setEdges={setEdges}
-              collapsedBranches={collapsedBranches}
-              setCollapsedBranches={setCollapsedBranches}
-              interactionMode={interactionMode}
-              setInteractionMode={setInteractionMode}
-              status={canvasStatus}
-              setStatus={setCanvasStatus}
-              isCanvasDirty={isCanvasDirty}
-              setIsCanvasDirty={setIsCanvasDirty}
-              isVisible={isEditMode}
-            />
-          </div>
-        </Panel>
+        <CanvasToolbox
+          user={user}
+          canvases={canvases}
+          setCanvases={setCanvases}
+          activeCanvasId={activeCanvasId}
+          setActiveCanvasId={setActiveCanvasId}
+          activeCanvasName={activeCanvasName}
+          setActiveCanvasName={setActiveCanvasName}
+          nodes={nodes}
+          setNodes={setNodes}
+          edges={edges}
+          setEdges={setEdges}
+          collapsedBranches={collapsedBranches}
+          setCollapsedBranches={setCollapsedBranches}
+          interactionMode={interactionMode}
+          setInteractionMode={setInteractionMode}
+          canvasStatus={canvasStatus}
+          setCanvasStatus={setCanvasStatus}
+          isCanvasDirty={isCanvasDirty}
+          setIsCanvasDirty={setIsCanvasDirty}
+          isEditMode={isEditMode}
+          setIsEditMode={setIsEditMode}
+          undoStack={undoStack}
+          undoLastAction={undoLastAction}
+          isFullscreen={isFullscreen}
+          toggleFullscreen={toggleFullscreen}
+        />
         <MultiSelectHint interactionMode={interactionMode} />
         <NodeSearch />
         <MiniMap 
