@@ -1473,6 +1473,10 @@ export default function HeroCanvas() {
   const [undoStack, setUndoStack] = useState([]);
   
   const containerRef = useRef(null);
+  const canvasSnapRef = useRef({
+    lastScrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+    lastSnapAt: 0
+  });
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [collapsedBranches, setCollapsedBranches] = useState({});
   const [isEditMode, setIsEditMode] = useState(false);
@@ -1617,6 +1621,45 @@ export default function HeroCanvas() {
       document.exitFullscreen?.();
     }
   };
+
+  useEffect(() => {
+    if (isFullscreen) return undefined;
+
+    const handleCanvasSnap = () => {
+      if (window.innerWidth < 980) return;
+      const canvasElement = containerRef.current;
+      if (!canvasElement) return;
+
+      const currentScrollY = window.scrollY;
+      const previousScrollY = canvasSnapRef.current.lastScrollY;
+      const scrollDelta = currentScrollY - previousScrollY;
+      canvasSnapRef.current.lastScrollY = currentScrollY;
+
+      if (scrollDelta <= 2) return;
+
+      const now = Date.now();
+      if (now - canvasSnapRef.current.lastSnapAt < 1800) return;
+
+      const rect = canvasElement.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const isApproachingCanvas = rect.top > 48 && rect.top < viewportHeight * 0.68 && rect.bottom > viewportHeight * 0.45;
+      const isAlreadyFramed = Math.abs(rect.top - 60) < 18 && rect.bottom < viewportHeight - 32;
+      if (!isApproachingCanvas || isAlreadyFramed) return;
+
+      const topOffset = Math.max(48, Math.min(72, viewportHeight * 0.07));
+      const targetTop = currentScrollY + rect.top - topOffset;
+      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+
+      canvasSnapRef.current.lastSnapAt = now;
+      window.scrollTo({
+        top: targetTop,
+        behavior: reducedMotion ? 'auto' : 'smooth'
+      });
+    };
+
+    window.addEventListener('scroll', handleCanvasSnap, { passive: true });
+    return () => window.removeEventListener('scroll', handleCanvasSnap);
+  }, [isFullscreen]);
 
   const onConnect = useCallback(
     (params) => {
