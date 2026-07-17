@@ -150,7 +150,7 @@ export default function AuthControls() {
         {user ? (
           <>
             <button className="edit-canvas-shortcut" onClick={handleEditCanvasShortcut} title="Edit canvas">
-              <img src="/assets/ui/edit-canvas-flash.png" alt="" />
+              <img src="/assets/ui/edit-canvas-flash.svg" alt="" />
               <span>Edit Canvas</span>
             </button>
             <button className="auth-pill" onClick={() => setActiveDrawer('account')} title="Account">

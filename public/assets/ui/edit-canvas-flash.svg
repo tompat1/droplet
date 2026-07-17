@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 112" role="img" aria-label="Flash">
+  <path d="M58 4 11 62h25l-11 46 58-67H51L58 4Z" fill="#07131f" opacity=".98"/>
+  <path d="M52 10 15 56h24l-10 40 47-55H47l5-31Z" fill="#ff6a00"/>
+  <path d="M46 18 21 50h17l-8 31 32-38H43l3-25Z" fill="#ff9f1c" opacity=".95"/>
+  <path d="M24 66 8 92l29-24-8 30 45-58-27 21 7-29L24 66Z" fill="#079bff" opacity=".88"/>
+  <path d="M55 4 8 63h20L14 101l14-10 10-35H20L62 4h-7Z" fill="#ffffff" opacity=".9"/>
+  <path d="M58 4 11 62h25l-11 46 58-67H51L58 4Z" fill="none" stroke="#06111c" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M54 10 18 55h23L31 91l43-49H47l7-32Z" fill="none" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" opacity=".8"/>
+</svg>
