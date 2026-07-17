@@ -887,7 +887,12 @@ const StickyNoteNode = ({ id, data, selected, width, height }) => {
   };
 
   const deleteNote = (event) => {
+    event.preventDefault();
     event.stopPropagation();
+    if (data.onDeleteNode) {
+      data.onDeleteNode(id, 'sticky note');
+      return;
+    }
     data.setGlobalNodes?.((nds) => nds.filter((node) => node.id !== id));
     data.setGlobalEdges?.((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
   };
@@ -1004,7 +1009,12 @@ const StickyNoteNode = ({ id, data, selected, width, height }) => {
           <circle cx="24" cy="12" r="2" />
         </svg>
         {canEditNote && (
-          <div className="nodrag nopan" style={{ display: 'flex', gap: '6px' }}>
+          <div
+            className="nodrag nopan"
+            onPointerDown={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
+            style={{ display: 'flex', gap: '6px' }}
+          >
             <button type="button" onClick={addSiblingNote} style={controlButtonStyle} title="Add note next to this" aria-label="Add note next to this">
               +
             </button>
@@ -2658,6 +2668,7 @@ export default function HeroCanvas() {
   const dragDepthRef = useRef(0);
   const lastCanvasPointerRef = useRef({ x: 0, y: 0 });
   const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
   const labelDragGroupRef = useRef(null);
 
   const graphChangeTypes = useMemo(() => new Set(['position', 'dimensions', 'add', 'remove', 'replace']), []);
@@ -2677,6 +2688,10 @@ export default function HeroCanvas() {
   useEffect(() => {
     nodesRef.current = nodes;
   }, [nodes]);
+
+  useEffect(() => {
+    edgesRef.current = edges;
+  }, [edges]);
 
   const loadUsageSummary = useCallback(async () => {
     if (!user) {
@@ -3149,6 +3164,24 @@ export default function HeroCanvas() {
     setCanvasStatus('Sticky note added next to the current note.');
   }, [createStickyNoteAt]);
 
+  const deleteCanvasNode = useCallback((nodeId, label = 'node') => {
+    const nodeToDelete = nodesRef.current.find((node) => node.id === nodeId);
+    if (!nodeToDelete) return;
+
+    const connectedEdges = edgesRef.current.filter((edge) => edge.source === nodeId || edge.target === nodeId);
+    pushUndoAction({
+      type: 'delete-node',
+      label: `Undo delete ${label}`,
+      node: nodeToDelete,
+      edges: connectedEdges
+    });
+
+    setPersistentNodes((nds) => nds.filter((node) => node.id !== nodeId));
+    setPersistentEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+    setSelectedNodeIds((ids) => ids.filter((id) => id !== nodeId));
+    setCanvasStatus(`Deleted ${label}.`);
+  }, [pushUndoAction, setPersistentEdges, setPersistentNodes]);
+
   const startLabelPlacement = useCallback(() => {
     setIsEditMode(true);
     setIsPlacingNote(false);
@@ -3402,6 +3435,7 @@ export default function HeroCanvas() {
             onGenerationUsageUpdate: loadUsageSummary,
             pushUndoAction,
             onCreateSiblingNote: createSiblingNote,
+            onDeleteNode: deleteCanvasNode,
             isEditMode,
             isDropTarget: node.type === 'labelNode' && node.id === activeDropLabelId
           }
@@ -3426,7 +3460,7 @@ export default function HeroCanvas() {
         }
       };
     }));
-  }, [activeDropLabelId, collapsedBranches, createSiblingNote, setNodes, setEdges, isEditMode, loadUsageSummary, pushUndoAction, setPersistentEdges, setPersistentNodes]);
+  }, [activeDropLabelId, collapsedBranches, createSiblingNote, deleteCanvasNode, setNodes, setEdges, isEditMode, loadUsageSummary, pushUndoAction, setPersistentEdges, setPersistentNodes]);
 
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
