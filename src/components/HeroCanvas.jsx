@@ -896,8 +896,7 @@ const StickyNoteNode = ({ id, data, selected, width, height }) => {
     data.onCreateSiblingNote?.(id);
   };
 
-  const resizeNote = (nextSize) => {
-    setNoteSize(nextSize);
+  const commitNoteSize = (nextSize) => {
     data.setGlobalNodes?.((nds) => nds.map((node) => node.id === id ? {
       ...node,
       width: nextSize.width,
@@ -914,24 +913,30 @@ const StickyNoteNode = ({ id, data, selected, width, height }) => {
     if (!canEditNote) return;
     event.preventDefault();
     event.stopPropagation();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
     const startX = event.clientX;
     const startY = event.clientY;
     const startWidth = noteSize.width;
     const startHeight = noteSize.height;
+    let latestSize = noteSize;
     document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'nwse-resize';
 
     const handlePointerMove = (moveEvent) => {
       const scale = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
-      resizeNote({
+      latestSize = {
         width: Math.max(NOTE_WIDTH, startWidth + (moveEvent.clientX - startX) / scale),
         height: Math.max(NOTE_HEIGHT, startHeight + (moveEvent.clientY - startY) / scale)
-      });
+      };
+      setNoteSize(latestSize);
     };
 
     const handlePointerUp = () => {
       document.body.style.userSelect = '';
+      document.body.style.cursor = '';
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
+      commitNoteSize(latestSize);
     };
 
     window.addEventListener('pointermove', handlePointerMove);
@@ -1061,16 +1066,19 @@ const StickyNoteNode = ({ id, data, selected, width, height }) => {
           aria-label="Resize note"
           style={{
             position: 'absolute',
-            right: '4px',
-            bottom: '4px',
-            width: '22px',
-            height: '22px',
+            right: '-2px',
+            bottom: '-2px',
+            width: '34px',
+            height: '34px',
             cursor: 'nwse-resize',
             zIndex: 2,
             display: 'grid',
             placeItems: 'end',
             color: 'rgba(51,37,0,0.48)',
-            touchAction: 'none'
+            touchAction: 'none',
+            padding: '6px',
+            borderRadius: '12px 0 18px 0',
+            background: 'rgba(255,255,255,0.18)'
           }}
         >
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
