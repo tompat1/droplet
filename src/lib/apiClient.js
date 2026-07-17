@@ -45,9 +45,14 @@ export const usageApi = {
   summary: () => apiRequest('/usage/summary')
 };
 
+export const siteContentApi = {
+  list: () => apiRequest('/site-content')
+};
+
 export const adminApi = {
   users: () => apiRequest('/admin/users'),
   createUser: (input) => apiRequest('/admin/users', { method: 'POST', body: input }),
   updateUser: (id, input) => apiRequest(`/admin/users/${id}`, { method: 'PATCH', body: input }),
-  deleteUser: (id) => apiRequest(`/admin/users/${id}`, { method: 'DELETE' })
+  deleteUser: (id) => apiRequest(`/admin/users/${id}`, { method: 'DELETE' }),
+  updateSiteContent: (key, input) => apiRequest(`/admin/site-content/${encodeURIComponent(key)}`, { method: 'PUT', body: input })
 };

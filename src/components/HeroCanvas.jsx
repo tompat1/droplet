@@ -19,6 +19,7 @@ import MediaModal from './MediaModal';
 import assetFiles from '../assetsData.json';
 import { defaultAssetTags } from '../defaultTags';
 import { useAuth } from './AuthContext';
+import EditableText from './EditableText';
 import { canvasApi, usageApi } from '../lib/apiClient';
 import { compressImageDataUrl, readImageFileAsDataUrl } from '../lib/mediaFiles';
 
@@ -3565,10 +3566,17 @@ export default function HeroCanvas() {
       {!isFullscreen && (
         <div style={{ padding: '20px 5% 0 5%', zIndex: 10, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: '40px' }}>
           <h1 style={{ fontSize: '3.5rem', margin: 0, whiteSpace: 'nowrap' }}>
-            Fluid <span className="text-gradient">Node Canvas</span>
+            <EditableText contentKey="canvas.title.prefix" fallback="Fluid" /> <span className="text-gradient"><EditableText contentKey="canvas.title.accent" fallback="Node Canvas" /></span>
           </h1>
           <p style={{ margin: 0, fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', lineHeight: '1.6', maxWidth: '650px', textAlign: 'left' }}>
-            Navigate the Droplet ecosystem through our interactive, physics-based graph. Pan, zoom, and explore <span style={{ fontWeight: 'bold', color: '#FF6A00' }}>connections dynamically.</span>
+            <EditableText
+              contentKey="canvas.description.main"
+              fallback="Navigate the Droplet ecosystem through our interactive, physics-based graph. Pan, zoom, and explore"
+              multiline
+            />{' '}
+            <span style={{ fontWeight: 'bold', color: '#FF6A00' }}>
+              <EditableText contentKey="canvas.description.emphasis" fallback="connections dynamically." />
+            </span>
           </p>
         </div>
       )}

@@ -76,6 +76,114 @@ h1, h2, h3, h4, h5, h6 {
   background-clip: text;
 }
 
+.editable-text-wrap.admin-editable {
+  outline: 1px dashed transparent;
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.editable-text-wrap.admin-editable:hover {
+  outline-color: rgba(255, 106, 0, 0.42);
+}
+
+.content-edit-button {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 106, 0, 0.46);
+  background: rgba(10, 10, 15, 0.86);
+  color: #ffb347;
+  -webkit-text-fill-color: #ffb347;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 0.72rem;
+  line-height: 1;
+  flex: 0 0 auto;
+  opacity: 0.42;
+  transition: opacity 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+
+.editable-text-wrap.admin-editable:hover .content-edit-button,
+.content-edit-button:focus-visible {
+  opacity: 1;
+  transform: translateY(-1px);
+  border-color: rgba(255, 106, 0, 0.86);
+}
+
+.content-edit-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 10000;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(8, 8, 12, 0.96);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255,255,255,0.08);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  color: #fff;
+  -webkit-text-fill-color: #fff;
+  text-align: left;
+}
+
+.content-edit-popover label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.58);
+}
+
+.content-edit-popover input,
+.content-edit-popover textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(0,0,0,0.46);
+  color: #fff;
+  padding: 10px 11px;
+  outline: none;
+  font: 500 0.9rem/1.45 inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  resize: vertical;
+}
+
+.content-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.content-edit-actions button {
+  min-height: 32px;
+  border-radius: 9px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  padding: 0 12px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.content-edit-actions button:last-child {
+  border-color: rgba(255, 106, 0, 0.52);
+  background: rgba(255, 106, 0, 0.18);
+}
+
+.content-edit-status {
+  margin-top: 8px;
+  color: rgba(255,255,255,0.62);
+  font-size: 0.76rem;
+}
+
 /* React Flow Customizations */
 .react-flow__node {
   border-radius: 16px;

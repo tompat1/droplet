@@ -1,4 +1,5 @@
 import React from 'react';
+import EditableText from './EditableText';
 
 export default function Overhero() {
   return (
@@ -44,7 +45,8 @@ export default function Overhero() {
 
       <div style={{ padding: '0 5%', zIndex: 10, textAlign: 'center', marginTop: '-10vh' }}>
         <h1 style={{ fontSize: 'clamp(3rem, 6vw, 6rem)', marginBottom: '24px', letterSpacing: '-0.02em' }}>
-          <span className="text-gradient">Droplet</span> Brand Space
+          <span className="text-gradient"><EditableText contentKey="overhero.title.brand" fallback="Droplet" /></span>{' '}
+          <EditableText contentKey="overhero.title.rest" fallback="Brand Space" />
         </h1>
         <div className="glass-panel" style={{ 
           maxWidth: '700px', 
@@ -57,7 +59,14 @@ export default function Overhero() {
           boxShadow: '0 12px 40px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.1)' 
         }}>
           <p style={{ margin: 0, fontWeight: 300 }}>
-            From one origin logo to a full brand universe: guides, mockups, videos, merch, and campaign assets, ready whenever your brand needs them. <span style={{ fontWeight: 500, color: '#FF6A00' }}>Endless possibilities.</span>
+            <EditableText
+              contentKey="overhero.body.main"
+              fallback="From one origin logo to a full brand universe: guides, mockups, videos, merch, and campaign assets, ready whenever your brand needs them."
+              multiline
+            />{' '}
+            <span style={{ fontWeight: 500, color: '#FF6A00' }}>
+              <EditableText contentKey="overhero.body.emphasis" fallback="Endless possibilities." />
+            </span>
           </p>
         </div>
       </div>

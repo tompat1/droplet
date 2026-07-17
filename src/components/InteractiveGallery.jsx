@@ -4,6 +4,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import assetFiles from '../assetsData.json';
 import MediaModal from './MediaModal';
 import { defaultAvailableTags, defaultAssetTags } from '../defaultTags';
+import EditableText from './EditableText';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -200,9 +201,15 @@ export default function InteractiveGallery() {
       <BackgroundLines />
 
       <div className="glass-panel" style={{ position: 'relative', zIndex: 2, maxWidth: '800px', margin: '0 auto 60px auto', padding: '40px', textAlign: 'center' }}>
-        <h2 style={{ fontSize: '3rem', marginBottom: '16px' }}>Asset <span className="text-gradient">Gallery</span></h2>
+        <h2 style={{ fontSize: '3rem', marginBottom: '16px' }}>
+          <EditableText contentKey="gallery.title.prefix" fallback="Asset" /> <span className="text-gradient"><EditableText contentKey="gallery.title.accent" fallback="Gallery" /></span>
+        </h2>
         <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '1.2rem', maxWidth: '700px', margin: '0 auto', lineHeight: '1.6', marginBottom: '30px' }}>
-          Follow the paths and explore the Droplet asset system: ads, mockups, videos, merch, and brand files brought together in one polished gallery
+          <EditableText
+            contentKey="gallery.description"
+            fallback="Follow the paths and explore the Droplet asset system: ads, mockups, videos, merch, and brand files brought together in one polished gallery"
+            multiline
+          />
         </p>
 
         {showTaggingToggle && (
@@ -341,8 +348,8 @@ export default function InteractiveGallery() {
             paddingBottom: '12px',
             color: 'var(--text-color)' 
           }}>
-            {category.title}
-          </h3>
+          <EditableText contentKey={`gallery.category.${category.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.title`} fallback={category.title} />
+        </h3>
           <div className="gallery-grid">
             {category.assets.map((filename, index) => {
               const isVideo = category.title === 'Campaign Videos' || filename.match(/\.(mp4|webm|mov)$/i);

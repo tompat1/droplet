@@ -20,7 +20,9 @@
     "db:migrate:usage:local": "wrangler d1 execute droplet-prod --local --file=./migrations/0004_generation_usage.sql",
     "db:migrate:usage:remote": "wrangler d1 execute droplet-prod --remote --file=./migrations/0004_generation_usage.sql",
     "db:migrate:canvas-assets:local": "wrangler d1 execute droplet-prod --local --file=./migrations/0005_canvas_assets.sql",
-    "db:migrate:canvas-assets:remote": "wrangler d1 execute droplet-prod --remote --file=./migrations/0005_canvas_assets.sql"
+    "db:migrate:canvas-assets:remote": "wrangler d1 execute droplet-prod --remote --file=./migrations/0005_canvas_assets.sql",
+    "db:migrate:site-content:local": "wrangler d1 execute droplet-prod --local --file=./migrations/0006_site_content.sql",
+    "db:migrate:site-content:remote": "wrangler d1 execute droplet-prod --remote --file=./migrations/0006_site_content.sql"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import EditableText from './EditableText';
+import { useSiteContent } from './SiteContentContext';
 
 const ConvergingLines = () => {
   const lineColors = ['#4B5EFA', '#ff00ff', '#00ffcc', '#FF5B24'];
@@ -55,6 +57,7 @@ const ConvergingLines = () => {
 export default function CallToAction() {
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [emailInput, setEmailInput] = useState('');
+  const { getText } = useSiteContent();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -80,14 +83,24 @@ export default function CallToAction() {
         fontWeight: '300',
         textShadow: '0 2px 10px rgba(0,0,0,0.5)'
       }}>
-        "This is brand momentum in motion.<br />From one identity to endless variations, assets, and campaigns. At any moment"
+        <EditableText
+          contentKey="cta.quote"
+          fallback={'"This is brand momentum in motion.\nFrom one identity to endless variations, assets, and campaigns. At any moment"'}
+          multiline
+        />
       </div>
       </div>
 
       <div className="glass-panel" style={{ maxWidth: '600px', margin: '0 auto', padding: '60px 40px' }}>
-        <h2 style={{ fontSize: '2.5rem', marginBottom: '20px' }}>Ready to Dive In?</h2>
+        <h2 style={{ fontSize: '2.5rem', marginBottom: '20px' }}>
+          <EditableText contentKey="cta.title" fallback="Ready to Dive In?" />
+        </h2>
         <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '1.2rem', marginBottom: '40px' }}>
-          See how Droplet can turn one brand mark into a complete digital asset system.
+          <EditableText
+            contentKey="cta.description"
+            fallback="See how Droplet can turn one brand mark into a complete digital asset system."
+            multiline
+          />
         </p>
         
         <form 
@@ -103,7 +116,7 @@ export default function CallToAction() {
             type="email" 
             value={emailInput}
             onChange={(e) => setEmailInput(e.target.value)}
-            placeholder="Enter your email address" 
+            placeholder={getText('cta.emailPlaceholder', 'Enter your email address')}
             required
             style={{
               padding: '16px 24px',
@@ -141,7 +154,7 @@ export default function CallToAction() {
               e.currentTarget.style.boxShadow = '0 4px 20px rgba(75, 94, 250, 0.4)';
             }}
           >
-            Request a Demo
+            {getText('cta.button', 'Request a Demo')}
           </button>
         </form>
       </div>

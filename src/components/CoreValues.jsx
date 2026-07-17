@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import EditableText from './EditableText';
 
 const values = [
   {
@@ -244,14 +245,16 @@ export default function CoreValues() {
                     transform: 'translateZ(0)',
                     backfaceVisibility: 'hidden'
                   }}>
-                    <h3 style={{ fontSize: '2rem', marginBottom: '20px', color: '#fff' }}>{val.title}</h3>
+                    <h3 style={{ fontSize: '2rem', marginBottom: '20px', color: '#fff' }}>
+                      <EditableText contentKey={`coreValues.${idx}.title`} fallback={val.title} />
+                    </h3>
                     <p style={{ 
                       fontSize: '1.25rem', 
                       lineHeight: '1.6', 
                       color: 'rgba(255,255,255,0.8)', 
                       margin: 0 
                     }}>
-                      {val.description}
+                      <EditableText contentKey={`coreValues.${idx}.description`} fallback={val.description} multiline />
                     </p>
                   </div>
                 </div>
@@ -313,7 +316,7 @@ export default function CoreValues() {
                     fontWeight: isHighlight ? 700 : 500,
                     transition: 'color 0.3s ease, text-shadow 0.3s ease, font-weight 0.3s ease'
                   }}>
-                    {val.title}
+                    <EditableText contentKey={`coreValues.${idx}.title`} fallback={val.title} />
                   </h2>
                 </div>
               );

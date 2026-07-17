@@ -6,6 +6,7 @@ import Preloader from './components/Preloader';
 import AudioPlayer from './components/AudioPlayer';
 import AuthControls from './components/AuthControls';
 import { AuthProvider } from './components/AuthProvider';
+import { SiteContentProvider } from './components/SiteContentProvider';
 import DropletLoader from './components/DropletLoader';
 
 import Overhero from './components/Overhero';
@@ -17,48 +18,50 @@ const HeroCanvas = lazy(() => import('./components/HeroCanvas'));
 function App() {
   return (
     <AuthProvider>
-      <Preloader />
-      <AudioPlayer />
-      <AuthControls />
-      <div className="app-background" style={{ zIndex: -4 }}></div>
-      {/* Background Video */}
-      <video
-        autoPlay
-        muted
-        loop
-        playsInline
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          objectFit: 'cover',
-          zIndex: -3,
-          opacity: 0.15,
-          pointerEvents: 'none'
-        }}
-      >
-        <source src="/assets/videos/videomp_.mp4" type="video/mp4" />
-      </video>
-      
-      {/* 3D WebGL Layer (Temporarily Hidden) */}
-      {/* <Suspense fallback={null}>
-        <ThreeScene />
-      </Suspense> */}
+      <SiteContentProvider>
+        <Preloader />
+        <AudioPlayer />
+        <AuthControls />
+        <div className="app-background" style={{ zIndex: -4 }}></div>
+        {/* Background Video */}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            objectFit: 'cover',
+            zIndex: -3,
+            opacity: 0.15,
+            pointerEvents: 'none'
+          }}
+        >
+          <source src="/assets/videos/videomp_.mp4" type="video/mp4" />
+        </video>
 
-      <main style={{ position: 'relative', zIndex: 1 }}>
-        <Overhero />
-        <ConnectorLine targetId="core-values" />
-        <CoreValues />
-        <ConnectorLine targetId="hero-canvas-section" />
-        <Suspense fallback={<div style={{ width: '100%', height: 'calc(100vh - 120px)', minHeight: '500px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(20,20,25,0.2)', borderRadius: '16px', margin: '20px auto', maxWidth: '1600px' }}><DropletLoader label="Loading canvas" size={180} /></div>}>
-          <HeroCanvas />
-        </Suspense>
-        <ConnectorLine targetId="asset-gallery" />
-        <InteractiveGallery />
-        <CallToAction />
-      </main>
+        {/* 3D WebGL Layer (Temporarily Hidden) */}
+        {/* <Suspense fallback={null}>
+          <ThreeScene />
+        </Suspense> */}
+
+        <main style={{ position: 'relative', zIndex: 1 }}>
+          <Overhero />
+          <ConnectorLine targetId="core-values" />
+          <CoreValues />
+          <ConnectorLine targetId="hero-canvas-section" />
+          <Suspense fallback={<div style={{ width: '100%', height: 'calc(100vh - 120px)', minHeight: '500px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(20,20,25,0.2)', borderRadius: '16px', margin: '20px auto', maxWidth: '1600px' }}><DropletLoader label="Loading canvas" size={180} /></div>}>
+            <HeroCanvas />
+          </Suspense>
+          <ConnectorLine targetId="asset-gallery" />
+          <InteractiveGallery />
+          <CallToAction />
+        </main>
+      </SiteContentProvider>
     </AuthProvider>
   );
 }

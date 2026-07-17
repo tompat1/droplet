@@ -105,6 +105,10 @@ async function routeApi(request, env, url) {
     return json({ ok: true, service: 'droplet-worker' });
   }
 
+  if (request.method === 'GET' && path === '/site-content') {
+    return listSiteContent(env);
+  }
+
   if (request.method === 'POST' && path === '/auth/register') {
     return withAuthDiagnostics('register', () => register(request, env));
   }
@@ -151,6 +155,11 @@ async function routeApi(request, env, url) {
 
     if (request.method === 'POST' && path === '/admin/users') {
       return createUserAsAdmin(request, env);
+    }
+
+    const siteContentMatch = path.match(/^\/admin\/site-content\/([^/]+)$/);
+    if (siteContentMatch && request.method === 'PUT') {
+      return updateSiteContent(request, env, siteContentMatch[1], session.user.id);
     }
 
     const adminUserMatch = path.match(/^\/admin\/users\/([^/]+)$/);
@@ -342,6 +351,48 @@ async function deleteUserAsAdmin(env, userId, currentUserId) {
   if (!result.meta || result.meta.changes === 0) return json({ error: 'User not found' }, 404);
 
   return json({ ok: true });
+}
+
+async function listSiteContent(env) {
+  let result;
+  try {
+    result = await env.DB.prepare(
+      'SELECT content_key, content_value, updated_at FROM site_content ORDER BY content_key ASC'
+    ).all();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/no such table: site_content/i.test(message)) return json({ content: {} });
+    throw error;
+  }
+
+  const content = {};
+  for (const row of result.results || []) {
+    content[row.content_key] = {
+      value: row.content_value,
+      updatedAt: row.updated_at
+    };
+  }
+
+  return json({ content });
+}
+
+async function updateSiteContent(request, env, rawKey, userId) {
+  const key = normalizeSiteContentKey(rawKey);
+  if (!key) return json({ error: 'Invalid content key' }, 400);
+
+  const body = await readJson(request);
+  const value = cleanText(body.value, 5000);
+
+  await env.DB.prepare(
+    `INSERT INTO site_content (content_key, content_value, updated_by, updated_at)
+     VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+     ON CONFLICT(content_key) DO UPDATE SET
+       content_value = excluded.content_value,
+       updated_by = excluded.updated_by,
+       updated_at = CURRENT_TIMESTAMP`
+  ).bind(key, value, userId).run();
+
+  return json({ item: { key, value } });
 }
 
 async function listCanvases(env, userId) {
@@ -1527,6 +1578,9 @@ function jsonError(error) {
   if (/no such table: canvas_assets|no such table: canvas_asset_chunks/i.test(message)) {
     return json({ error: 'Canvas asset storage is not migrated yet. Run the canvas assets D1 migration, then try saving again.' }, 500);
   }
+  if (/no such table: site_content/i.test(message)) {
+    return json({ error: 'Site content storage is not migrated yet. Run the site content D1 migration, then try saving again.' }, 500);
+  }
   if (/string or blob too big|database or disk is full|too many sql variables|D1_ERROR/i.test(message)) {
     return json({ error: `Canvas storage failed: ${message}` }, 400);
   }
@@ -1557,6 +1611,11 @@ function normalizeEmail(value) {
 
 function cleanText(value, maxLength) {
   return String(value || '').trim().slice(0, maxLength);
+}
+
+function normalizeSiteContentKey(value) {
+  const key = String(value || '').trim();
+  return /^[a-z0-9][a-z0-9._-]{1,120}$/i.test(key) ? key : '';
 }
 
 function roundMoney(value) {
