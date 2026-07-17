@@ -5,6 +5,7 @@ import assetFiles from '../assetsData.json';
 import MediaModal from './MediaModal';
 import { defaultAvailableTags, defaultAssetTags } from '../defaultTags';
 import EditableText from './EditableText';
+import { useCanvasAssets } from './CanvasAssetsState';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -71,29 +72,171 @@ const BackgroundLines = () => {
   );
 };
 
-export default function InteractiveGallery() {
-  const galleryRef = useRef(null);
+const mediaTitleFromPath = (value = 'Canvas Asset') => {
+  const basename = String(value || 'Canvas Asset').split('/').pop() || 'Canvas Asset';
+  return basename
+    .replace(/\.(webp|png|jpe?g|gif|svg|mp4|webm|mov)$/i, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim() || 'Canvas Asset';
+};
 
-  const allAssets = useMemo(() => {
-    const list = [];
-    Object.keys(assetFiles).forEach(key => {
-      if (key === 'Canvas Ads' || key === 'Canvas In The Wild Products' || key === 'Canvas Products Shots') return;
-      assetFiles[key].forEach(filename => {
-        const isVideo = key === 'Campaign Videos' || filename.match(/\.(mp4|webm|mov)$/i);
-        const basename = filename.split('/').pop();
-        const title = basename.replace(/\.(webp|png|jpg|mp4|webm|mov)$/i, '').replace(/[-_]/g, ' ');
-        const mediaSrc = isVideo ? `/assets/videos/${filename}` : `/assets/branding/${filename}`;
-        list.push({ type: isVideo ? 'video' : 'image', src: mediaSrc, title });
+const galleryDomId = (src = '') => {
+  const value = String(src);
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0;
+  }
+  return `gallery-item-${Math.abs(hash).toString(36)}`;
+};
+
+const staticAssetToItem = (categoryTitle, filename, index) => {
+  const isVideo = categoryTitle === 'Campaign Videos' || filename.match(/\.(mp4|webm|mov)$/i);
+  const mediaSrc = isVideo ? `/assets/videos/${filename}` : `/assets/branding/${filename}`;
+  return {
+    key: `static-${categoryTitle}-${filename}-${index}`,
+    type: isVideo ? 'video' : 'image',
+    src: mediaSrc,
+    tagKey: mediaSrc,
+    title: mediaTitleFromPath(filename),
+    source: 'static'
+  };
+};
+
+const canvasMediaItemsForNode = (node) => {
+  if (node.type !== 'brandCard' || node.id === 'padding-node') return [];
+  const data = node.data || {};
+  const title = data.title || mediaTitleFromPath(data.image || data.video || node.id);
+  const items = [];
+
+  if (data.image) {
+    items.push({
+      key: `canvas-${node.id}-image`,
+      nodeId: node.id,
+      type: 'image',
+      src: data.image,
+      tagKey: `canvas:${node.id}:image`,
+      title,
+      source: 'canvas',
+      labelGroupId: data.labelGroupId || '',
+      labelTitle: data.labelTitle || '',
+      nodeGroup: data.nodeGroup || 'canvas'
+    });
+  }
+
+  if (data.video) {
+    items.push({
+      key: `canvas-${node.id}-video`,
+      nodeId: node.id,
+      type: 'video',
+      src: data.video,
+      tagKey: `canvas:${node.id}:video`,
+      title,
+      source: 'canvas',
+      labelGroupId: data.labelGroupId || '',
+      labelTitle: data.labelTitle || '',
+      nodeGroup: data.nodeGroup || 'canvas'
+    });
+  }
+
+  return items;
+};
+
+const buildCanvasCategories = (canvasNodes, canvasName = '') => {
+  const nodes = Array.isArray(canvasNodes) ? canvasNodes : [];
+  const labelNodes = nodes
+    .filter((node) => node.type === 'labelNode')
+    .sort((a, b) => (a.position?.y || 0) - (b.position?.y || 0) || (a.position?.x || 0) - (b.position?.x || 0));
+  const memberToLabel = new Map();
+
+  const categoriesById = new Map(labelNodes.map((labelNode) => {
+    const title = labelNode.data?.title || 'Canvas Label';
+    (Array.isArray(labelNode.data?.memberIds) ? labelNode.data.memberIds : []).forEach((memberId) => {
+      if (!memberToLabel.has(memberId)) memberToLabel.set(memberId, labelNode.id);
+    });
+    return [labelNode.id, {
+      id: `canvas-label-${labelNode.id}`,
+      title,
+      assets: [],
+      isCanvasCategory: true,
+      editableTitle: false
+    }];
+  }));
+
+  const ungroupedCategory = {
+    id: 'canvas-live-assets',
+    title: canvasName ? `${canvasName} Assets` : 'Canvas Assets',
+    assets: [],
+    isCanvasCategory: true,
+    editableTitle: false
+  };
+  const seenSources = new Set();
+
+  nodes
+    .filter((node) => node.type === 'brandCard' && node.id !== 'padding-node')
+    .sort((a, b) => (a.position?.y || 0) - (b.position?.y || 0) || (a.position?.x || 0) - (b.position?.x || 0))
+    .forEach((node) => {
+      const explicitLabelId = node.data?.labelGroupId || memberToLabel.get(node.id) || '';
+      let category = explicitLabelId ? categoriesById.get(explicitLabelId) : null;
+
+      if (!category && explicitLabelId) {
+        category = {
+          id: `canvas-label-${explicitLabelId}`,
+          title: node.data?.labelTitle || 'Canvas Label',
+          assets: [],
+          isCanvasCategory: true,
+          editableTitle: false
+        };
+        categoriesById.set(explicitLabelId, category);
+      }
+
+      canvasMediaItemsForNode(node).forEach((item) => {
+        if (!item.src || seenSources.has(item.src)) return;
+        seenSources.add(item.src);
+        (category || ungroupedCategory).assets.push(item);
       });
     });
-    return list;
-  }, []);
+
+  const labelCategories = Array.from(categoriesById.values()).filter((category) => category.assets.length > 0);
+  return [
+    ...labelCategories,
+    ...(ungroupedCategory.assets.length > 0 ? [ungroupedCategory] : [])
+  ];
+};
+
+const buildStaticCategories = (excludedSources) => Object.keys(assetFiles)
+  .filter(key => key !== 'Canvas Ads' && key !== 'Canvas In The Wild Products' && key !== 'Canvas Products Shots')
+  .map(key => ({
+    id: `static-${key}`,
+    title: key,
+    editableTitle: true,
+    assets: assetFiles[key]
+      .map((filename, index) => staticAssetToItem(key, filename, index))
+      .filter((item) => !excludedSources.has(item.src))
+  }))
+  .filter((category) => category.assets.length > 0);
+
+export default function InteractiveGallery() {
+  const galleryRef = useRef(null);
+  const { canvasNodes, canvasName } = useCanvasAssets();
+
+  const canvasCategories = useMemo(() => buildCanvasCategories(canvasNodes, canvasName), [canvasName, canvasNodes]);
+  const canvasSourceSet = useMemo(() => new Set(canvasCategories.flatMap((category) => category.assets.map((asset) => asset.src))), [canvasCategories]);
+  const staticCategories = useMemo(() => buildStaticCategories(canvasSourceSet), [canvasSourceSet]);
+  const categories = useMemo(() => [...canvasCategories, ...staticCategories], [canvasCategories, staticCategories]);
+  const allAssets = useMemo(() => categories.flatMap((category) => category.assets), [categories]);
 
   const [activeIndex, setActiveIndex] = useState(null);
   const activeMedia = activeIndex !== null ? allAssets[activeIndex] : null;
 
-  const handleNext = () => setActiveIndex(prev => (prev + 1) % allAssets.length);
-  const handlePrev = () => setActiveIndex(prev => (prev - 1 + allAssets.length) % allAssets.length);
+  const handleNext = () => setActiveIndex(prev => allAssets.length > 0 ? (prev + 1) % allAssets.length : null);
+  const handlePrev = () => setActiveIndex(prev => allAssets.length > 0 ? (prev - 1 + allAssets.length) % allAssets.length : null);
+
+  useEffect(() => {
+    if (activeIndex !== null && activeIndex >= allAssets.length) {
+      setActiveIndex(null);
+    }
+  }, [activeIndex, allAssets.length]);
 
   const [highlightedSrc, setHighlightedSrc] = useState(null);
 
@@ -156,7 +299,7 @@ export default function InteractiveGallery() {
       setHighlightedSrc(src);
       
       setTimeout(() => {
-        const elId = `gallery-item-${src.replace(/[^a-zA-Z0-9]/g, '-')}`;
+        const elId = galleryDomId(src);
         const el = document.getElementById(elId);
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -188,13 +331,6 @@ export default function InteractiveGallery() {
 
     return () => ctx.revert();
   }, []);
-
-  const categories = Object.keys(assetFiles)
-    .filter(key => key !== 'Canvas Ads' && key !== 'Canvas In The Wild Products' && key !== 'Canvas Products Shots')
-    .map(key => ({
-      title: key,
-      assets: assetFiles[key]
-    }));
 
   return (
     <div id="asset-gallery" ref={galleryRef} style={{ padding: '80px 5%', maxWidth: '1600px', margin: '0 auto', position: 'relative', zIndex: 5 }}>
@@ -348,21 +484,30 @@ export default function InteractiveGallery() {
             paddingBottom: '12px',
             color: 'var(--text-color)' 
           }}>
-          <EditableText contentKey={`gallery.category.${category.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.title`} fallback={category.title} />
+          {category.editableTitle === false ? (
+            <span>{category.title}</span>
+          ) : (
+            <EditableText contentKey={`gallery.category.${category.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.title`} fallback={category.title} />
+          )}
+          {category.isCanvasCategory && (
+            <span style={{ marginLeft: '12px', fontSize: '0.72rem', color: 'rgba(0,255,204,0.76)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', verticalAlign: 'middle' }}>
+              Live Canvas
+            </span>
+          )}
         </h3>
           <div className="gallery-grid">
-            {category.assets.map((filename, index) => {
-              const isVideo = category.title === 'Campaign Videos' || filename.match(/\.(mp4|webm|mov)$/i);
-              const basename = filename.split('/').pop();
-              const title = basename.replace(/\.(webp|png|jpg|mp4|webm|mov)$/i, '').replace(/[-_]/g, ' ');
-              const mediaSrc = isVideo ? `/assets/videos/${filename}` : `/assets/branding/${filename}`;
+            {category.assets.map((asset, index) => {
+              const isVideo = asset.type === 'video';
+              const title = asset.title || 'Canvas Asset';
+              const mediaSrc = asset.src;
+              const tagKey = asset.tagKey || mediaSrc;
               const isHighlighted = highlightedSrc === mediaSrc;
-              const isSelected = selectedAssets.has(mediaSrc);
-              const activeTags = assetTags[mediaSrc] || [];
-              const elId = `gallery-item-${mediaSrc.replace(/[^a-zA-Z0-9]/g, '-')}`;
+              const isSelected = selectedAssets.has(tagKey);
+              const activeTags = assetTags[tagKey] || [];
+              const elId = galleryDomId(mediaSrc);
               
               return (
-                <div key={`${catIndex}-${index}`} className="gallery-grid-cell" style={{ display: 'flex', justifyContent: 'center' }}>
+                <div key={asset.key || `${catIndex}-${index}`} className="gallery-grid-cell" style={{ display: 'flex', justifyContent: 'center' }}>
                   <div 
                     id={elId}
                     className="gallery-item glass-panel" 
@@ -382,12 +527,12 @@ export default function InteractiveGallery() {
                     if (isTaggingMode) {
                       setSelectedAssets(prev => {
                         const next = new Set(prev);
-                        if (next.has(mediaSrc)) next.delete(mediaSrc);
-                        else next.add(mediaSrc);
+                        if (next.has(tagKey)) next.delete(tagKey);
+                        else next.add(tagKey);
                         return next;
                       });
                     } else {
-                      const globalIndex = allAssets.findIndex(a => a.src === mediaSrc);
+                      const globalIndex = allAssets.findIndex(a => a.src === mediaSrc && (a.tagKey || a.src) === tagKey);
                       setActiveIndex(globalIndex);
                     }
                   }}
@@ -426,8 +571,8 @@ export default function InteractiveGallery() {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setAssetTags(prev => {
-                                  const current = prev[mediaSrc] || [];
-                                  return { ...prev, [mediaSrc]: current.filter(t => t !== tag) };
+                                  const current = prev[tagKey] || [];
+                                  return { ...prev, [tagKey]: current.filter(t => t !== tag) };
                                 });
                               }}
                               style={{ marginLeft: '6px', background: 'transparent', border: 'none', color: '#ff8888', cursor: 'pointer', padding: '0 2px', fontSize: '10px' }}

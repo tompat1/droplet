@@ -20,6 +20,7 @@ import assetFiles from '../assetsData.json';
 import { defaultAssetTags } from '../defaultTags';
 import { useAuth } from './AuthContext';
 import EditableText from './EditableText';
+import { useCanvasAssets } from './CanvasAssetsState';
 import { canvasApi, usageApi } from '../lib/apiClient';
 import { compressImageDataUrl, readImageFileAsDataUrl } from '../lib/mediaFiles';
 
@@ -2703,6 +2704,7 @@ const CanvasToolbox = ({
 
 export default function HeroCanvas() {
   const { user } = useAuth();
+  const { setCanvasSnapshot } = useCanvasAssets();
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [activeIndex, setActiveIndex] = useState(null);
@@ -2769,6 +2771,14 @@ export default function HeroCanvas() {
   useEffect(() => {
     edgesRef.current = edges;
   }, [edges]);
+
+  useEffect(() => {
+    setCanvasSnapshot({
+      nodes,
+      edges,
+      canvasName: activeCanvasName || 'Fluid Node Canvas'
+    });
+  }, [activeCanvasName, edges, nodes, setCanvasSnapshot]);
 
   const loadUsageSummary = useCallback(async () => {
     if (!user) {
