@@ -2556,6 +2556,7 @@ export default function HeroCanvas() {
   const canvasUploadInputRef = useRef(null);
   const dragDepthRef = useRef(0);
   const lastCanvasPointerRef = useRef({ x: 0, y: 0 });
+  const nodesRef = useRef(nodes);
 
   const graphChangeTypes = useMemo(() => new Set(['position', 'dimensions', 'add', 'remove', 'replace']), []);
   const edgeChangeTypes = useMemo(() => new Set(['add', 'remove', 'replace']), []);
@@ -2570,6 +2571,10 @@ export default function HeroCanvas() {
   const pushUndoAction = useCallback((action) => {
     setUndoStack((stack) => [action, ...stack].slice(0, 12));
   }, []);
+
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
 
   const loadUsageSummary = useCallback(async () => {
     if (!user) {
@@ -3031,14 +3036,14 @@ export default function HeroCanvas() {
   }, [setNodes]);
 
   const createSiblingNote = useCallback((sourceId) => {
-    const sourceNode = nodes.find((node) => node.id === sourceId);
+    const sourceNode = nodesRef.current.find((node) => node.id === sourceId);
     if (!sourceNode) return;
     createStickyNoteAt({
       x: Number(sourceNode.position?.x || 0) + NOTE_WIDTH + NOTE_SIBLING_GAP,
       y: Number(sourceNode.position?.y || 0)
     });
     setCanvasStatus('Sticky note added next to the current note.');
-  }, [createStickyNoteAt, nodes]);
+  }, [createStickyNoteAt]);
 
   const startLabelPlacement = useCallback(() => {
     setIsEditMode(true);
