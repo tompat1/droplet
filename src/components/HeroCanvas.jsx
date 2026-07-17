@@ -47,10 +47,13 @@ const IMPORT_GRID_Y = 430;
 const MAX_IMPORT_FILES = 24;
 const CARD_GRID_X = 380;
 const CARD_GRID_Y = 430;
+const CARD_WIDTH = 320;
+const CARD_FALLBACK_HEIGHT = 430;
 const LABEL_WIDTH = 230;
 const LABEL_HEIGHT = 86;
 const LABEL_CARD_GAP = 150;
 const LABEL_DROP_DISTANCE = 260;
+const LABEL_DROP_BUFFER = 96;
 const MAX_SAVE_PAYLOAD_BYTES = 7_500_000;
 const CANVAS_STORAGE_WARNING_BYTES = 5_000_000;
 const CANVAS_MEDIA_WARNING_BYTES = 3_000_000;
@@ -131,6 +134,65 @@ const estimateCanvasMediaBytes = (nodes) => nodes.reduce((total, node) => {
   }
   return nextTotal;
 }, 0);
+
+const finiteNumber = (...values) => values.find((value) => Number.isFinite(Number(value))) ?? 0;
+
+const nodeBounds = (node, fallbackWidth, fallbackHeight) => {
+  const width = Number(finiteNumber(node.measured?.width, node.width, fallbackWidth));
+  const height = Number(finiteNumber(node.measured?.height, node.height, fallbackHeight));
+  return {
+    left: Number(node.position?.x || 0),
+    top: Number(node.position?.y || 0),
+    right: Number(node.position?.x || 0) + width,
+    bottom: Number(node.position?.y || 0) + height,
+    width,
+    height
+  };
+};
+
+const expandBounds = (bounds, amount) => ({
+  left: bounds.left - amount,
+  top: bounds.top - amount,
+  right: bounds.right + amount,
+  bottom: bounds.bottom + amount,
+  width: bounds.width + amount * 2,
+  height: bounds.height + amount * 2
+});
+
+const boundsOverlapArea = (a, b) => {
+  const width = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+  const height = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+  return width * height;
+};
+
+const boundsCenterDistance = (a, b) => {
+  const ax = a.left + a.width / 2;
+  const ay = a.top + a.height / 2;
+  const bx = b.left + b.width / 2;
+  const by = b.top + b.height / 2;
+  return Math.hypot(ax - bx, ay - by);
+};
+
+const findLabelDropTarget = (cards, labels) => {
+  if (cards.length === 0 || labels.length === 0) return null;
+
+  return labels
+    .map((label) => {
+      const labelBounds = nodeBounds(label, LABEL_WIDTH, LABEL_HEIGHT);
+      const expandedLabelBounds = expandBounds(labelBounds, LABEL_DROP_BUFFER);
+      const score = cards.reduce((total, card) => {
+        const cardBounds = nodeBounds(card, CARD_WIDTH, CARD_FALLBACK_HEIGHT);
+        return total + boundsOverlapArea(cardBounds, expandedLabelBounds);
+      }, 0);
+      const distance = Math.min(...cards.map((card) => boundsCenterDistance(
+        nodeBounds(card, CARD_WIDTH, CARD_FALLBACK_HEIGHT),
+        labelBounds
+      )));
+      return { label, score, distance };
+    })
+    .filter((candidate) => candidate.score > 0 || candidate.distance <= LABEL_DROP_DISTANCE)
+    .sort((a, b) => b.score - a.score || a.distance - b.distance)[0]?.label || null;
+};
 
 const shouldOptimizeDataUrl = (value) => (
   typeof value === 'string' &&
@@ -651,6 +713,7 @@ const NodeSearch = () => {
 
 const LabelNode = ({ id, data, selected, isConnectable }) => {
   const memberCount = Array.isArray(data.memberIds) ? data.memberIds.length : 0;
+  const isDropTarget = data.isDropTarget === true;
 
   const renameLabel = (event) => {
     event.stopPropagation();
@@ -687,11 +750,17 @@ const LabelNode = ({ id, data, selected, isConnectable }) => {
         minHeight: `${LABEL_HEIGHT}px`,
         padding: '14px 16px',
         borderRadius: '14px',
-        borderColor: selected ? 'rgba(0,255,204,0.86)' : 'rgba(0,255,204,0.28)',
-        background: 'linear-gradient(135deg, rgba(0,255,204,0.13), rgba(8,8,14,0.92))',
+        borderColor: isDropTarget ? 'rgba(255, 179, 71, 0.95)' : selected ? 'rgba(0,255,204,0.86)' : 'rgba(0,255,204,0.28)',
+        background: isDropTarget
+          ? 'linear-gradient(135deg, rgba(255,179,71,0.24), rgba(0,255,204,0.12), rgba(8,8,14,0.94))'
+          : 'linear-gradient(135deg, rgba(0,255,204,0.13), rgba(8,8,14,0.92))',
         color: '#fff',
-        boxShadow: selected ? '0 0 28px rgba(0,255,204,0.32), inset 0 1px 0 rgba(255,255,255,0.08)' : '0 14px 38px rgba(0,0,0,0.22)',
-        cursor: 'grab'
+        boxShadow: isDropTarget
+          ? '0 0 34px rgba(255,179,71,0.34), 0 0 26px rgba(0,255,204,0.18), inset 0 1px 0 rgba(255,255,255,0.12)'
+          : selected ? '0 0 28px rgba(0,255,204,0.32), inset 0 1px 0 rgba(255,255,255,0.08)' : '0 14px 38px rgba(0,0,0,0.22)',
+        cursor: 'grab',
+        transition: 'border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease',
+        transform: isDropTarget ? 'scale(1.03)' : 'scale(1)'
       }}
       onDoubleClick={renameLabel}
     >
@@ -727,7 +796,7 @@ const LabelNode = ({ id, data, selected, isConnectable }) => {
         )}
       </div>
       <div style={{ marginTop: '10px', fontSize: '0.76rem', color: 'rgba(255,255,255,0.58)' }}>
-        {memberCount === 1 ? '1 card connected' : `${memberCount} cards connected`}
+        {isDropTarget ? 'Drop to connect and arrange' : memberCount === 1 ? '1 card connected' : `${memberCount} cards connected`}
       </div>
       <Handle type="source" position={Position.Right} isConnectable={isConnectable} style={{ background: '#050505', border: '2px solid rgba(0,255,204,0.75)' }} />
     </div>
@@ -1062,6 +1131,7 @@ const sanitizeNodeForSave = (node) => {
   delete data.onToggleCollapse;
   delete data.onGenerationUsageUpdate;
   delete data.isHighlighted;
+  delete data.isDropTarget;
   delete data.isParentCollapsed;
   delete data.parentOffsetX;
   delete data.parentOffsetY;
@@ -2188,6 +2258,7 @@ export default function HeroCanvas() {
   const [interactionMode, setInteractionMode] = useState('pan');
   const [isImportDragActive, setIsImportDragActive] = useState(false);
   const [isPlacingLabel, setIsPlacingLabel] = useState(false);
+  const [activeDropLabelId, setActiveDropLabelId] = useState(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState([]);
   const reactFlowInstanceRef = useRef(null);
   const canvasUploadInputRef = useRef(null);
@@ -2685,33 +2756,58 @@ export default function HeroCanvas() {
     setSelectedNodeIds(selectedNodes.map((node) => node.id));
   }, []);
 
-  const handleNodeDragStop = useCallback((event, node) => {
-    if (node.type === 'labelNode') return;
-    const draggedCardIds = selectedCardIds.includes(node.id) ? selectedCardIds : [node.id];
-    const cards = nodes.filter((candidate) => draggedCardIds.includes(candidate.id) && candidate.type === 'brandCard');
-    if (cards.length === 0) return;
+  const getDraggedCardDropContext = useCallback((node, draggedNodes = []) => {
+    if (node.type !== 'brandCard') return { cardIds: [], cards: [], labels: [] };
 
-    const labels = nodes.filter((candidate) => candidate.type === 'labelNode');
-    const nearestLabel = labels
-      .map((label) => {
-        const labelCenter = {
-          x: label.position.x + LABEL_WIDTH / 2,
-          y: label.position.y + LABEL_HEIGHT / 2
-        };
-        const distance = Math.min(...cards.map((card) => Math.hypot(
-          card.position.x + 160 - labelCenter.x,
-          card.position.y + 220 - labelCenter.y
-        )));
-        return {
-          label,
-          distance
-        };
-      })
-      .sort((a, b) => a.distance - b.distance)[0];
+    const overrideNodes = [node, ...draggedNodes].filter(Boolean);
+    const overrideMap = new Map(overrideNodes.map((candidate) => [candidate.id, candidate]));
+    const visibleNodes = nodes.map((candidate) => {
+      const override = overrideMap.get(candidate.id);
+      return override ? {
+        ...candidate,
+        ...override,
+        data: {
+          ...candidate.data,
+          ...override.data
+        }
+      } : candidate;
+    });
 
-    if (!nearestLabel || nearestLabel.distance > LABEL_DROP_DISTANCE) return;
-    connectCardsToLabel(nearestLabel.label.id, draggedCardIds);
-  }, [connectCardsToLabel, nodes, selectedCardIds]);
+    const draggedNodeIds = overrideNodes
+      .filter((candidate) => candidate.type === 'brandCard')
+      .map((candidate) => candidate.id);
+    const cardIds = selectedCardIds.includes(node.id)
+      ? selectedCardIds
+      : [...new Set(draggedNodeIds.length > 0 ? draggedNodeIds : [node.id])];
+    const cardSet = new Set(cardIds);
+
+    return {
+      cardIds,
+      cards: visibleNodes.filter((candidate) => cardSet.has(candidate.id) && candidate.type === 'brandCard'),
+      labels: visibleNodes.filter((candidate) => candidate.type === 'labelNode')
+    };
+  }, [nodes, selectedCardIds]);
+
+  const handleNodeDrag = useCallback((event, node, draggedNodes) => {
+    if (!isEditMode || node.type !== 'brandCard') {
+      setActiveDropLabelId(null);
+      return;
+    }
+
+    const { cards, labels } = getDraggedCardDropContext(node, draggedNodes);
+    const targetLabel = findLabelDropTarget(cards, labels);
+    setActiveDropLabelId(targetLabel?.id || null);
+  }, [getDraggedCardDropContext, isEditMode]);
+
+  const handleNodeDragStop = useCallback((event, node, draggedNodes) => {
+    setActiveDropLabelId(null);
+    if (!isEditMode || node.type === 'labelNode') return;
+
+    const { cardIds, cards, labels } = getDraggedCardDropContext(node, draggedNodes);
+    const targetLabel = findLabelDropTarget(cards, labels);
+    if (!targetLabel) return;
+    connectCardsToLabel(targetLabel.id, cardIds, targetLabel.data?.title);
+  }, [connectCardsToLabel, getDraggedCardDropContext, isEditMode]);
 
   const undoLastAction = useCallback(() => {
     setUndoStack((stack) => {
@@ -2792,7 +2888,8 @@ export default function HeroCanvas() {
             setGlobalEdges: setPersistentEdges,
             onGenerationUsageUpdate: loadUsageSummary,
             pushUndoAction,
-            isEditMode
+            isEditMode,
+            isDropTarget: node.type === 'labelNode' && node.id === activeDropLabelId
           }
         };
       });
@@ -2815,7 +2912,7 @@ export default function HeroCanvas() {
         }
       };
     }));
-  }, [collapsedBranches, setNodes, setEdges, isEditMode, loadUsageSummary, pushUndoAction, setPersistentEdges, setPersistentNodes]);
+  }, [activeDropLabelId, collapsedBranches, setNodes, setEdges, isEditMode, loadUsageSummary, pushUndoAction, setPersistentEdges, setPersistentNodes]);
 
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -2992,6 +3089,7 @@ export default function HeroCanvas() {
         onNodeClick={onNodeClick}
         onPaneClick={handlePaneClick}
         onSelectionChange={handleSelectionChange}
+        onNodeDrag={handleNodeDrag}
         onNodeDragStop={handleNodeDragStop}
         nodeTypes={nodeTypes}
         fitView
