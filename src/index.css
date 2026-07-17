@@ -326,6 +326,20 @@ h1, h2, h3, h4, h5, h6 {
   padding: 12px;
 }
 
+.gallery-item.glass-panel {
+  background: linear-gradient(145deg, rgba(18, 18, 26, 0.94), rgba(9, 9, 14, 0.9));
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.gallery-item.glass-panel:hover {
+  background: linear-gradient(145deg, rgba(24, 24, 34, 0.96), rgba(11, 11, 17, 0.92));
+}
+
+.gallery-item .gallery-media-asset {
+  background: rgba(0, 0, 0, 0.28);
+}
+
 .gallery-lines-desktop,
 .gallery-lines-tablet {
   display: none;
