@@ -1,4 +1,5 @@
 import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ReactFlow,
   useNodesState,
@@ -1524,6 +1525,37 @@ const buildCanvasPayload = ({ name, nodes, edges, viewport, collapsedBranches, i
   }
 });
 
+const ExportToast = ({ message }) => {
+  if (!message || typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        position: 'fixed',
+        right: '24px',
+        bottom: '24px',
+        zIndex: 2147483647,
+        maxWidth: '360px',
+        borderRadius: '14px',
+        border: '1px solid rgba(0,255,204,0.52)',
+        background: 'rgba(5, 8, 12, 0.96)',
+        boxShadow: '0 18px 46px rgba(0,0,0,0.52), 0 0 28px rgba(0,255,204,0.24)',
+        color: '#fff',
+        padding: '13px 15px',
+        fontSize: '0.82rem',
+        lineHeight: 1.35,
+        fontWeight: 850,
+        pointerEvents: 'none'
+      }}
+    >
+      {message}
+    </div>,
+    document.body
+  );
+};
+
 const CanvasPersistencePanel = ({
   user,
   canvases,
@@ -1919,31 +1951,7 @@ const CanvasPersistencePanel = ({
 
   return (
     <div style={panelStyle}>
-      {exportToast && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            position: 'fixed',
-            right: '24px',
-            bottom: '24px',
-            zIndex: 10020,
-            maxWidth: '340px',
-            borderRadius: '14px',
-            border: '1px solid rgba(0,255,204,0.42)',
-            background: 'rgba(5, 8, 12, 0.94)',
-            boxShadow: '0 18px 46px rgba(0,0,0,0.48), 0 0 24px rgba(0,255,204,0.18)',
-            color: '#fff',
-            padding: '12px 14px',
-            fontSize: '0.78rem',
-            lineHeight: 1.35,
-            fontWeight: 850,
-            pointerEvents: 'none'
-          }}
-        >
-          {exportToast}
-        </div>
-      )}
+      <ExportToast message={exportToast} />
       <input
         ref={brandGuideInputRef}
         type="file"
