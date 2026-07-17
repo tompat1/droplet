@@ -845,12 +845,25 @@ const LabelNode = ({ id, data, selected, isConnectable }) => {
   );
 };
 
-const StickyNoteNode = ({ id, data, selected }) => {
+const StickyNoteNode = ({ id, data, selected, width, height }) => {
   const [draftText, setDraftText] = useState(data.text || '');
+  const { zoom } = useViewport();
+  const canEditNote = data.isEditMode !== false;
+  const [noteSize, setNoteSize] = useState({
+    width: Number(data.noteWidth || width || NOTE_WIDTH),
+    height: Number(data.noteHeight || height || NOTE_HEIGHT)
+  });
 
   useEffect(() => {
     setDraftText(data.text || '');
   }, [data.text]);
+
+  useEffect(() => {
+    setNoteSize({
+      width: Number(data.noteWidth || width || NOTE_WIDTH),
+      height: Number(data.noteHeight || height || NOTE_HEIGHT)
+    });
+  }, [data.noteHeight, data.noteWidth, height, width]);
 
   const updateNoteText = (text) => {
     data.setGlobalNodes?.((nds) => nds.map((node) => node.id === id ? {
@@ -873,6 +886,48 @@ const StickyNoteNode = ({ id, data, selected }) => {
     data.onCreateSiblingNote?.(id);
   };
 
+  const resizeNote = (nextSize) => {
+    setNoteSize(nextSize);
+    data.setGlobalNodes?.((nds) => nds.map((node) => node.id === id ? {
+      ...node,
+      width: nextSize.width,
+      height: nextSize.height,
+      data: {
+        ...node.data,
+        noteWidth: nextSize.width,
+        noteHeight: nextSize.height
+      }
+    } : node));
+  };
+
+  const startResizeNote = (event) => {
+    if (!canEditNote) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startWidth = noteSize.width;
+    const startHeight = noteSize.height;
+    document.body.style.userSelect = 'none';
+
+    const handlePointerMove = (moveEvent) => {
+      const scale = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+      resizeNote({
+        width: Math.max(NOTE_WIDTH, startWidth + (moveEvent.clientX - startX) / scale),
+        height: Math.max(NOTE_HEIGHT, startHeight + (moveEvent.clientY - startY) / scale)
+      });
+    };
+
+    const handlePointerUp = () => {
+      document.body.style.userSelect = '';
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+  };
+
   const controlButtonStyle = {
     width: '26px',
     height: '26px',
@@ -892,8 +947,9 @@ const StickyNoteNode = ({ id, data, selected }) => {
   return (
     <div
       style={{
-        width: `${NOTE_WIDTH}px`,
-        minHeight: `${NOTE_HEIGHT}px`,
+        width: `${noteSize.width}px`,
+        height: `${noteSize.height}px`,
+        boxSizing: 'border-box',
         borderRadius: '6px 6px 18px 6px',
         background: 'linear-gradient(145deg, #fff29b 0%, #ffe066 62%, #f8c847 100%)',
         color: '#332500',
@@ -931,7 +987,7 @@ const StickyNoteNode = ({ id, data, selected }) => {
           <circle cx="15" cy="12" r="2" />
           <circle cx="24" cy="12" r="2" />
         </svg>
-        {data.isEditMode && (
+        {canEditNote && (
           <div className="nodrag nopan" style={{ display: 'flex', gap: '6px' }}>
             <button type="button" onClick={addSiblingNote} style={controlButtonStyle} title="Add note next to this" aria-label="Add note next to this">
               +
@@ -969,9 +1025,9 @@ const StickyNoteNode = ({ id, data, selected }) => {
           fontWeight: 700,
           letterSpacing: 0,
           padding: '4px 2px',
-          cursor: data.isEditMode ? 'text' : 'default'
+          cursor: canEditNote ? 'text' : 'default'
         }}
-        readOnly={!data.isEditMode}
+        readOnly={!canEditNote}
       />
       <div
         aria-hidden="true"
@@ -987,6 +1043,32 @@ const StickyNoteNode = ({ id, data, selected }) => {
           pointerEvents: 'none'
         }}
       />
+      {canEditNote && (
+        <div
+          className="nodrag nopan"
+          onPointerDown={startResizeNote}
+          title="Resize note"
+          aria-label="Resize note"
+          style={{
+            position: 'absolute',
+            right: '4px',
+            bottom: '4px',
+            width: '22px',
+            height: '22px',
+            cursor: 'nwse-resize',
+            zIndex: 2,
+            display: 'grid',
+            placeItems: 'end',
+            color: 'rgba(51,37,0,0.48)',
+            touchAction: 'none'
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+            <path d="M6 16h10V6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path d="M11 16h5v-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity=".65" />
+          </svg>
+        </div>
+      )}
     </div>
   );
 };
@@ -3022,6 +3104,8 @@ export default function HeroCanvas() {
       position,
       data: {
         text,
+        noteWidth: NOTE_WIDTH,
+        noteHeight: NOTE_HEIGHT,
         nodeGroup: 'notes'
       },
       selected: true
