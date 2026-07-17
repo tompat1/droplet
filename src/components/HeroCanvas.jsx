@@ -49,6 +49,9 @@ const CARD_GRID_X = 380;
 const CARD_GRID_Y = 430;
 const CARD_WIDTH = 320;
 const CARD_FALLBACK_HEIGHT = 430;
+const NOTE_WIDTH = 240;
+const NOTE_HEIGHT = 190;
+const NOTE_SIBLING_GAP = 28;
 const LABEL_WIDTH = 230;
 const LABEL_HEIGHT = 86;
 const LABEL_CARD_GAP = 150;
@@ -842,9 +845,156 @@ const LabelNode = ({ id, data, selected, isConnectable }) => {
   );
 };
 
+const StickyNoteNode = ({ id, data, selected }) => {
+  const [draftText, setDraftText] = useState(data.text || '');
+
+  useEffect(() => {
+    setDraftText(data.text || '');
+  }, [data.text]);
+
+  const updateNoteText = (text) => {
+    data.setGlobalNodes?.((nds) => nds.map((node) => node.id === id ? {
+      ...node,
+      data: {
+        ...node.data,
+        text
+      }
+    } : node));
+  };
+
+  const deleteNote = (event) => {
+    event.stopPropagation();
+    data.setGlobalNodes?.((nds) => nds.filter((node) => node.id !== id));
+    data.setGlobalEdges?.((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
+  };
+
+  const addSiblingNote = (event) => {
+    event.stopPropagation();
+    data.onCreateSiblingNote?.(id);
+  };
+
+  const controlButtonStyle = {
+    width: '26px',
+    height: '26px',
+    borderRadius: '8px',
+    border: '1px solid rgba(81, 55, 0, 0.16)',
+    background: 'rgba(255,255,255,0.34)',
+    color: '#3a2a00',
+    cursor: 'pointer',
+    display: 'grid',
+    placeItems: 'center',
+    fontSize: '1rem',
+    lineHeight: 1,
+    fontWeight: 950,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.38)'
+  };
+
+  return (
+    <div
+      style={{
+        width: `${NOTE_WIDTH}px`,
+        minHeight: `${NOTE_HEIGHT}px`,
+        borderRadius: '6px 6px 18px 6px',
+        background: 'linear-gradient(145deg, #fff29b 0%, #ffe066 62%, #f8c847 100%)',
+        color: '#332500',
+        border: selected ? '2px solid rgba(255, 106, 0, 0.78)' : '1px solid rgba(83, 57, 0, 0.16)',
+        boxShadow: selected
+          ? '0 18px 40px rgba(255, 196, 0, 0.28), 0 0 0 4px rgba(255,106,0,0.12)'
+          : '0 16px 32px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.45)',
+        padding: '10px 12px 12px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        transform: 'rotate(-1.2deg)',
+        position: 'relative'
+      }}
+    >
+      <div
+        className="note-drag-handle"
+        title="Drag note"
+        aria-label="Drag note"
+        style={{
+          minHeight: '30px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '8px',
+          cursor: 'grab',
+          color: 'rgba(51,37,0,0.66)'
+        }}
+      >
+        <svg width="30" height="18" viewBox="0 0 30 18" fill="currentColor" aria-hidden="true">
+          <circle cx="6" cy="6" r="2" />
+          <circle cx="15" cy="6" r="2" />
+          <circle cx="24" cy="6" r="2" />
+          <circle cx="6" cy="12" r="2" />
+          <circle cx="15" cy="12" r="2" />
+          <circle cx="24" cy="12" r="2" />
+        </svg>
+        {data.isEditMode && (
+          <div className="nodrag nopan" style={{ display: 'flex', gap: '6px' }}>
+            <button type="button" onClick={addSiblingNote} style={controlButtonStyle} title="Add note next to this" aria-label="Add note next to this">
+              +
+            </button>
+            <button type="button" onClick={deleteNote} style={{ ...controlButtonStyle, background: 'rgba(255,122,92,0.34)', color: '#5c1600' }} title="Delete note" aria-label="Delete note">
+              −
+            </button>
+          </div>
+        )}
+      </div>
+      <textarea
+        className="nodrag nopan"
+        value={draftText}
+        onChange={(event) => setDraftText(event.target.value)}
+        onBlur={() => updateNoteText(draftText)}
+        onKeyDown={(event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+            event.currentTarget.blur();
+          }
+        }}
+        placeholder="Write a note..."
+        aria-label="Sticky note text"
+        style={{
+          flex: 1,
+          width: '100%',
+          minHeight: '126px',
+          resize: 'none',
+          border: 'none',
+          outline: 'none',
+          background: 'transparent',
+          color: '#332500',
+          fontFamily: '"Comic Sans MS", "Bradley Hand", "Marker Felt", cursive',
+          fontSize: '1rem',
+          lineHeight: 1.35,
+          fontWeight: 700,
+          letterSpacing: 0,
+          padding: '4px 2px',
+          cursor: data.isEditMode ? 'text' : 'default'
+        }}
+        readOnly={!data.isEditMode}
+      />
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          right: 0,
+          bottom: 0,
+          width: '42px',
+          height: '42px',
+          borderRadius: '20px 0 18px 0',
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.2), rgba(158,96,0,0.22))',
+          clipPath: 'polygon(100% 0, 0 100%, 100% 100%)',
+          pointerEvents: 'none'
+        }}
+      />
+    </div>
+  );
+};
+
 const nodeTypes = {
   brandCard: BrandCard,
   labelNode: LabelNode,
+  noteNode: StickyNoteNode,
 };
 
 // Pull the specific logo image and one dynamic image
@@ -1178,10 +1328,12 @@ const sanitizeNodeForSave = (node) => {
   delete data.isCollapsed;
   delete data.isEditMode;
   delete data.pushUndoAction;
+  delete data.onCreateSiblingNote;
 
   return {
     id: String(node.id),
     type: node.type,
+    dragHandle: node.dragHandle,
     position: node.position || { x: 0, y: 0 },
     width: node.width,
     height: node.height,
@@ -1887,6 +2039,8 @@ const CanvasToolbox = ({
   onCreateLabelGroup,
   isPlacingLabel,
   onStartLabelPlacement,
+  isPlacingNote,
+  onStartNotePlacement,
   usageSummary,
   usageCurrency,
   onUsageCurrencyChange,
@@ -2134,9 +2288,14 @@ const CanvasToolbox = ({
             </button>
             <button type="button" onClick={() => setIsEditMode((value) => !value)} style={{ ...iconButtonStyle, borderColor: isEditMode ? 'rgba(75,94,250,0.75)' : iconButtonStyle.border, color: isEditMode ? '#fff' : 'rgba(255,255,255,0.62)', background: isEditMode ? 'rgba(75,94,250,0.24)' : iconButtonStyle.background, fontSize: '0.72rem' }} title="Toggle edit mode" aria-label="Toggle edit mode">ED</button>
             {isEditMode && (
-              <button type="button" onClick={onStartLabelPlacement} style={{ ...iconButtonStyle, borderColor: isPlacingLabel ? 'rgba(0,255,204,0.75)' : iconButtonStyle.border, color: isPlacingLabel ? '#fff' : 'rgba(255,255,255,0.68)', background: isPlacingLabel ? 'rgba(0,255,204,0.2)' : iconButtonStyle.background, fontSize: '0.62rem' }} title="Place a new label" aria-label="Place a new label">
-                LBL
-              </button>
+              <>
+                <button type="button" onClick={onStartLabelPlacement} style={{ ...iconButtonStyle, borderColor: isPlacingLabel ? 'rgba(0,255,204,0.75)' : iconButtonStyle.border, color: isPlacingLabel ? '#fff' : 'rgba(255,255,255,0.68)', background: isPlacingLabel ? 'rgba(0,255,204,0.2)' : iconButtonStyle.background, fontSize: '0.62rem' }} title="Place a new label" aria-label="Place a new label">
+                  LBL
+                </button>
+                <button type="button" onClick={onStartNotePlacement} style={{ ...iconButtonStyle, borderColor: isPlacingNote ? 'rgba(255,224,102,0.86)' : iconButtonStyle.border, color: isPlacingNote ? '#2d2100' : 'rgba(255,255,255,0.72)', background: isPlacingNote ? '#ffe066' : iconButtonStyle.background, fontSize: '0.62rem' }} title="Place a sticky note" aria-label="Place a sticky note">
+                  NTE
+                </button>
+              </>
             )}
             <button type="button" onClick={() => setInteractionMode((prev) => prev === 'pan' ? 'select' : 'pan')} style={{ ...iconButtonStyle, borderColor: interactionMode === 'pan' ? 'rgba(0,255,204,0.62)' : iconButtonStyle.border, color: interactionMode === 'pan' ? '#fff' : 'rgba(255,255,255,0.62)', background: interactionMode === 'pan' ? 'rgba(0,255,204,0.18)' : iconButtonStyle.background, fontSize: '0.68rem' }} title={interactionMode === 'pan' ? 'Pan mode is on' : 'Selection mode is on'} aria-label="Toggle pan mode">
               {interactionMode === 'pan' ? 'PAN' : 'SEL'}
@@ -2233,6 +2392,27 @@ const CanvasToolbox = ({
                   aria-label={isPlacingLabel ? 'Click the canvas to place a label' : 'Create an empty label anywhere on the canvas'}
                 >
                   {isPlacingLabel ? 'Click Canvas To Place Label' : '+ New Label'}
+                </button>
+                <button
+                  type="button"
+                  onClick={onStartNotePlacement}
+                  style={{
+                    minHeight: '42px',
+                    width: '100%',
+                    borderRadius: '12px',
+                    border: isPlacingNote ? '1px solid rgba(255,224,102,0.84)' : '1px solid rgba(255,224,102,0.28)',
+                    background: isPlacingNote ? 'rgba(255,224,102,0.24)' : 'rgba(255,224,102,0.09)',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '0.78rem',
+                    fontWeight: 900,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em'
+                  }}
+                  title={isPlacingNote ? 'Click the canvas to place a sticky note' : 'Create a sticky note anywhere on the canvas'}
+                  aria-label={isPlacingNote ? 'Click the canvas to place a sticky note' : 'Create a sticky note anywhere on the canvas'}
+                >
+                  {isPlacingNote ? 'Click Canvas To Place Note' : '+ Sticky Note'}
                 </button>
 
                 {selectedCardCount > 0 && (
@@ -2369,6 +2549,7 @@ export default function HeroCanvas() {
   const [interactionMode, setInteractionMode] = useState('pan');
   const [isImportDragActive, setIsImportDragActive] = useState(false);
   const [isPlacingLabel, setIsPlacingLabel] = useState(false);
+  const [isPlacingNote, setIsPlacingNote] = useState(false);
   const [activeDropLabelId, setActiveDropLabelId] = useState(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState([]);
   const reactFlowInstanceRef = useRef(null);
@@ -2827,8 +3008,41 @@ export default function HeroCanvas() {
     return labelId;
   }, [setNodes]);
 
+  const createStickyNoteAt = useCallback((position, text = '') => {
+    const noteId = `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const noteNode = {
+      id: noteId,
+      type: 'noteNode',
+      dragHandle: '.note-drag-handle',
+      position,
+      data: {
+        text,
+        nodeGroup: 'notes'
+      },
+      selected: true
+    };
+
+    setNodes((nds) => [...nds.map((node) => ({ ...node, selected: false })), noteNode]);
+    setSelectedNodeIds([noteId]);
+    setIsCanvasDirty(true);
+    setIsEditMode(true);
+    setCanvasStatus('Sticky note created.');
+    return noteId;
+  }, [setNodes]);
+
+  const createSiblingNote = useCallback((sourceId) => {
+    const sourceNode = nodes.find((node) => node.id === sourceId);
+    if (!sourceNode) return;
+    createStickyNoteAt({
+      x: Number(sourceNode.position?.x || 0) + NOTE_WIDTH + NOTE_SIBLING_GAP,
+      y: Number(sourceNode.position?.y || 0)
+    });
+    setCanvasStatus('Sticky note added next to the current note.');
+  }, [createStickyNoteAt, nodes]);
+
   const startLabelPlacement = useCallback(() => {
     setIsEditMode(true);
+    setIsPlacingNote(false);
     setIsPlacingLabel((value) => {
       const nextValue = !value;
       setCanvasStatus(nextValue ? 'Click anywhere on the canvas to place a label.' : 'Label placement cancelled.');
@@ -2836,8 +3050,24 @@ export default function HeroCanvas() {
     });
   }, []);
 
+  const startNotePlacement = useCallback(() => {
+    setIsEditMode(true);
+    setIsPlacingLabel(false);
+    setIsPlacingNote((value) => {
+      const nextValue = !value;
+      setCanvasStatus(nextValue ? 'Click anywhere on the canvas to place a sticky note.' : 'Sticky note placement cancelled.');
+      return nextValue;
+    });
+  }, []);
+
   const handlePaneClick = useCallback((event) => {
-    if (!isPlacingLabel) return;
+    if (!isPlacingLabel && !isPlacingNote) return;
+
+    if (isPlacingNote) {
+      createStickyNoteAt(clientPointToCanvasPoint(event.clientX, event.clientY));
+      setIsPlacingNote(false);
+      return;
+    }
 
     const titleInput = window.prompt('Label name:', 'Canvas Label');
     if (titleInput === null) {
@@ -2848,20 +3078,21 @@ export default function HeroCanvas() {
 
     createEmptyLabelAt(clientPointToCanvasPoint(event.clientX, event.clientY), titleInput);
     setIsPlacingLabel(false);
-  }, [clientPointToCanvasPoint, createEmptyLabelAt, isPlacingLabel]);
+  }, [clientPointToCanvasPoint, createEmptyLabelAt, createStickyNoteAt, isPlacingLabel, isPlacingNote]);
 
   useEffect(() => {
-    if (!isPlacingLabel) return undefined;
+    if (!isPlacingLabel && !isPlacingNote) return undefined;
 
     const handleKeyDown = (event) => {
       if (event.key !== 'Escape') return;
       setIsPlacingLabel(false);
-      setCanvasStatus('Label placement cancelled.');
+      setIsPlacingNote(false);
+      setCanvasStatus(isPlacingNote ? 'Sticky note placement cancelled.' : 'Label placement cancelled.');
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPlacingLabel]);
+  }, [isPlacingLabel, isPlacingNote]);
 
   const handleSelectionChange = useCallback(({ nodes: selectedNodes }) => {
     setSelectedNodeIds(selectedNodes.map((node) => node.id));
@@ -2986,6 +3217,7 @@ export default function HeroCanvas() {
         
         return { 
           ...node, 
+          dragHandle: node.type === 'noteNode' ? '.note-drag-handle' : node.dragHandle,
           hidden: false,
           data: {
             ...node.data,
@@ -2999,6 +3231,7 @@ export default function HeroCanvas() {
             setGlobalEdges: setPersistentEdges,
             onGenerationUsageUpdate: loadUsageSummary,
             pushUndoAction,
+            onCreateSiblingNote: createSiblingNote,
             isEditMode,
             isDropTarget: node.type === 'labelNode' && node.id === activeDropLabelId
           }
@@ -3023,7 +3256,7 @@ export default function HeroCanvas() {
         }
       };
     }));
-  }, [activeDropLabelId, collapsedBranches, setNodes, setEdges, isEditMode, loadUsageSummary, pushUndoAction, setPersistentEdges, setPersistentNodes]);
+  }, [activeDropLabelId, collapsedBranches, createSiblingNote, setNodes, setEdges, isEditMode, loadUsageSummary, pushUndoAction, setPersistentEdges, setPersistentNodes]);
 
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -3180,7 +3413,7 @@ export default function HeroCanvas() {
         onDrop={handleCanvasDrop}
         onPointerMove={handleCanvasPointerMove}
         onPointerDown={handleCanvasPointerDown}
-        style={{ width: '100%', minHeight: '500px', height: isFullscreen ? '100vh' : 'calc(100vh - 120px)', position: 'relative', backgroundColor: isFullscreen ? '#050505' : 'transparent', marginTop: '20px', outline: 'none', cursor: isPlacingLabel ? 'crosshair' : 'default' }}
+        style={{ width: '100%', minHeight: '500px', height: isFullscreen ? '100vh' : 'calc(100vh - 120px)', position: 'relative', backgroundColor: isFullscreen ? '#050505' : 'transparent', marginTop: '20px', outline: 'none', cursor: isPlacingLabel || isPlacingNote ? 'crosshair' : 'default' }}
       >
       <input
         ref={canvasUploadInputRef}
@@ -3248,6 +3481,8 @@ export default function HeroCanvas() {
           onCreateLabelGroup={createLabelGroup}
           isPlacingLabel={isPlacingLabel}
           onStartLabelPlacement={startLabelPlacement}
+          isPlacingNote={isPlacingNote}
+          onStartNotePlacement={startNotePlacement}
           usageSummary={usageSummary}
           usageCurrency={usageCurrency}
           onUsageCurrencyChange={handleUsageCurrencyChange}
