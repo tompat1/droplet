@@ -1541,6 +1541,8 @@ const CanvasToolbox = ({
   onAlignSelectedRow,
   onAlignSelectedColumn,
   onCreateLabelGroup,
+  isPlacingLabel,
+  onStartLabelPlacement,
   usageSummary,
   usageCurrency,
   onUsageCurrencyChange,
@@ -1787,6 +1789,11 @@ const CanvasToolbox = ({
               {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
             </button>
             <button type="button" onClick={() => setIsEditMode((value) => !value)} style={{ ...iconButtonStyle, borderColor: isEditMode ? 'rgba(75,94,250,0.75)' : iconButtonStyle.border, color: isEditMode ? '#fff' : 'rgba(255,255,255,0.62)', background: isEditMode ? 'rgba(75,94,250,0.24)' : iconButtonStyle.background, fontSize: '0.72rem' }} title="Toggle edit mode" aria-label="Toggle edit mode">ED</button>
+            {isEditMode && (
+              <button type="button" onClick={onStartLabelPlacement} style={{ ...iconButtonStyle, borderColor: isPlacingLabel ? 'rgba(0,255,204,0.75)' : iconButtonStyle.border, color: isPlacingLabel ? '#fff' : 'rgba(255,255,255,0.68)', background: isPlacingLabel ? 'rgba(0,255,204,0.2)' : iconButtonStyle.background, fontSize: '0.62rem' }} title="Place a new label" aria-label="Place a new label">
+                LBL
+              </button>
+            )}
             <button type="button" onClick={() => setInteractionMode((prev) => prev === 'pan' ? 'select' : 'pan')} style={{ ...iconButtonStyle, borderColor: interactionMode === 'pan' ? 'rgba(0,255,204,0.62)' : iconButtonStyle.border, color: interactionMode === 'pan' ? '#fff' : 'rgba(255,255,255,0.62)', background: interactionMode === 'pan' ? 'rgba(0,255,204,0.18)' : iconButtonStyle.background, fontSize: '0.68rem' }} title={interactionMode === 'pan' ? 'Pan mode is on' : 'Selection mode is on'} aria-label="Toggle pan mode">
               {interactionMode === 'pan' ? 'PAN' : 'SEL'}
             </button>
@@ -1862,6 +1869,28 @@ const CanvasToolbox = ({
 
             {isEditMode && (
               <>
+                <button
+                  type="button"
+                  onClick={onStartLabelPlacement}
+                  style={{
+                    minHeight: '42px',
+                    width: '100%',
+                    borderRadius: '12px',
+                    border: isPlacingLabel ? '1px solid rgba(0,255,204,0.62)' : '1px solid rgba(0,255,204,0.24)',
+                    background: isPlacingLabel ? 'rgba(0,255,204,0.17)' : 'rgba(0,255,204,0.075)',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '0.78rem',
+                    fontWeight: 900,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em'
+                  }}
+                  title={isPlacingLabel ? 'Click the canvas to place a label' : 'Create an empty label anywhere on the canvas'}
+                  aria-label={isPlacingLabel ? 'Click the canvas to place a label' : 'Create an empty label anywhere on the canvas'}
+                >
+                  {isPlacingLabel ? 'Click Canvas To Place Label' : '+ New Label'}
+                </button>
+
                 {selectedCardCount > 0 && (
                   <div
                     style={{
@@ -1995,6 +2024,7 @@ export default function HeroCanvas() {
   
   const [interactionMode, setInteractionMode] = useState('pan');
   const [isImportDragActive, setIsImportDragActive] = useState(false);
+  const [isPlacingLabel, setIsPlacingLabel] = useState(false);
   const [selectedNodeIds, setSelectedNodeIds] = useState([]);
   const reactFlowInstanceRef = useRef(null);
   const canvasUploadInputRef = useRef(null);
@@ -2040,7 +2070,7 @@ export default function HeroCanvas() {
   const selectedCardIds = useMemo(() => {
     const selectedSet = new Set(selectedNodeIds);
     return nodes
-      .filter((node) => selectedSet.has(node.id) && node.type === 'brandCard' && node.id !== 'padding-node')
+      .filter((node) => (selectedSet.has(node.id) || node.selected === true) && node.type === 'brandCard' && node.id !== 'padding-node')
       .map((node) => node.id);
   }, [nodes, selectedNodeIds]);
 
@@ -2429,6 +2459,65 @@ export default function HeroCanvas() {
     setSelectedNodeIds([labelId, ...selectedCardIds]);
   }, [connectCardsToLabel, nodes, selectedCardIds, setNodes]);
 
+  const createEmptyLabelAt = useCallback((position, titleInput) => {
+    const title = String(titleInput || '').trim() || 'Canvas Label';
+    const labelId = `label-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const labelNode = {
+      id: labelId,
+      type: 'labelNode',
+      position,
+      data: {
+        title,
+        memberIds: [],
+        nodeGroup: 'labels'
+      },
+      selected: true
+    };
+
+    setNodes((nds) => [...nds.map((node) => ({ ...node, selected: false })), labelNode]);
+    setSelectedNodeIds([labelId]);
+    setIsCanvasDirty(true);
+    setIsEditMode(true);
+    setCanvasStatus(`Label "${title}" created.`);
+    return labelId;
+  }, [setNodes]);
+
+  const startLabelPlacement = useCallback(() => {
+    setIsEditMode(true);
+    setIsPlacingLabel((value) => {
+      const nextValue = !value;
+      setCanvasStatus(nextValue ? 'Click anywhere on the canvas to place a label.' : 'Label placement cancelled.');
+      return nextValue;
+    });
+  }, []);
+
+  const handlePaneClick = useCallback((event) => {
+    if (!isPlacingLabel) return;
+
+    const titleInput = window.prompt('Label name:', 'Canvas Label');
+    if (titleInput === null) {
+      setIsPlacingLabel(false);
+      setCanvasStatus('Label placement cancelled.');
+      return;
+    }
+
+    createEmptyLabelAt(clientPointToCanvasPoint(event.clientX, event.clientY), titleInput);
+    setIsPlacingLabel(false);
+  }, [clientPointToCanvasPoint, createEmptyLabelAt, isPlacingLabel]);
+
+  useEffect(() => {
+    if (!isPlacingLabel) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key !== 'Escape') return;
+      setIsPlacingLabel(false);
+      setCanvasStatus('Label placement cancelled.');
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPlacingLabel]);
+
   const handleSelectionChange = useCallback(({ nodes: selectedNodes }) => {
     setSelectedNodeIds(selectedNodes.map((node) => node.id));
   }, []);
@@ -2682,6 +2771,8 @@ export default function HeroCanvas() {
   }, [edgeChangeTypes, onEdgesChange]);
 
   const onNodeClick = useCallback((event, node) => {
+    if (isEditMode) return;
+
     const src = node.data.image || node.data.video || (node.data.colors ? 'palette-' + node.id : null);
     if (src) {
       const groupMedias = canvasMedias.filter(m => m.nodeGroup === (node.data.nodeGroup || 'canvas'));
@@ -2691,7 +2782,7 @@ export default function HeroCanvas() {
         setActiveIndex(index);
       }
     }
-  }, [canvasMedias]);
+  }, [canvasMedias, isEditMode]);
 
   const handleNext = () => setActiveIndex(prev => (prev + 1) % activeGroupMedias.length);
   const handlePrev = () => setActiveIndex(prev => (prev - 1 + activeGroupMedias.length) % activeGroupMedias.length);
@@ -2718,7 +2809,7 @@ export default function HeroCanvas() {
         onDrop={handleCanvasDrop}
         onPointerMove={handleCanvasPointerMove}
         onPointerDown={handleCanvasPointerDown}
-        style={{ width: '100%', minHeight: '500px', height: isFullscreen ? '100vh' : 'calc(100vh - 120px)', position: 'relative', backgroundColor: isFullscreen ? '#050505' : 'transparent', marginTop: '20px', outline: 'none' }}
+        style={{ width: '100%', minHeight: '500px', height: isFullscreen ? '100vh' : 'calc(100vh - 120px)', position: 'relative', backgroundColor: isFullscreen ? '#050505' : 'transparent', marginTop: '20px', outline: 'none', cursor: isPlacingLabel ? 'crosshair' : 'default' }}
       >
       <input
         ref={canvasUploadInputRef}
@@ -2736,6 +2827,7 @@ export default function HeroCanvas() {
         onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
+        onPaneClick={handlePaneClick}
         onSelectionChange={handleSelectionChange}
         onNodeDragStop={handleNodeDragStop}
         nodeTypes={nodeTypes}
@@ -2782,6 +2874,8 @@ export default function HeroCanvas() {
           onAlignSelectedRow={() => alignSelectedCards('row')}
           onAlignSelectedColumn={() => alignSelectedCards('column')}
           onCreateLabelGroup={createLabelGroup}
+          isPlacingLabel={isPlacingLabel}
+          onStartLabelPlacement={startLabelPlacement}
           usageSummary={usageSummary}
           usageCurrency={usageCurrency}
           onUsageCurrencyChange={handleUsageCurrencyChange}
