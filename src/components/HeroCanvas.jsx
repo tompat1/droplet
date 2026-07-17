@@ -1482,6 +1482,7 @@ const sanitizeNodeForSave = (node) => {
   delete data.isEditMode;
   delete data.pushUndoAction;
   delete data.onCreateSiblingNote;
+  delete data.onDeleteNode;
 
   return {
     id: String(node.id),
@@ -1547,6 +1548,7 @@ const CanvasPersistencePanel = ({
   const { getViewport, setViewport, fitView } = useReactFlow();
   const [isBusy, setIsBusy] = useState(false);
   const [draftName, setDraftName] = useState(activeCanvasName || 'Fluid Node Canvas');
+  const [exportToast, setExportToast] = useState('');
   const hasAutoLoadedCanvas = useRef(false);
   const brandGuideInputRef = useRef(null);
   const brandGuideResolverRef = useRef(null);
@@ -1570,6 +1572,12 @@ const CanvasPersistencePanel = ({
   useEffect(() => {
     setDraftName(activeCanvasName || 'Fluid Node Canvas');
   }, [activeCanvasName]);
+
+  useEffect(() => {
+    if (!exportToast) return undefined;
+    const timeout = window.setTimeout(() => setExportToast(''), 3600);
+    return () => window.clearTimeout(timeout);
+  }, [exportToast]);
 
   const refreshCanvases = useCallback(async () => {
     if (!user) {
@@ -1660,8 +1668,10 @@ const CanvasPersistencePanel = ({
       canvas: currentCanvasPayload
     };
     const stamp = exportedAt.slice(0, 10);
-    downloadJsonFile(`${safeFileName(currentCanvasPayload.name)}-${stamp}.json`, exportPayload);
+    const fileName = `${safeFileName(currentCanvasPayload.name)}-${stamp}.json`;
+    downloadJsonFile(fileName, exportPayload);
     setStatus('Canvas exported as JSON.');
+    setExportToast(`Canvas export saved to your local disk / Downloads folder: ${fileName}`);
   };
 
   const openCanvasImportPicker = () => {
@@ -1908,6 +1918,31 @@ const CanvasPersistencePanel = ({
 
   return (
     <div style={panelStyle}>
+      {exportToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            right: '24px',
+            bottom: '24px',
+            zIndex: 10020,
+            maxWidth: '340px',
+            borderRadius: '14px',
+            border: '1px solid rgba(0,255,204,0.42)',
+            background: 'rgba(5, 8, 12, 0.94)',
+            boxShadow: '0 18px 46px rgba(0,0,0,0.48), 0 0 24px rgba(0,255,204,0.18)',
+            color: '#fff',
+            padding: '12px 14px',
+            fontSize: '0.78rem',
+            lineHeight: 1.35,
+            fontWeight: 850,
+            pointerEvents: 'none'
+          }}
+        >
+          {exportToast}
+        </div>
+      )}
       <input
         ref={brandGuideInputRef}
         type="file"
