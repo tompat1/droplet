@@ -236,6 +236,16 @@ const findLabelDropTarget = (cards, labels) => {
     .sort((a, b) => b.score - a.score || a.distance - b.distance)[0]?.label || null;
 };
 
+const labelMemberIdsFromNodes = (labelNode, nodes) => {
+  const memberIds = new Set(Array.isArray(labelNode?.data?.memberIds) ? labelNode.data.memberIds : []);
+  nodes.forEach((node) => {
+    if (node.type === 'brandCard' && node.data?.labelGroupId === labelNode.id) {
+      memberIds.add(node.id);
+    }
+  });
+  return [...memberIds];
+};
+
 const shouldOptimizeDataUrl = (value) => (
   typeof value === 'string' &&
   value.startsWith('data:image/') &&
@@ -2639,6 +2649,7 @@ export default function HeroCanvas() {
   const dragDepthRef = useRef(0);
   const lastCanvasPointerRef = useRef({ x: 0, y: 0 });
   const nodesRef = useRef(nodes);
+  const labelDragGroupRef = useRef(null);
 
   const graphChangeTypes = useMemo(() => new Set(['position', 'dimensions', 'add', 'remove', 'replace']), []);
   const edgeChangeTypes = useMemo(() => new Set(['add', 'remove', 'replace']), []);
@@ -3220,6 +3231,24 @@ export default function HeroCanvas() {
   }, [nodes, selectedCardIds]);
 
   const handleNodeDrag = useCallback((event, node, draggedNodes) => {
+    if (node.type === 'labelNode' && labelDragGroupRef.current?.labelId === node.id) {
+      const dragState = labelDragGroupRef.current;
+      const deltaX = Number(node.position?.x || 0) - dragState.labelStart.x;
+      const deltaY = Number(node.position?.y || 0) - dragState.labelStart.y;
+      setNodes((nds) => nds.map((candidate) => {
+        const startPosition = dragState.memberStartPositions.get(candidate.id);
+        if (!startPosition) return candidate;
+        return {
+          ...candidate,
+          position: {
+            x: startPosition.x + deltaX,
+            y: startPosition.y + deltaY
+          }
+        };
+      }));
+      return;
+    }
+
     if (!isEditMode || node.type !== 'brandCard') {
       setActiveDropLabelId(null);
       return;
@@ -3228,11 +3257,54 @@ export default function HeroCanvas() {
     const { cards, labels } = getDraggedCardDropContext(node, draggedNodes);
     const targetLabel = findLabelDropTarget(cards, labels);
     setActiveDropLabelId(targetLabel?.id || null);
-  }, [getDraggedCardDropContext, isEditMode]);
+  }, [getDraggedCardDropContext, isEditMode, setNodes]);
+
+  const handleNodeDragStart = useCallback((event, node) => {
+    if (!isEditMode || node.type !== 'labelNode') {
+      labelDragGroupRef.current = null;
+      return;
+    }
+
+    const sourceNodes = nodesRef.current;
+    const memberIds = labelMemberIdsFromNodes(node, sourceNodes);
+    if (memberIds.length === 0) {
+      labelDragGroupRef.current = null;
+      return;
+    }
+
+    const memberSet = new Set(memberIds);
+    const memberStartPositions = new Map(
+      sourceNodes
+        .filter((candidate) => memberSet.has(candidate.id) && candidate.type === 'brandCard')
+        .map((candidate) => [candidate.id, {
+          x: Number(candidate.position?.x || 0),
+          y: Number(candidate.position?.y || 0)
+        }])
+    );
+
+    labelDragGroupRef.current = {
+      labelId: node.id,
+      labelStart: {
+        x: Number(node.position?.x || 0),
+        y: Number(node.position?.y || 0)
+      },
+      memberStartPositions
+    };
+  }, [isEditMode]);
 
   const handleNodeDragStop = useCallback((event, node, draggedNodes) => {
+    if (node.type === 'labelNode') {
+      const draggedCount = labelDragGroupRef.current?.memberStartPositions?.size || 0;
+      labelDragGroupRef.current = null;
+      if (draggedCount > 0) {
+        setIsCanvasDirty(true);
+        setCanvasStatus(`Moved label group with ${draggedCount} card${draggedCount === 1 ? '' : 's'}.`);
+      }
+      return;
+    }
+
     setActiveDropLabelId(null);
-    if (!isEditMode || node.type === 'labelNode') return;
+    if (!isEditMode) return;
 
     const { cardIds, cards, labels } = getDraggedCardDropContext(node, draggedNodes);
     const targetLabel = findLabelDropTarget(cards, labels);
@@ -3522,6 +3594,7 @@ export default function HeroCanvas() {
         onNodeClick={onNodeClick}
         onPaneClick={handlePaneClick}
         onSelectionChange={handleSelectionChange}
+        onNodeDragStart={handleNodeDragStart}
         onNodeDrag={handleNodeDrag}
         onNodeDragStop={handleNodeDragStop}
         nodeTypes={nodeTypes}
