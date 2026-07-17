@@ -79,6 +79,52 @@ const isEditableTarget = (target) => (
 
 const imageFilesFromList = (files) => Array.from(files || []).filter((file) => file?.type?.startsWith('image/'));
 
+const dataTransferDirectoryEntries = (dataTransfer) => Array.from(dataTransfer?.items || [])
+  .map((item) => (typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null))
+  .filter((entry) => entry?.isDirectory);
+
+const fileFromEntry = (entry) => new Promise((resolve, reject) => {
+  entry.file(resolve, reject);
+});
+
+const readDirectoryEntries = (reader) => new Promise((resolve, reject) => {
+  const entries = [];
+  const readBatch = () => {
+    reader.readEntries((batch) => {
+      if (!batch.length) {
+        resolve(entries);
+        return;
+      }
+      entries.push(...batch);
+      readBatch();
+    }, reject);
+  };
+  readBatch();
+});
+
+const imageFilesFromDirectoryEntry = async (entry, limit = MAX_IMPORT_FILES) => {
+  const files = [];
+
+  const visit = async (currentEntry) => {
+    if (files.length >= limit) return;
+    if (currentEntry.isFile) {
+      const file = await fileFromEntry(currentEntry);
+      if (file?.type?.startsWith('image/')) files.push(file);
+      return;
+    }
+
+    if (!currentEntry.isDirectory) return;
+    const entries = await readDirectoryEntries(currentEntry.createReader());
+    for (const childEntry of entries) {
+      if (files.length >= limit) return;
+      await visit(childEntry);
+    }
+  };
+
+  await visit(entry);
+  return files;
+};
+
 const formatSpend = (usdValue, currencyCode = 'USD') => {
   const currency = DISPLAY_CURRENCIES[currencyCode] || DISPLAY_CURRENCIES.USD;
   const value = Number(usdValue || 0) * currency.rate;
@@ -1977,7 +2023,7 @@ export default function HeroCanvas() {
 
   const createImportedImageCards = useCallback(async (files, originPoint, source = 'upload') => {
     const imageFiles = imageFilesFromList(files).slice(0, MAX_IMPORT_FILES);
-    if (imageFiles.length === 0) return;
+    if (imageFiles.length === 0) return { nodeIds: [], count: 0 };
 
     const skippedCount = imageFilesFromList(files).length - imageFiles.length;
     setCanvasStatus(`Importing ${imageFiles.length} image${imageFiles.length === 1 ? '' : 's'}...`);
@@ -2025,7 +2071,79 @@ export default function HeroCanvas() {
     const skippedText = skippedCount > 0 ? ` Skipped ${skippedCount} over the ${MAX_IMPORT_FILES}-file limit.` : '';
     const failedText = failedNames.length > 0 ? ` ${failedNames.length} could not be imported.` : '';
     setCanvasStatus(importedNodes.length > 0 ? `${importedText}${skippedText}${failedText}` : `No images imported.${failedText}`);
+    return {
+      nodeIds: importedNodes.map((node) => node.id),
+      count: importedNodes.length
+    };
   }, [setNodes]);
+
+  const createLabelForImportedCards = useCallback((title, cardIds, originPoint, folderIndex = 0) => {
+    const uniqueCardIds = [...new Set(cardIds)].filter(Boolean);
+    if (uniqueCardIds.length === 0) return null;
+
+    const labelTitle = String(title || 'Imported Folder').trim() || 'Imported Folder';
+    const labelId = `label-${Date.now()}-${folderIndex}-${Math.random().toString(36).slice(2, 8)}`;
+    const labelPosition = {
+      x: originPoint.x + folderIndex * (CARD_GRID_X * 3 + LABEL_WIDTH + LABEL_CARD_GAP),
+      y: originPoint.y
+    };
+
+    const labelNode = {
+      id: labelId,
+      type: 'labelNode',
+      position: labelPosition,
+      data: {
+        title: labelTitle,
+        memberIds: uniqueCardIds,
+        nodeGroup: 'labels',
+        sourceFolderName: labelTitle
+      }
+    };
+
+    const positions = new Map(uniqueCardIds.map((cardId, index) => {
+      const column = index % 3;
+      const row = Math.floor(index / 3);
+      return [cardId, {
+        x: labelPosition.x + LABEL_WIDTH + LABEL_CARD_GAP + column * CARD_GRID_X,
+        y: labelPosition.y + row * CARD_GRID_Y
+      }];
+    }));
+
+    setNodes((nds) => [
+      ...nds.map((node) => positions.has(node.id) ? {
+        ...node,
+        position: positions.get(node.id),
+        data: {
+          ...node.data,
+          labelGroupId: labelId,
+          labelTitle,
+          sourceFolderName: labelTitle
+        }
+      } : node),
+      labelNode
+    ]);
+
+    setEdges((eds) => {
+      const existingIds = new Set(eds.map((edge) => edge.id));
+      const labelEdges = uniqueCardIds
+        .map((cardId) => ({
+          id: `label-${labelId}-${cardId}`,
+          source: labelId,
+          target: cardId,
+          type: 'smoothstep',
+          animated: true,
+          data: { isLabelLink: true, labelId, sourceFolderName: labelTitle },
+          style: { stroke: 'rgba(0,255,204,0.72)', strokeWidth: 3 }
+        }))
+        .filter((edge) => !existingIds.has(edge.id));
+      return [...eds, ...labelEdges];
+    });
+
+    setSelectedNodeIds([labelId, ...uniqueCardIds]);
+    setIsCanvasDirty(true);
+    setIsEditMode(true);
+    return labelId;
+  }, [setEdges, setNodes]);
 
   const openCanvasUploadPicker = useCallback(() => {
     canvasUploadInputRef.current?.click();
@@ -2057,13 +2175,50 @@ export default function HeroCanvas() {
     event.dataTransfer.dropEffect = 'copy';
   }, []);
 
-  const handleCanvasDrop = useCallback((event) => {
+  const handleCanvasDrop = useCallback(async (event) => {
     if (!hasFileDrag(event)) return;
     event.preventDefault();
+    const dropPoint = clientPointToCanvasPoint(event.clientX, event.clientY);
+    const directoryEntries = dataTransferDirectoryEntries(event.dataTransfer);
     dragDepthRef.current = 0;
     setIsImportDragActive(false);
-    createImportedImageCards(event.dataTransfer.files, clientPointToCanvasPoint(event.clientX, event.clientY), 'drop');
-  }, [clientPointToCanvasPoint, createImportedImageCards]);
+
+    if (directoryEntries.length > 0) {
+      setCanvasStatus(`Reading ${directoryEntries.length} folder${directoryEntries.length === 1 ? '' : 's'}...`);
+      let importedFolderCount = 0;
+      let importedImageCount = 0;
+
+      for (let index = 0; index < directoryEntries.length; index += 1) {
+        const directoryEntry = directoryEntries[index];
+        try {
+          const files = await imageFilesFromDirectoryEntry(directoryEntry, MAX_IMPORT_FILES);
+          if (files.length === 0) continue;
+          const folderOrigin = {
+            x: dropPoint.x + index * (CARD_GRID_X * 3 + LABEL_WIDTH + LABEL_CARD_GAP),
+            y: dropPoint.y
+          };
+          const result = await createImportedImageCards(files, {
+            x: folderOrigin.x + LABEL_WIDTH + LABEL_CARD_GAP,
+            y: folderOrigin.y
+          }, 'folder');
+          if (result.nodeIds.length > 0) {
+            createLabelForImportedCards(directoryEntry.name || 'Imported Folder', result.nodeIds, dropPoint, index);
+            importedFolderCount += 1;
+            importedImageCount += result.count;
+          }
+        } catch (error) {
+          console.warn('Folder import failed:', error);
+        }
+      }
+
+      setCanvasStatus(importedImageCount > 0
+        ? `Imported ${importedImageCount} image${importedImageCount === 1 ? '' : 's'} from ${importedFolderCount} folder${importedFolderCount === 1 ? '' : 's'}.`
+        : 'No images found in dropped folder.');
+      return;
+    }
+
+    createImportedImageCards(event.dataTransfer.files, dropPoint, 'drop');
+  }, [clientPointToCanvasPoint, createImportedImageCards, createLabelForImportedCards]);
 
   const handleCanvasPointerMove = useCallback((event) => {
     lastCanvasPointerRef.current = { x: event.clientX, y: event.clientY };
