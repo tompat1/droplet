@@ -58,6 +58,7 @@ const LABEL_HEIGHT = 86;
 const LABEL_CARD_GAP = 150;
 const LABEL_DROP_DISTANCE = 260;
 const LABEL_DROP_BUFFER = 96;
+const LABEL_TOOLTIP_ZOOM_THRESHOLD = 0.4;
 const MAX_SAVE_PAYLOAD_BYTES = 7_500_000;
 const CANVAS_STORAGE_WARNING_BYTES = 5_000_000;
 const CANVAS_MEDIA_WARNING_BYTES = 3_000_000;
@@ -767,6 +768,11 @@ const NodeSearch = () => {
 const LabelNode = ({ id, data, selected, isConnectable }) => {
   const memberCount = Array.isArray(data.memberIds) ? data.memberIds.length : 0;
   const isDropTarget = data.isDropTarget === true;
+  const { zoom } = useViewport();
+  const [isTooltipVisible, setIsTooltipVisible] = useState(false);
+  const labelTitle = data.title || 'Canvas Label';
+  const showZoomTooltip = zoom <= LABEL_TOOLTIP_ZOOM_THRESHOLD;
+  const tooltipScale = Math.min(4, Math.max(1, 1 / Math.max(zoom, 0.25)));
 
   const renameLabel = (event) => {
     event.stopPropagation();
@@ -798,6 +804,8 @@ const LabelNode = ({ id, data, selected, isConnectable }) => {
   return (
     <div
       className="glass-panel"
+      tabIndex={0}
+      aria-label={labelTitle}
       style={{
         width: `${LABEL_WIDTH}px`,
         minHeight: `${LABEL_HEIGHT}px`,
@@ -812,11 +820,45 @@ const LabelNode = ({ id, data, selected, isConnectable }) => {
           ? '0 0 34px rgba(255,179,71,0.34), 0 0 26px rgba(0,255,204,0.18), inset 0 1px 0 rgba(255,255,255,0.12)'
           : selected ? '0 0 28px rgba(0,255,204,0.32), inset 0 1px 0 rgba(255,255,255,0.08)' : '0 14px 38px rgba(0,0,0,0.22)',
         cursor: 'grab',
+        position: 'relative',
         transition: 'border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease',
         transform: isDropTarget ? 'scale(1.03)' : 'scale(1)'
       }}
       onDoubleClick={renameLabel}
+      onFocus={() => setIsTooltipVisible(true)}
+      onBlur={() => setIsTooltipVisible(false)}
+      onMouseEnter={() => setIsTooltipVisible(true)}
+      onMouseLeave={() => setIsTooltipVisible(false)}
     >
+      {showZoomTooltip && isTooltipVisible && (
+        <div
+          role="tooltip"
+          style={{
+            position: 'absolute',
+            left: '10px',
+            bottom: `calc(100% + ${10 / tooltipScale}px)`,
+            zIndex: 30,
+            maxWidth: '320px',
+            minWidth: '180px',
+            padding: '10px 12px',
+            borderRadius: '10px',
+            border: '1px solid rgba(0,255,204,0.52)',
+            background: 'rgba(5, 7, 12, 0.96)',
+            color: '#fff',
+            boxShadow: '0 16px 36px rgba(0,0,0,0.42), 0 0 22px rgba(0,255,204,0.18)',
+            fontSize: '0.88rem',
+            lineHeight: 1.25,
+            fontWeight: 900,
+            letterSpacing: 0,
+            whiteSpace: 'normal',
+            pointerEvents: 'none',
+            transform: `scale(${tooltipScale})`,
+            transformOrigin: 'bottom left'
+          }}
+        >
+          {labelTitle}
+        </div>
+      )}
       <Handle type="target" position={Position.Left} isConnectable={isConnectable} style={{ background: '#050505', border: '2px solid rgba(0,255,204,0.75)' }} />
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
         <div style={{ minWidth: 0 }}>
@@ -824,7 +866,7 @@ const LabelNode = ({ id, data, selected, isConnectable }) => {
             Label Group
           </div>
           <div style={{ marginTop: '5px', fontSize: '1rem', lineHeight: 1.15, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {data.title || 'Canvas Label'}
+            {labelTitle}
           </div>
         </div>
         {data.isEditMode && (
