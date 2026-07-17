@@ -2,6 +2,8 @@ const SESSION_COOKIE = 'droplet_session';
 const SESSION_DAYS = 30;
 const MAX_JSON_BYTES = 8_000_000;
 const PBKDF2_ITERATIONS = 100000;
+const CANVAS_ASSET_CHUNK_CHARS = 64000;
+const CANVAS_ASSET_REF_FLAG = '__dropletCanvasAsset';
 const GENERATION_PROVIDERS = {
   openai_image: {
     label: 'ChatGPT Images',
@@ -357,7 +359,9 @@ async function getCanvas(env, userId, canvasId) {
   ).bind(canvasId, userId).first();
 
   if (!row) return json({ error: 'Canvas not found' }, 404);
-  return json({ canvas: parseCanvasRow(row, true) });
+  const canvas = parseCanvasRow(row, true);
+  canvas.snapshot = await hydrateCanvasSnapshotAssets(env, canvas.id, canvas.snapshot);
+  return json({ canvas });
 }
 
 async function createCanvas(request, env, userId) {
@@ -376,10 +380,20 @@ async function createCanvas(request, env, userId) {
     canvas.isDefault ? 1 : 0,
     JSON.stringify(canvas.viewport),
     JSON.stringify(canvas.settings),
-    JSON.stringify(canvas.snapshot)
+    JSON.stringify(emptyCanvasSnapshot(canvas.snapshot))
   ).run();
 
-  await syncCanvasParts(env, id, canvas.snapshot);
+  try {
+    const storageSnapshot = await prepareCanvasSnapshotForStorage(env, id, canvas.snapshot);
+    await env.DB.prepare(
+      'UPDATE canvases SET snapshot_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    ).bind(JSON.stringify(storageSnapshot), id).run();
+    await syncCanvasParts(env, id, storageSnapshot);
+  } catch (error) {
+    await env.DB.prepare('DELETE FROM canvases WHERE id = ?').bind(id).run();
+    throw error;
+  }
+
   return getCanvas(env, userId, id);
 }
 
@@ -391,6 +405,7 @@ async function updateCanvas(request, env, userId, canvasId) {
   if (!exists) return json({ error: 'Canvas not found' }, 404);
 
   const canvas = normalizeCanvasPayload(await readJson(request));
+  const storageSnapshot = await prepareCanvasSnapshotForStorage(env, canvasId, canvas.snapshot);
 
   await env.DB.prepare(
     `UPDATE canvases
@@ -402,12 +417,12 @@ async function updateCanvas(request, env, userId, canvasId) {
     canvas.isDefault ? 1 : 0,
     JSON.stringify(canvas.viewport),
     JSON.stringify(canvas.settings),
-    JSON.stringify(canvas.snapshot),
+    JSON.stringify(storageSnapshot),
     canvasId,
     userId
   ).run();
 
-  await syncCanvasParts(env, canvasId, canvas.snapshot);
+  await syncCanvasParts(env, canvasId, storageSnapshot);
   return getCanvas(env, userId, canvasId);
 }
 
@@ -1161,6 +1176,16 @@ function sanitizeSnapshot(snapshot) {
   };
 }
 
+function emptyCanvasSnapshot(snapshot) {
+  return {
+    nodes: [],
+    edges: [],
+    viewport: snapshot.viewport || {},
+    settings: snapshot.settings || {},
+    collapsedBranches: snapshot.collapsedBranches || {}
+  };
+}
+
 function sanitizeNode(node) {
   return {
     id: String(node.id),
@@ -1211,16 +1236,188 @@ function compactCanvasNodeData(data) {
     if (typeof copy[key] === 'string' && copy[key].startsWith('data:')) {
       copy[`${key}InlineBytes`] = estimateDataUrlBytes(copy[key]);
       copy[key] = '[inline-media]';
+    } else if (isCanvasAssetRef(copy[key])) {
+      copy[`${key}InlineBytes`] = copy[key].byteLength || 0;
+      copy[key] = `[canvas-asset:${copy[key].id}]`;
     }
   });
 
   if (Array.isArray(copy.generationRefs)) {
     copy.generationRefs = copy.generationRefs.map((ref) => (
-      typeof ref === 'string' && ref.startsWith('data:') ? '[inline-reference]' : ref
+      typeof ref === 'string' && ref.startsWith('data:')
+        ? '[inline-reference]'
+        : (isCanvasAssetRef(ref) ? `[canvas-asset:${ref.id}]` : ref)
     ));
   }
 
   return copy;
+}
+
+async function prepareCanvasSnapshotForStorage(env, canvasId, snapshot) {
+  const assetCache = new Map();
+  const nodes = Array.isArray(snapshot.nodes)
+    ? await Promise.all(snapshot.nodes.map((node) => prepareCanvasNodeForStorage(env, canvasId, node, assetCache)))
+    : [];
+
+  return {
+    ...snapshot,
+    nodes
+  };
+}
+
+async function prepareCanvasNodeForStorage(env, canvasId, node, assetCache) {
+  const data = { ...(node.data || {}) };
+  const nextData = await replaceInlineMediaValues(env, canvasId, data, assetCache);
+  return {
+    ...node,
+    data: nextData
+  };
+}
+
+async function replaceInlineMediaValues(env, canvasId, data, assetCache) {
+  const copy = { ...data };
+
+  for (const key of ['image', 'video']) {
+    if (typeof copy[key] === 'string' && copy[key].startsWith('data:')) {
+      copy[key] = await storeCanvasAsset(env, canvasId, key, copy[key], assetCache);
+    }
+  }
+
+  if (Array.isArray(copy.generationRefs)) {
+    const refs = [];
+    for (const ref of copy.generationRefs) {
+      refs.push(typeof ref === 'string' && ref.startsWith('data:')
+        ? await storeCanvasAsset(env, canvasId, 'reference', ref, assetCache)
+        : ref);
+    }
+    copy.generationRefs = refs;
+  }
+
+  return copy;
+}
+
+async function storeCanvasAsset(env, canvasId, kind, dataUrl, assetCache) {
+  if (assetCache.has(dataUrl)) return assetCache.get(dataUrl);
+
+  const assetHash = await sha256Hex(dataUrl);
+  const existing = await env.DB.prepare(
+    'SELECT id, kind, mime_type, byte_length FROM canvas_assets WHERE canvas_id = ? AND asset_hash = ?'
+  ).bind(canvasId, assetHash).first();
+
+  if (existing) {
+    const firstChunk = await env.DB.prepare(
+      'SELECT asset_id FROM canvas_asset_chunks WHERE asset_id = ? AND chunk_index = 0'
+    ).bind(existing.id).first();
+    if (firstChunk) {
+      const ref = canvasAssetRef(existing.id, existing.kind || kind, existing.mime_type, Number(existing.byte_length || 0));
+      assetCache.set(dataUrl, ref);
+      return ref;
+    }
+    await env.DB.prepare('DELETE FROM canvas_assets WHERE id = ?').bind(existing.id).run();
+  }
+
+  const assetId = crypto.randomUUID();
+  const mimeType = inferImageMimeType(dataUrl);
+  const byteLength = estimateDataUrlBytes(dataUrl);
+  await env.DB.prepare(
+    `INSERT INTO canvas_assets (id, canvas_id, asset_hash, kind, mime_type, byte_length)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).bind(assetId, canvasId, assetHash, String(kind), mimeType, byteLength).run();
+
+  const chunks = chunkString(dataUrl, CANVAS_ASSET_CHUNK_CHARS);
+  if (chunks.length > 0) {
+    await env.DB.batch(chunks.map((chunk, index) => env.DB.prepare(
+      'INSERT INTO canvas_asset_chunks (asset_id, chunk_index, chunk_text) VALUES (?, ?, ?)'
+    ).bind(assetId, index, chunk)));
+  }
+
+  const ref = canvasAssetRef(assetId, kind, mimeType, byteLength);
+  assetCache.set(dataUrl, ref);
+  return ref;
+}
+
+function canvasAssetRef(id, kind, mimeType, byteLength) {
+  return {
+    [CANVAS_ASSET_REF_FLAG]: true,
+    id,
+    kind,
+    mimeType,
+    byteLength
+  };
+}
+
+function isCanvasAssetRef(value) {
+  return Boolean(value && typeof value === 'object' && value[CANVAS_ASSET_REF_FLAG] === true && value.id);
+}
+
+async function hydrateCanvasSnapshotAssets(env, canvasId, snapshot) {
+  const assetCache = new Map();
+  const nodes = Array.isArray(snapshot.nodes)
+    ? await Promise.all(snapshot.nodes.map((node) => hydrateCanvasNodeAssets(env, canvasId, node, assetCache)))
+    : [];
+
+  return {
+    ...snapshot,
+    nodes
+  };
+}
+
+async function hydrateCanvasNodeAssets(env, canvasId, node, assetCache) {
+  const data = { ...(node.data || {}) };
+  const nextData = await hydrateCanvasDataAssets(env, canvasId, data, assetCache);
+  return {
+    ...node,
+    data: nextData
+  };
+}
+
+async function hydrateCanvasDataAssets(env, canvasId, data, assetCache) {
+  const copy = { ...data };
+
+  for (const key of ['image', 'video']) {
+    if (isCanvasAssetRef(copy[key])) {
+      copy[key] = await loadCanvasAssetDataUrl(env, canvasId, copy[key], assetCache);
+    }
+  }
+
+  if (Array.isArray(copy.generationRefs)) {
+    const refs = [];
+    for (const ref of copy.generationRefs) {
+      refs.push(isCanvasAssetRef(ref) ? await loadCanvasAssetDataUrl(env, canvasId, ref, assetCache) : ref);
+    }
+    copy.generationRefs = refs;
+  }
+
+  return copy;
+}
+
+async function loadCanvasAssetDataUrl(env, canvasId, ref, assetCache) {
+  if (assetCache.has(ref.id)) return assetCache.get(ref.id);
+
+  const asset = await env.DB.prepare(
+    'SELECT id FROM canvas_assets WHERE id = ? AND canvas_id = ?'
+  ).bind(String(ref.id), canvasId).first();
+
+  if (!asset) {
+    assetCache.set(ref.id, '');
+    return '';
+  }
+
+  const result = await env.DB.prepare(
+    'SELECT chunk_text FROM canvas_asset_chunks WHERE asset_id = ? ORDER BY chunk_index ASC'
+  ).bind(String(ref.id)).all();
+  const dataUrl = result.results.map((row) => row.chunk_text || '').join('');
+  assetCache.set(ref.id, dataUrl);
+  return dataUrl;
+}
+
+function chunkString(value, size) {
+  const chunks = [];
+  const text = String(value || '');
+  for (let index = 0; index < text.length; index += size) {
+    chunks.push(text.slice(index, index + size));
+  }
+  return chunks;
 }
 
 function parseCanvasRow(row, includeSnapshot = false) {
@@ -1324,8 +1521,11 @@ function json(body, status = 200, cookie) {
 
 function jsonError(error) {
   const message = error instanceof Error ? error.message : String(error);
-  if (/payload is too large|request body too large|body too large|too large/i.test(message)) {
+  if (/payload is too large|request body too large|body too large|too large|SQLITE_TOOBIG/i.test(message)) {
     return json({ error: 'Canvas is too large to save. Import fewer images or use smaller image exports.' }, 413);
+  }
+  if (/no such table: canvas_assets|no such table: canvas_asset_chunks/i.test(message)) {
+    return json({ error: 'Canvas asset storage is not migrated yet. Run the canvas assets D1 migration, then try saving again.' }, 500);
   }
   if (/string or blob too big|database or disk is full|too many sql variables|D1_ERROR/i.test(message)) {
     return json({ error: `Canvas storage failed: ${message}` }, 400);
