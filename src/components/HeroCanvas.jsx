@@ -52,6 +52,8 @@ const LABEL_HEIGHT = 86;
 const LABEL_CARD_GAP = 150;
 const LABEL_DROP_DISTANCE = 260;
 const MAX_SAVE_PAYLOAD_BYTES = 7_500_000;
+const CANVAS_STORAGE_WARNING_BYTES = 5_000_000;
+const CANVAS_MEDIA_WARNING_BYTES = 3_000_000;
 const CANVAS_IMPORT_IMAGE_OPTIONS = { maxBytes: 180000, maxDimension: 960 };
 const DISPLAY_CURRENCIES = {
   USD: { label: 'USD', symbol: '$', rate: 1 },
@@ -82,6 +84,53 @@ const isEditableTarget = (target) => (
 const imageFilesFromList = (files) => Array.from(files || []).filter((file) => file?.type?.startsWith('image/'));
 
 const estimatedJsonBytes = (value) => new Blob([JSON.stringify(value)]).size;
+
+const estimatedDataUrlBytes = (value) => Math.ceil(String(value || '').length * 0.75);
+
+const formatBytes = (bytes) => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
+  if (bytes < 1000000) return `${Math.max(1, Math.round(bytes / 1000))} KB`;
+  return `${(bytes / 1000000).toFixed(bytes > 10000000 ? 0 : 1)} MB`;
+};
+
+const safeFileName = (value, fallback = 'fluid-node-canvas') => {
+  const cleaned = String(value || fallback)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return cleaned || fallback;
+};
+
+const downloadJsonFile = (fileName, value) => {
+  const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
+const estimateCanvasMediaBytes = (nodes) => nodes.reduce((total, node) => {
+  const data = node.data || {};
+  let nextTotal = total;
+  ['image', 'video'].forEach((key) => {
+    if (typeof data[key] === 'string' && data[key].startsWith('data:')) {
+      nextTotal += estimatedDataUrlBytes(data[key]);
+    }
+  });
+  if (Array.isArray(data.generationRefs)) {
+    nextTotal += data.generationRefs.reduce((refsTotal, ref) => (
+      typeof ref === 'string' && ref.startsWith('data:')
+        ? refsTotal + estimatedDataUrlBytes(ref)
+        : refsTotal
+    ), 0);
+  }
+  return nextTotal;
+}, 0);
 
 const shouldOptimizeDataUrl = (value) => (
   typeof value === 'string' &&
@@ -1091,6 +1140,17 @@ const CanvasPersistencePanel = ({
   const displayCanvasName = activeCanvasName || activeCanvasFromList?.name || 'Unsaved Canvas';
   const isNameDirty = draftName.trim() !== (activeCanvasName || 'Fluid Node Canvas');
   const canSave = user && !isBusy && (!activeCanvasId || isCanvasDirty || isNameDirty);
+  const currentCanvasPayload = useMemo(() => buildCanvasPayload({
+    name: draftName.trim() || activeCanvasName || 'Fluid Node Canvas',
+    nodes,
+    edges,
+    viewport: getViewport(),
+    collapsedBranches,
+    interactionMode
+  }), [activeCanvasName, collapsedBranches, draftName, edges, getViewport, interactionMode, nodes]);
+  const currentPayloadBytes = useMemo(() => estimatedJsonBytes(currentCanvasPayload), [currentCanvasPayload]);
+  const currentMediaBytes = useMemo(() => estimateCanvasMediaBytes(nodes), [nodes]);
+  const showStorageWarning = currentPayloadBytes > CANVAS_STORAGE_WARNING_BYTES || currentMediaBytes > CANVAS_MEDIA_WARNING_BYTES;
 
   useEffect(() => {
     setDraftName(activeCanvasName || 'Fluid Node Canvas');
@@ -1169,6 +1229,57 @@ const CanvasPersistencePanel = ({
       const payload = await canvasApi.get(canvasId);
       applyCanvasSnapshot(payload.canvas);
       setStatus('Canvas loaded.');
+    } catch (err) {
+      setStatus(err.message);
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const exportCanvas = () => {
+    const exportedAt = new Date().toISOString();
+    const exportPayload = {
+      type: 'droplet-fluid-node-canvas',
+      version: 1,
+      exportedAt,
+      canvas: currentCanvasPayload
+    };
+    const stamp = exportedAt.slice(0, 10);
+    downloadJsonFile(`${safeFileName(currentCanvasPayload.name)}-${stamp}.json`, exportPayload);
+    setStatus('Canvas exported as JSON.');
+  };
+
+  const deleteActiveCanvas = async () => {
+    if (!user || !activeCanvasId) {
+      setStatus('Load a saved canvas before deleting.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete "${displayCanvasName}" from cloud storage? Export it first if you want a backup.`);
+    if (!confirmed) return;
+
+    setIsBusy(true);
+    setStatus('Deleting canvas...');
+    try {
+      await canvasApi.delete(activeCanvasId);
+      const nextCanvases = await refreshCanvases();
+      const nextCanvas = nextCanvases?.find((canvas) => canvas.id !== activeCanvasId) || nextCanvases?.[0];
+      if (nextCanvas) {
+        const payload = await canvasApi.get(nextCanvas.id);
+        applyCanvasSnapshot(payload.canvas);
+        setStatus('Canvas deleted. Loaded your next saved canvas.');
+      } else {
+        setNodes(initialNodes);
+        setEdges(initialEdges);
+        setCollapsedBranches({});
+        setInteractionMode('pan');
+        setActiveCanvasId(null);
+        setActiveCanvasName('');
+        setDraftName('Fluid Node Canvas');
+        setIsCanvasDirty(false);
+        window.requestAnimationFrame(() => fitView({ duration: 350, nodes: [{ id: '1' }, { id: '2' }], maxZoom: 0.5 }));
+        setStatus('Canvas deleted. You are back on an unsaved starter canvas.');
+      }
     } catch (err) {
       setStatus(err.message);
     } finally {
@@ -1397,6 +1508,58 @@ const CanvasPersistencePanel = ({
           >
             {isBusy ? 'Working...' : !canSave ? 'Saved' : activeCanvasId ? 'Save Canvas' : 'Create & Save'}
           </button>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={exportCanvas}
+              disabled={isBusy}
+              title="Export this canvas as a JSON backup"
+              aria-label="Export canvas"
+              style={{
+                ...controlStyle,
+                borderColor: 'rgba(0,255,204,0.26)',
+                background: 'rgba(0,255,204,0.08)',
+                cursor: isBusy ? 'not-allowed' : 'pointer',
+                fontWeight: 850
+              }}
+            >
+              Export
+            </button>
+            <button
+              type="button"
+              onClick={deleteActiveCanvas}
+              disabled={!activeCanvasId || isBusy}
+              title={activeCanvasId ? 'Delete this saved canvas from cloud storage' : 'Load a saved canvas before deleting'}
+              aria-label="Delete canvas"
+              style={{
+                ...controlStyle,
+                borderColor: activeCanvasId ? 'rgba(255, 108, 108, 0.46)' : 'rgba(255,255,255,0.1)',
+                background: activeCanvasId ? 'rgba(255, 64, 64, 0.13)' : 'rgba(255,255,255,0.055)',
+                color: activeCanvasId ? '#ffd6d6' : 'rgba(255,255,255,0.38)',
+                cursor: activeCanvasId && !isBusy ? 'pointer' : 'not-allowed',
+                fontWeight: 850
+              }}
+            >
+              Delete
+            </button>
+          </div>
+
+          {showStorageWarning && (
+            <div
+              style={{
+                border: '1px solid rgba(255, 179, 71, 0.38)',
+                background: 'rgba(255, 179, 71, 0.1)',
+                borderRadius: '10px',
+                padding: '9px 10px',
+                color: '#ffd9a1',
+                fontSize: '0.74rem',
+                lineHeight: 1.35
+              }}
+            >
+              Space warning: this canvas is media-heavy ({formatBytes(currentMediaBytes)} media, {formatBytes(currentPayloadBytes)} save payload). Export and delete older canvases to free cloud space.
+            </div>
+          )}
         </>
       )}
 
