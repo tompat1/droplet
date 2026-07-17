@@ -117,6 +117,45 @@ const downloadJsonFile = (fileName, value) => {
   URL.revokeObjectURL(url);
 };
 
+const canvasNameFromFileName = (fileName = '') => {
+  const cleaned = String(fileName)
+    .replace(/\.json$/i, '')
+    .replace(/-\d{4}-\d{2}-\d{2}$/i, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned ? cleaned.replace(/\b\w/g, (letter) => letter.toUpperCase()) : 'Imported Fluid Node Canvas';
+};
+
+const normalizeImportedCanvas = (input, fileName = '') => {
+  const importedCanvas = input?.type === 'droplet-fluid-node-canvas' && input.canvas ? input.canvas : input;
+  const snapshot = importedCanvas?.snapshot || importedCanvas;
+  if (!snapshot || !Array.isArray(snapshot.nodes)) {
+    throw new Error('That JSON file does not look like a Droplet canvas export.');
+  }
+
+  const nodes = snapshot.nodes.map(sanitizeNodeForSave);
+  const edges = Array.isArray(snapshot.edges) ? snapshot.edges.map(sanitizeEdgeForSave) : [];
+  const settings = importedCanvas.settings || snapshot.settings || {};
+  const collapsedBranches = snapshot.collapsedBranches || settings.collapsedBranches || {};
+  const interactionMode = settings.interactionMode || 'pan';
+  const viewport = importedCanvas.viewport || snapshot.viewport || {};
+  const name = String(importedCanvas.name || canvasNameFromFileName(fileName)).trim() || 'Imported Fluid Node Canvas';
+
+  return {
+    id: null,
+    name,
+    settings: { ...settings, interactionMode, collapsedBranches },
+    snapshot: {
+      nodes,
+      edges,
+      viewport,
+      settings: { ...settings, interactionMode, collapsedBranches },
+      collapsedBranches
+    }
+  };
+};
+
 const estimateCanvasMediaBytes = (nodes) => nodes.reduce((total, node) => {
   const data = node.data || {};
   let nextTotal = total;
@@ -1206,6 +1245,7 @@ const CanvasPersistencePanel = ({
   const hasAutoLoadedCanvas = useRef(false);
   const brandGuideInputRef = useRef(null);
   const brandGuideResolverRef = useRef(null);
+  const importCanvasInputRef = useRef(null);
   const activeCanvasFromList = canvases.find((canvas) => canvas.id === activeCanvasId);
   const displayCanvasName = activeCanvasName || activeCanvasFromList?.name || 'Unsaved Canvas';
   const isNameDirty = draftName.trim() !== (activeCanvasName || 'Fluid Node Canvas');
@@ -1317,6 +1357,51 @@ const CanvasPersistencePanel = ({
     const stamp = exportedAt.slice(0, 10);
     downloadJsonFile(`${safeFileName(currentCanvasPayload.name)}-${stamp}.json`, exportPayload);
     setStatus('Canvas exported as JSON.');
+  };
+
+  const openCanvasImportPicker = () => {
+    if (isCanvasDirty) {
+      const confirmed = window.confirm('Importing a canvas will replace the current unsaved canvas view. Export or save first if you want to keep it.');
+      if (!confirmed) return;
+    }
+    importCanvasInputRef.current?.click();
+  };
+
+  const handleCanvasImport = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setIsBusy(true);
+    setStatus('Importing canvas...');
+    try {
+      const parsed = JSON.parse(await file.text());
+      const importedCanvas = normalizeImportedCanvas(parsed, file.name);
+      const snapshot = importedCanvas.snapshot;
+      const nextCollapsedBranches = snapshot.collapsedBranches || snapshot.settings?.collapsedBranches || {};
+      const nextInteractionMode = snapshot.settings?.interactionMode || importedCanvas.settings?.interactionMode || 'pan';
+
+      setNodes(snapshot.nodes);
+      setEdges(snapshot.edges);
+      setCollapsedBranches(nextCollapsedBranches);
+      setInteractionMode(nextInteractionMode);
+      setActiveCanvasId(null);
+      setActiveCanvasName(importedCanvas.name);
+      setDraftName(importedCanvas.name);
+      setIsCanvasDirty(true);
+
+      if (snapshot.viewport && Number.isFinite(snapshot.viewport.zoom)) {
+        setViewport(snapshot.viewport, { duration: 250 });
+      } else {
+        window.requestAnimationFrame(() => fitView({ duration: 350, nodes: [{ id: '1' }, { id: '2' }], maxZoom: 0.5 }));
+      }
+
+      setStatus('Canvas imported. Save it to store a new cloud copy.');
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : 'Could not import that canvas.');
+    } finally {
+      setIsBusy(false);
+    }
   };
 
   const deleteActiveCanvas = async () => {
@@ -1525,6 +1610,13 @@ const CanvasPersistencePanel = ({
         style={{ display: 'none' }}
         onChange={handleBrandGuideUpload}
       />
+      <input
+        ref={importCanvasInputRef}
+        type="file"
+        accept="application/json,.json"
+        style={{ display: 'none' }}
+        onChange={handleCanvasImport}
+      />
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.48)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Canvas</div>
@@ -1579,7 +1671,24 @@ const CanvasPersistencePanel = ({
             {isBusy ? 'Working...' : !canSave ? 'Saved' : activeCanvasId ? 'Save Canvas' : 'Create & Save'}
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={openCanvasImportPicker}
+              disabled={isBusy}
+              title="Import a Droplet canvas JSON backup"
+              aria-label="Import canvas"
+              style={{
+                ...controlStyle,
+                borderColor: 'rgba(75,94,250,0.34)',
+                background: 'rgba(75,94,250,0.12)',
+                cursor: isBusy ? 'not-allowed' : 'pointer',
+                fontWeight: 850,
+                padding: '0 8px'
+              }}
+            >
+              Import
+            </button>
             <button
               type="button"
               onClick={exportCanvas}
@@ -1591,7 +1700,8 @@ const CanvasPersistencePanel = ({
                 borderColor: 'rgba(0,255,204,0.26)',
                 background: 'rgba(0,255,204,0.08)',
                 cursor: isBusy ? 'not-allowed' : 'pointer',
-                fontWeight: 850
+                fontWeight: 850,
+                padding: '0 8px'
               }}
             >
               Export
@@ -1608,7 +1718,8 @@ const CanvasPersistencePanel = ({
                 background: activeCanvasId ? 'rgba(255, 64, 64, 0.13)' : 'rgba(255,255,255,0.055)',
                 color: activeCanvasId ? '#ffd6d6' : 'rgba(255,255,255,0.38)',
                 cursor: activeCanvasId && !isBusy ? 'pointer' : 'not-allowed',
-                fontWeight: 850
+                fontWeight: 850,
+                padding: '0 8px'
               }}
             >
               Delete
