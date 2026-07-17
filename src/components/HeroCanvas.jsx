@@ -1525,7 +1525,7 @@ const buildCanvasPayload = ({ name, nodes, edges, viewport, collapsedBranches, i
   }
 });
 
-const ExportToast = ({ message }) => {
+const CanvasActionToast = ({ message }) => {
   if (!message || typeof document === 'undefined') return null;
 
   return createPortal(
@@ -1534,19 +1534,21 @@ const ExportToast = ({ message }) => {
       aria-live="polite"
       style={{
         position: 'fixed',
-        right: '24px',
-        bottom: '24px',
+        left: '50%',
+        top: '50%',
+        transform: 'translate(-50%, -50%)',
         zIndex: 2147483647,
-        maxWidth: '360px',
-        borderRadius: '14px',
-        border: '1px solid rgba(0,255,204,0.52)',
-        background: 'rgba(5, 8, 12, 0.96)',
-        boxShadow: '0 18px 46px rgba(0,0,0,0.52), 0 0 28px rgba(0,255,204,0.24)',
+        maxWidth: 'min(440px, calc(100vw - 40px))',
+        borderRadius: '18px',
+        border: '1px solid rgba(0,255,204,0.58)',
+        background: 'linear-gradient(145deg, rgba(5, 8, 12, 0.97), rgba(15, 17, 26, 0.95))',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.56), 0 0 36px rgba(0,255,204,0.26), inset 0 1px 0 rgba(255,255,255,0.12)',
         color: '#fff',
-        padding: '13px 15px',
-        fontSize: '0.82rem',
+        padding: '16px 18px',
+        fontSize: '0.9rem',
         lineHeight: 1.35,
-        fontWeight: 850,
+        fontWeight: 900,
+        textAlign: 'center',
         pointerEvents: 'none'
       }}
     >
@@ -1576,12 +1578,12 @@ const CanvasPersistencePanel = ({
   setStatus,
   isCanvasDirty,
   setIsCanvasDirty,
-  isVisible
+  isVisible,
+  onNotify
 }) => {
   const { getViewport, setViewport, fitView } = useReactFlow();
   const [isBusy, setIsBusy] = useState(false);
   const [draftName, setDraftName] = useState(activeCanvasName || 'Fluid Node Canvas');
-  const [exportToast, setExportToast] = useState('');
   const hasAutoLoadedCanvas = useRef(false);
   const brandGuideInputRef = useRef(null);
   const brandGuideResolverRef = useRef(null);
@@ -1605,12 +1607,6 @@ const CanvasPersistencePanel = ({
   useEffect(() => {
     setDraftName(activeCanvasName || 'Fluid Node Canvas');
   }, [activeCanvasName]);
-
-  useEffect(() => {
-    if (!exportToast) return undefined;
-    const timeout = window.setTimeout(() => setExportToast(''), 3600);
-    return () => window.clearTimeout(timeout);
-  }, [exportToast]);
 
   const refreshCanvases = useCallback(async () => {
     if (!user) {
@@ -1685,6 +1681,7 @@ const CanvasPersistencePanel = ({
       const payload = await canvasApi.get(canvasId);
       applyCanvasSnapshot(payload.canvas);
       setStatus('Canvas loaded.');
+      onNotify?.(`Canvas loaded: ${payload.canvas?.name || 'Fluid Node Canvas'}.`);
     } catch (err) {
       setStatus(err.message);
     } finally {
@@ -1704,7 +1701,7 @@ const CanvasPersistencePanel = ({
     const fileName = `${safeFileName(currentCanvasPayload.name)}-${stamp}.json`;
     downloadJsonFile(fileName, exportPayload);
     setStatus('Canvas exported as JSON.');
-    setExportToast(`Canvas export saved to your local disk / Downloads folder: ${fileName}`);
+    onNotify?.(`Canvas export saved to your local disk / Downloads folder: ${fileName}`);
   };
 
   const openCanvasImportPicker = () => {
@@ -1745,6 +1742,7 @@ const CanvasPersistencePanel = ({
       }
 
       setStatus('Canvas imported. Save it to store a new cloud copy.');
+      onNotify?.(`Canvas imported: ${importedCanvas.name}.`);
     } catch (err) {
       setStatus(err instanceof Error ? err.message : 'Could not import that canvas.');
     } finally {
@@ -1771,6 +1769,7 @@ const CanvasPersistencePanel = ({
         const payload = await canvasApi.get(nextCanvas.id);
         applyCanvasSnapshot(payload.canvas);
         setStatus('Canvas deleted. Loaded your next saved canvas.');
+        onNotify?.(`Canvas deleted. Loaded ${payload.canvas?.name || 'next saved canvas'}.`);
       } else {
         setNodes(initialNodes);
         setEdges(initialEdges);
@@ -1782,6 +1781,7 @@ const CanvasPersistencePanel = ({
         setIsCanvasDirty(false);
         window.requestAnimationFrame(() => fitView({ duration: 350, nodes: [{ id: '1' }, { id: '2' }], maxZoom: 0.5 }));
         setStatus('Canvas deleted. You are back on an unsaved starter canvas.');
+        onNotify?.('Canvas deleted. Starter canvas is ready.');
       }
     } catch (err) {
       setStatus(err.message);
@@ -1830,12 +1830,13 @@ const CanvasPersistencePanel = ({
       await refreshCanvases();
       setIsCanvasDirty(false);
       setStatus(silent ? 'Autosaved.' : 'Canvas saved.');
+      if (!silent) onNotify?.(`Canvas saved: ${saved.name}.`);
     } catch (err) {
       setStatus(err.message);
     } finally {
       setIsBusy(false);
     }
-  }, [activeCanvasId, activeCanvasName, collapsedBranches, draftName, edges, getViewport, interactionMode, nodes, refreshCanvases, setActiveCanvasId, setActiveCanvasName, setIsCanvasDirty, setNodes, setStatus, user]);
+  }, [activeCanvasId, activeCanvasName, collapsedBranches, draftName, edges, getViewport, interactionMode, nodes, onNotify, refreshCanvases, setActiveCanvasId, setActiveCanvasName, setIsCanvasDirty, setNodes, setStatus, user]);
 
   useEffect(() => {
     if (!user || !activeCanvasId || !isCanvasDirty || isBusy) return undefined;
@@ -1892,6 +1893,7 @@ const CanvasPersistencePanel = ({
       applyCanvasSnapshot(result.canvas);
       setIsCanvasDirty(false);
       setStatus('New canvas created.');
+      onNotify?.(`New canvas created: ${result.canvas?.name || payload.name}.`);
     } catch (err) {
       setStatus(err.message);
     } finally {
@@ -1951,7 +1953,6 @@ const CanvasPersistencePanel = ({
 
   return (
     <div style={panelStyle}>
-      <ExportToast message={exportToast} />
       <input
         ref={brandGuideInputRef}
         type="file"
@@ -2242,7 +2243,8 @@ const CanvasToolbox = ({
   usageCurrency,
   onUsageCurrencyChange,
   isUsageLoading,
-  onRefreshUsage
+  onRefreshUsage,
+  onNotify
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [toolboxPosition, setToolboxPosition] = useState(() => {
@@ -2261,6 +2263,7 @@ const CanvasToolbox = ({
   const { zoom } = useViewport();
   const { zoomIn, zoomOut, zoomTo, fitView } = useReactFlow();
   const zoomPercent = Math.round(zoom * 100);
+  const notify = useCallback((message) => onNotify?.(message), [onNotify]);
 
   const clampToolboxPosition = useCallback((position) => {
     const width = isMinimized ? 58 : Math.min(360, window.innerWidth - 40);
@@ -2304,6 +2307,57 @@ const CanvasToolbox = ({
 
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
+  };
+
+  const toggleMinimized = (nextValue) => {
+    setIsMinimized(nextValue);
+    notify(nextValue ? 'Canvas tools minimized.' : 'Canvas tools expanded.');
+  };
+
+  const handleFitView = () => {
+    fitView({ duration: 350, padding: 0.18 });
+    notify('Canvas fitted to view.');
+  };
+
+  const handleZoomToActualSize = () => {
+    zoomTo(1, { duration: 350 });
+    notify('Canvas zoom set to 1:1.');
+  };
+
+  const handleUploadImagesClick = () => {
+    onImportImagesClick();
+    notify('Choose images to add as canvas cards.');
+  };
+
+  const handleToggleFullscreen = () => {
+    toggleFullscreen();
+    notify(isFullscreen ? 'Fullscreen off.' : 'Fullscreen on.');
+  };
+
+  const handleToggleEditMode = () => {
+    setIsEditMode((value) => {
+      const nextValue = !value;
+      notify(nextValue ? 'Edit mode on. Cards and tools are unlocked.' : 'View mode on. Canvas editing is locked.');
+      return nextValue;
+    });
+  };
+
+  const handleToggleInteractionMode = () => {
+    setInteractionMode((prev) => {
+      const nextMode = prev === 'pan' ? 'select' : 'pan';
+      notify(nextMode === 'pan' ? 'Pan mode on. Drag moves the view.' : 'Select mode on. Drag selects cards.');
+      return nextMode;
+    });
+  };
+
+  const handleStartLabelPlacement = () => {
+    onStartLabelPlacement();
+    notify(isPlacingLabel ? 'Label placement cancelled.' : 'Label placement on. Click the canvas to place it.');
+  };
+
+  const handleStartNotePlacement = () => {
+    onStartNotePlacement();
+    notify(isPlacingNote ? 'Sticky note placement cancelled.' : 'Sticky note placement on. Click the canvas to place it.');
   };
 
   const toolboxStyle = {
@@ -2464,11 +2518,11 @@ const CanvasToolbox = ({
             >
               {horizontalDragDots}
             </div>
-            <button type="button" onClick={() => setIsMinimized(false)} style={iconButtonStyle} title="Expand canvas tools" aria-label="Expand canvas tools">›</button>
+            <button type="button" onClick={() => toggleMinimized(false)} style={iconButtonStyle} title="Expand canvas tools" aria-label="Expand canvas tools">›</button>
             <button type="button" onClick={() => zoomOut({ duration: 250 })} style={iconButtonStyle} title="Zoom out" aria-label="Zoom out">−</button>
             <div style={zoomChipStyle}>{zoomPercent}%</div>
             <button type="button" onClick={() => zoomIn({ duration: 250 })} style={iconButtonStyle} title="Zoom in" aria-label="Zoom in">+</button>
-            <button type="button" onClick={() => fitView({ duration: 350, padding: 0.18 })} style={fitViewButtonStyle} title="Fit view" aria-label="Fit view">
+            <button type="button" onClick={handleFitView} style={fitViewButtonStyle} title="Fit view" aria-label="Fit view">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M4 9V4h5" />
                 <path d="M20 9V4h-5" />
@@ -2476,25 +2530,25 @@ const CanvasToolbox = ({
                 <path d="M20 15v5h-5" />
               </svg>
             </button>
-            <button type="button" onClick={onImportImagesClick} style={iconButtonStyle} title="Upload images to canvas" aria-label="Upload images to canvas">
+            <button type="button" onClick={handleUploadImagesClick} style={iconButtonStyle} title="Upload images to canvas" aria-label="Upload images to canvas">
               <UploadIcon />
             </button>
-            <button type="button" onClick={() => zoomTo(1, { duration: 350 })} style={{ ...iconButtonStyle, fontSize: '0.78rem', fontFamily: 'monospace' }} title="Zoom 1:1" aria-label="Zoom 1:1">1:1</button>
-            <button type="button" onClick={toggleFullscreen} style={iconButtonStyle} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
+            <button type="button" onClick={handleZoomToActualSize} style={{ ...iconButtonStyle, fontSize: '0.78rem', fontFamily: 'monospace' }} title="Zoom 1:1" aria-label="Zoom 1:1">1:1</button>
+            <button type="button" onClick={handleToggleFullscreen} style={iconButtonStyle} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
               {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
             </button>
-            <button type="button" onClick={() => setIsEditMode((value) => !value)} style={{ ...iconButtonStyle, borderColor: isEditMode ? 'rgba(75,94,250,0.75)' : iconButtonStyle.border, color: isEditMode ? '#fff' : 'rgba(255,255,255,0.62)', background: isEditMode ? 'rgba(75,94,250,0.24)' : iconButtonStyle.background, fontSize: '0.72rem' }} title="Toggle edit mode" aria-label="Toggle edit mode">ED</button>
+            <button type="button" onClick={handleToggleEditMode} style={{ ...iconButtonStyle, borderColor: isEditMode ? 'rgba(75,94,250,0.75)' : iconButtonStyle.border, color: isEditMode ? '#fff' : 'rgba(255,255,255,0.62)', background: isEditMode ? 'rgba(75,94,250,0.24)' : iconButtonStyle.background, fontSize: '0.72rem' }} title="Toggle edit mode" aria-label="Toggle edit mode">ED</button>
             {isEditMode && (
               <>
-                <button type="button" onClick={onStartLabelPlacement} style={{ ...iconButtonStyle, borderColor: isPlacingLabel ? 'rgba(0,255,204,0.75)' : iconButtonStyle.border, color: isPlacingLabel ? '#fff' : 'rgba(255,255,255,0.68)', background: isPlacingLabel ? 'rgba(0,255,204,0.2)' : iconButtonStyle.background, fontSize: '0.62rem' }} title="Place a new label" aria-label="Place a new label">
+                <button type="button" onClick={handleStartLabelPlacement} style={{ ...iconButtonStyle, borderColor: isPlacingLabel ? 'rgba(0,255,204,0.75)' : iconButtonStyle.border, color: isPlacingLabel ? '#fff' : 'rgba(255,255,255,0.68)', background: isPlacingLabel ? 'rgba(0,255,204,0.2)' : iconButtonStyle.background, fontSize: '0.62rem' }} title="Place a new label" aria-label="Place a new label">
                   LBL
                 </button>
-                <button type="button" onClick={onStartNotePlacement} style={{ ...iconButtonStyle, borderColor: isPlacingNote ? 'rgba(255,224,102,0.86)' : iconButtonStyle.border, color: isPlacingNote ? '#2d2100' : 'rgba(255,255,255,0.72)', background: isPlacingNote ? '#ffe066' : iconButtonStyle.background, fontSize: '0.62rem' }} title="Place a sticky note" aria-label="Place a sticky note">
+                <button type="button" onClick={handleStartNotePlacement} style={{ ...iconButtonStyle, borderColor: isPlacingNote ? 'rgba(255,224,102,0.86)' : iconButtonStyle.border, color: isPlacingNote ? '#2d2100' : 'rgba(255,255,255,0.72)', background: isPlacingNote ? '#ffe066' : iconButtonStyle.background, fontSize: '0.62rem' }} title="Place a sticky note" aria-label="Place a sticky note">
                   NTE
                 </button>
               </>
             )}
-            <button type="button" onClick={() => setInteractionMode((prev) => prev === 'pan' ? 'select' : 'pan')} style={{ ...iconButtonStyle, borderColor: interactionMode === 'pan' ? 'rgba(0,255,204,0.62)' : iconButtonStyle.border, color: interactionMode === 'pan' ? '#fff' : 'rgba(255,255,255,0.62)', background: interactionMode === 'pan' ? 'rgba(0,255,204,0.18)' : iconButtonStyle.background, fontSize: '0.68rem' }} title={interactionMode === 'pan' ? 'Pan mode is on' : 'Selection mode is on'} aria-label="Toggle pan mode">
+            <button type="button" onClick={handleToggleInteractionMode} style={{ ...iconButtonStyle, borderColor: interactionMode === 'pan' ? 'rgba(0,255,204,0.62)' : iconButtonStyle.border, color: interactionMode === 'pan' ? '#fff' : 'rgba(255,255,255,0.62)', background: interactionMode === 'pan' ? 'rgba(0,255,204,0.18)' : iconButtonStyle.background, fontSize: '0.68rem' }} title={interactionMode === 'pan' ? 'Pan mode is on' : 'Selection mode is on'} aria-label="Toggle pan mode">
               {interactionMode === 'pan' ? 'PAN' : 'SEL'}
             </button>
           </>
@@ -2514,13 +2568,13 @@ const CanvasToolbox = ({
                   Canvas Tools
                 </span>
               </div>
-              <button type="button" onClick={() => setIsMinimized(true)} style={{ ...iconButtonStyle, width: '40px', height: '36px' }} title="Minimize canvas tools" aria-label="Minimize canvas tools">‹</button>
+              <button type="button" onClick={() => toggleMinimized(true)} style={{ ...iconButtonStyle, width: '40px', height: '36px' }} title="Minimize canvas tools" aria-label="Minimize canvas tools">‹</button>
             </div>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <button type="button" onClick={() => zoomOut({ duration: 250 })} style={iconButtonStyle} title="Zoom out" aria-label="Zoom out">−</button>
               <div style={zoomChipStyle}>{zoomPercent}%</div>
               <button type="button" onClick={() => zoomIn({ duration: 250 })} style={iconButtonStyle} title="Zoom in" aria-label="Zoom in">+</button>
-              <button type="button" onClick={() => fitView({ duration: 350, padding: 0.18 })} style={fitViewButtonStyle} title="Fit view" aria-label="Fit view">
+              <button type="button" onClick={handleFitView} style={fitViewButtonStyle} title="Fit view" aria-label="Fit view">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M4 9V4h5" />
                   <path d="M20 9V4h-5" />
@@ -2528,11 +2582,11 @@ const CanvasToolbox = ({
                   <path d="M20 15v5h-5" />
                 </svg>
               </button>
-              <button type="button" onClick={onImportImagesClick} style={iconButtonStyle} title="Upload images to canvas" aria-label="Upload images to canvas">
+              <button type="button" onClick={handleUploadImagesClick} style={iconButtonStyle} title="Upload images to canvas" aria-label="Upload images to canvas">
                 <UploadIcon />
               </button>
-              <button type="button" onClick={() => zoomTo(1, { duration: 350 })} style={{ ...iconButtonStyle, fontSize: '0.78rem', fontFamily: 'monospace' }} title="Zoom 1:1" aria-label="Zoom 1:1">1:1</button>
-              <button type="button" onClick={toggleFullscreen} style={iconButtonStyle} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
+              <button type="button" onClick={handleZoomToActualSize} style={{ ...iconButtonStyle, fontSize: '0.78rem', fontFamily: 'monospace' }} title="Zoom 1:1" aria-label="Zoom 1:1">1:1</button>
+              <button type="button" onClick={handleToggleFullscreen} style={iconButtonStyle} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
                 {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
               </button>
             </div>
@@ -2540,7 +2594,7 @@ const CanvasToolbox = ({
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 type="button"
-                onClick={() => setIsEditMode((value) => !value)}
+                onClick={handleToggleEditMode}
                 style={modeButton(isEditMode, '#4B5EFA')}
                 title="Toggle edit mode"
                 aria-label="Toggle edit mode"
@@ -2554,7 +2608,7 @@ const CanvasToolbox = ({
 
               <button
                 type="button"
-                onClick={() => setInteractionMode((prev) => prev === 'pan' ? 'select' : 'pan')}
+                onClick={handleToggleInteractionMode}
                 style={modeButton(interactionMode === 'pan', '#00ffcc')}
                 title={interactionMode === 'pan' ? 'Pan mode is on' : 'Selection mode is on'}
                 aria-label="Toggle pan and selection mode"
@@ -2571,7 +2625,7 @@ const CanvasToolbox = ({
               <>
                 <button
                   type="button"
-                  onClick={onStartLabelPlacement}
+                  onClick={handleStartLabelPlacement}
                   style={{
                     minHeight: '42px',
                     width: '100%',
@@ -2592,7 +2646,7 @@ const CanvasToolbox = ({
                 </button>
                 <button
                   type="button"
-                  onClick={onStartNotePlacement}
+                  onClick={handleStartNotePlacement}
                   style={{
                     minHeight: '42px',
                     width: '100%',
@@ -2692,6 +2746,7 @@ const CanvasToolbox = ({
               isCanvasDirty={isCanvasDirty}
               setIsCanvasDirty={setIsCanvasDirty}
               isVisible={isEditMode}
+              onNotify={onNotify}
             />
             {isEditMode && (
               <GenerationSpendPanel
@@ -2722,6 +2777,7 @@ export default function HeroCanvas() {
   const [activeCanvasId, setActiveCanvasId] = useState(null);
   const [activeCanvasName, setActiveCanvasName] = useState('');
   const [canvasStatus, setCanvasStatus] = useState('');
+  const [canvasActionToast, setCanvasActionToast] = useState('');
   const [usageSummary, setUsageSummary] = useState(null);
   const [isUsageLoading, setIsUsageLoading] = useState(false);
   const [usageCurrency, setUsageCurrency] = useState(() => {
@@ -2779,6 +2835,17 @@ export default function HeroCanvas() {
   useEffect(() => {
     edgesRef.current = edges;
   }, [edges]);
+
+  useEffect(() => {
+    if (!canvasActionToast) return undefined;
+    const timeout = window.setTimeout(() => setCanvasActionToast(''), 6200);
+    return () => window.clearTimeout(timeout);
+  }, [canvasActionToast]);
+
+  const showCanvasActionToast = useCallback((message) => {
+    setCanvasActionToast('');
+    window.requestAnimationFrame(() => setCanvasActionToast(message));
+  }, []);
 
   useEffect(() => {
     setCanvasSnapshot({
@@ -2896,11 +2963,12 @@ export default function HeroCanvas() {
     const skippedText = skippedCount > 0 ? ` Skipped ${skippedCount} over the ${MAX_IMPORT_FILES}-file limit.` : '';
     const failedText = failedNames.length > 0 ? ` ${failedNames.length} could not be imported.` : '';
     setCanvasStatus(importedNodes.length > 0 ? `${importedText}${skippedText}${failedText}` : `No images imported.${failedText}`);
+    if (importedNodes.length > 0 && source !== 'folder') showCanvasActionToast(importedText);
     return {
       nodeIds: importedNodes.map((node) => node.id),
       count: importedNodes.length
     };
-  }, [setNodes]);
+  }, [setNodes, showCanvasActionToast]);
 
   const createLabelForImportedCards = useCallback((title, cardIds, originPoint, folderIndex = 0) => {
     const uniqueCardIds = [...new Set(cardIds)].filter(Boolean);
@@ -2967,8 +3035,9 @@ export default function HeroCanvas() {
     setSelectedNodeIds([labelId, ...uniqueCardIds]);
     setIsCanvasDirty(true);
     setIsEditMode(true);
+    showCanvasActionToast(`Label "${labelTitle}" created from folder.`);
     return labelId;
-  }, [setEdges, setNodes]);
+  }, [setEdges, setNodes, showCanvasActionToast]);
 
   const openCanvasUploadPicker = useCallback(() => {
     canvasUploadInputRef.current?.click();
@@ -3036,14 +3105,17 @@ export default function HeroCanvas() {
         }
       }
 
-      setCanvasStatus(importedImageCount > 0
+    setCanvasStatus(importedImageCount > 0
         ? `Imported ${importedImageCount} image${importedImageCount === 1 ? '' : 's'} from ${importedFolderCount} folder${importedFolderCount === 1 ? '' : 's'}.`
         : 'No images found in dropped folder.');
+      if (importedImageCount > 0) {
+        showCanvasActionToast(`Imported ${importedImageCount} image${importedImageCount === 1 ? '' : 's'} from ${importedFolderCount} folder${importedFolderCount === 1 ? '' : 's'}.`);
+      }
       return;
     }
 
     createImportedImageCards(event.dataTransfer.files, dropPoint, 'drop');
-  }, [clientPointToCanvasPoint, createImportedImageCards, createLabelForImportedCards]);
+  }, [clientPointToCanvasPoint, createImportedImageCards, createLabelForImportedCards, showCanvasActionToast]);
 
   const handleCanvasPointerMove = useCallback((event) => {
     lastCanvasPointerRef.current = { x: event.clientX, y: event.clientY };
@@ -3080,8 +3152,10 @@ export default function HeroCanvas() {
       position: nextPositions.get(node.id)
     } : node));
     setIsCanvasDirty(true);
-    setCanvasStatus(direction === 'row' ? 'Selected cards aligned in a row.' : 'Selected cards aligned in a column.');
-  }, [nodes, selectedCardIds, setNodes]);
+    const message = direction === 'row' ? 'Selected cards aligned in a row.' : 'Selected cards aligned in a column.';
+    setCanvasStatus(message);
+    showCanvasActionToast(message);
+  }, [nodes, selectedCardIds, setNodes, showCanvasActionToast]);
 
   const connectCardsToLabel = useCallback((labelId, cardIds, fallbackTitle = '') => {
     const uniqueCardIds = [...new Set(cardIds)].filter(Boolean);
@@ -3167,7 +3241,8 @@ export default function HeroCanvas() {
     });
     setIsCanvasDirty(true);
     setCanvasStatus(`Added ${uniqueCardIds.length} card${uniqueCardIds.length === 1 ? '' : 's'} to "${labelTitle}".`);
-  }, [nodes, setEdges, setNodes]);
+    showCanvasActionToast(`Added ${uniqueCardIds.length} card${uniqueCardIds.length === 1 ? '' : 's'} to "${labelTitle}".`);
+  }, [nodes, setEdges, setNodes, showCanvasActionToast]);
 
   const createLabelGroup = useCallback(() => {
     if (selectedCardIds.length === 0) {
@@ -3200,7 +3275,8 @@ export default function HeroCanvas() {
     setNodes((nds) => [...nds.map((node) => ({ ...node, selected: selectedSet.has(node.id) })), labelNode]);
     window.requestAnimationFrame(() => connectCardsToLabel(labelId, selectedCardIds, title));
     setSelectedNodeIds([labelId, ...selectedCardIds]);
-  }, [connectCardsToLabel, nodes, selectedCardIds, setNodes]);
+    showCanvasActionToast(`Label "${title}" created for selected cards.`);
+  }, [connectCardsToLabel, nodes, selectedCardIds, setNodes, showCanvasActionToast]);
 
   const createEmptyLabelAt = useCallback((position, titleInput) => {
     const title = String(titleInput || '').trim() || 'Canvas Label';
@@ -3222,8 +3298,9 @@ export default function HeroCanvas() {
     setIsCanvasDirty(true);
     setIsEditMode(true);
     setCanvasStatus(`Label "${title}" created.`);
+    showCanvasActionToast(`Label "${title}" created.`);
     return labelId;
-  }, [setNodes]);
+  }, [setNodes, showCanvasActionToast]);
 
   const createStickyNoteAt = useCallback((position, text = '') => {
     const noteId = `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -3246,8 +3323,9 @@ export default function HeroCanvas() {
     setIsCanvasDirty(true);
     setIsEditMode(true);
     setCanvasStatus('Sticky note created.');
+    showCanvasActionToast('Sticky note created.');
     return noteId;
-  }, [setNodes]);
+  }, [setNodes, showCanvasActionToast]);
 
   const createSiblingNote = useCallback((sourceId) => {
     const sourceNode = nodesRef.current.find((node) => node.id === sourceId);
@@ -3257,7 +3335,8 @@ export default function HeroCanvas() {
       y: Number(sourceNode.position?.y || 0)
     });
     setCanvasStatus('Sticky note added next to the current note.');
-  }, [createStickyNoteAt]);
+    showCanvasActionToast('Sticky note added next to the current note.');
+  }, [createStickyNoteAt, showCanvasActionToast]);
 
   const deleteCanvasNode = useCallback((nodeId, label = 'node') => {
     const nodeToDelete = nodesRef.current.find((node) => node.id === nodeId);
@@ -3275,7 +3354,8 @@ export default function HeroCanvas() {
     setPersistentEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
     setSelectedNodeIds((ids) => ids.filter((id) => id !== nodeId));
     setCanvasStatus(`Deleted ${label}.`);
-  }, [pushUndoAction, setPersistentEdges, setPersistentNodes]);
+    showCanvasActionToast(`Deleted ${label}.`);
+  }, [pushUndoAction, setPersistentEdges, setPersistentNodes, showCanvasActionToast]);
 
   const startLabelPlacement = useCallback(() => {
     setIsEditMode(true);
@@ -3436,6 +3516,7 @@ export default function HeroCanvas() {
       if (draggedCount > 0) {
         setIsCanvasDirty(true);
         setCanvasStatus(`Moved label group with ${draggedCount} card${draggedCount === 1 ? '' : 's'}.`);
+        showCanvasActionToast(`Moved label group with ${draggedCount} card${draggedCount === 1 ? '' : 's'}.`);
       }
       return;
     }
@@ -3447,7 +3528,7 @@ export default function HeroCanvas() {
     const targetLabel = findLabelDropTarget(cards, labels);
     if (!targetLabel) return;
     connectCardsToLabel(targetLabel.id, cardIds, targetLabel.data?.title);
-  }, [connectCardsToLabel, getDraggedCardDropContext, isEditMode]);
+  }, [connectCardsToLabel, getDraggedCardDropContext, isEditMode, showCanvasActionToast]);
 
   const undoLastAction = useCallback(() => {
     setUndoStack((stack) => {
@@ -3466,11 +3547,12 @@ export default function HeroCanvas() {
         });
         setIsCanvasDirty(true);
         setCanvasStatus('Restored deleted node.');
+        showCanvasActionToast(`Restored ${action.node?.data?.title || 'deleted node'}.`);
       }
 
       return rest;
     });
-  }, [setEdges, setNodes]);
+  }, [setEdges, setNodes, showCanvasActionToast]);
 
   useEffect(() => {
     const handleToggle = (id) => {
@@ -3692,6 +3774,7 @@ export default function HeroCanvas() {
 
   return (
     <div id="hero-canvas-section" style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+      <CanvasActionToast message={canvasActionToast} />
       {!isFullscreen && (
         <div style={{ padding: '20px 5% 0 5%', zIndex: 10, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: '40px' }}>
           <h1 style={{ fontSize: '3.5rem', margin: 0, whiteSpace: 'nowrap' }}>
@@ -3795,6 +3878,7 @@ export default function HeroCanvas() {
           onUsageCurrencyChange={handleUsageCurrencyChange}
           isUsageLoading={isUsageLoading}
           onRefreshUsage={loadUsageSummary}
+          onNotify={showCanvasActionToast}
         />
         <MultiSelectHint interactionMode={interactionMode} />
         <NodeSearch />
