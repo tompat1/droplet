@@ -20,7 +20,7 @@ import assetFiles from '../assetsData.json';
 import { defaultAssetTags } from '../defaultTags';
 import { useAuth } from './AuthContext';
 import { canvasApi, usageApi } from '../lib/apiClient';
-import { readImageFileAsDataUrl } from '../lib/mediaFiles';
+import { compressImageDataUrl, readImageFileAsDataUrl } from '../lib/mediaFiles';
 
 const FullscreenIcon = () => (
   <svg viewBox="2 2 20 20" width="18" height="18" fill="currentColor" aria-hidden="true">
@@ -51,6 +51,8 @@ const LABEL_WIDTH = 230;
 const LABEL_HEIGHT = 86;
 const LABEL_CARD_GAP = 150;
 const LABEL_DROP_DISTANCE = 260;
+const MAX_SAVE_PAYLOAD_BYTES = 7_500_000;
+const CANVAS_IMPORT_IMAGE_OPTIONS = { maxBytes: 180000, maxDimension: 960 };
 const DISPLAY_CURRENCIES = {
   USD: { label: 'USD', symbol: '$', rate: 1 },
   EUR: { label: 'EUR', symbol: '€', rate: 0.92 },
@@ -78,6 +80,45 @@ const isEditableTarget = (target) => (
 );
 
 const imageFilesFromList = (files) => Array.from(files || []).filter((file) => file?.type?.startsWith('image/'));
+
+const estimatedJsonBytes = (value) => new Blob([JSON.stringify(value)]).size;
+
+const shouldOptimizeDataUrl = (value) => (
+  typeof value === 'string' &&
+  value.startsWith('data:image/') &&
+  estimatedJsonBytes(value) > CANVAS_IMPORT_IMAGE_OPTIONS.maxBytes * 1.35
+);
+
+const optimizeNodesForCanvasSave = async (nodes) => {
+  let changed = false;
+  const optimizedNodes = [];
+
+  for (const node of nodes) {
+    const data = { ...(node.data || {}) };
+    let nodeChanged = false;
+    if (shouldOptimizeDataUrl(data.image)) {
+      data.image = await compressImageDataUrl(data.image, CANVAS_IMPORT_IMAGE_OPTIONS);
+      changed = true;
+      nodeChanged = true;
+    }
+    if (Array.isArray(data.generationRefs)) {
+      const nextRefs = [];
+      for (const ref of data.generationRefs) {
+        if (shouldOptimizeDataUrl(ref)) {
+          nextRefs.push(await compressImageDataUrl(ref, CANVAS_IMPORT_IMAGE_OPTIONS));
+          changed = true;
+          nodeChanged = true;
+        } else {
+          nextRefs.push(ref);
+        }
+      }
+      if (nodeChanged) data.generationRefs = nextRefs;
+    }
+    optimizedNodes.push(nodeChanged ? { ...node, data } : node);
+  }
+
+  return { nodes: optimizedNodes, changed };
+};
 
 const dataTransferDirectoryEntries = (dataTransfer) => Array.from(dataTransfer?.items || [])
   .map((item) => (typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null))
@@ -1142,14 +1183,25 @@ const CanvasPersistencePanel = ({
     }
 
     const name = draftName.trim() || activeCanvasName || 'Fluid Node Canvas';
+    setStatus('Preparing canvas for save...');
+    const optimized = await optimizeNodesForCanvasSave(nodes);
+    if (optimized.changed) {
+      setNodes(optimized.nodes);
+      setStatus('Optimized imported images for saving...');
+    }
     const payload = buildCanvasPayload({
       name,
-      nodes,
+      nodes: optimized.nodes,
       edges,
       viewport: getViewport(),
       collapsedBranches,
       interactionMode
     });
+    const payloadBytes = estimatedJsonBytes(payload);
+    if (payloadBytes > MAX_SAVE_PAYLOAD_BYTES) {
+      setStatus(`Canvas is too large to save (${(payloadBytes / 1000000).toFixed(1)} MB). Import fewer images or use smaller exports.`);
+      return;
+    }
 
     setIsBusy(true);
     setStatus(silent ? 'Autosaving canvas...' : activeCanvasId ? 'Saving canvas...' : 'Creating canvas...');
@@ -1169,7 +1221,7 @@ const CanvasPersistencePanel = ({
     } finally {
       setIsBusy(false);
     }
-  }, [activeCanvasId, activeCanvasName, collapsedBranches, draftName, edges, getViewport, interactionMode, nodes, refreshCanvases, setActiveCanvasId, setActiveCanvasName, setIsCanvasDirty, setStatus, user]);
+  }, [activeCanvasId, activeCanvasName, collapsedBranches, draftName, edges, getViewport, interactionMode, nodes, refreshCanvases, setActiveCanvasId, setActiveCanvasName, setIsCanvasDirty, setNodes, setStatus, user]);
 
   useEffect(() => {
     if (!user || !activeCanvasId || !isCanvasDirty || isBusy) return undefined;
@@ -2033,7 +2085,7 @@ export default function HeroCanvas() {
     for (let index = 0; index < imageFiles.length; index += 1) {
       const file = imageFiles[index];
       try {
-        const image = await readImageFileAsDataUrl(file);
+        const image = await readImageFileAsDataUrl(file, CANVAS_IMPORT_IMAGE_OPTIONS);
         const column = index % 3;
         const row = Math.floor(index / 3);
         importedNodes.push({

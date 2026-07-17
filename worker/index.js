@@ -91,7 +91,7 @@ export default {
       return await routeApi(request, env, url);
     } catch (error) {
       console.error(error);
-      return json({ error: 'Unexpected server error' }, 500);
+      return jsonError(error);
     }
   }
 };
@@ -1026,54 +1026,58 @@ function providerError(payload, status) {
 }
 
 async function syncCanvasParts(env, canvasId, snapshot) {
-  await env.DB.batch([
-    env.DB.prepare('DELETE FROM canvas_edges WHERE canvas_id = ?').bind(canvasId),
-    env.DB.prepare('DELETE FROM canvas_nodes WHERE canvas_id = ?').bind(canvasId)
-  ]);
+  try {
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM canvas_edges WHERE canvas_id = ?').bind(canvasId),
+      env.DB.prepare('DELETE FROM canvas_nodes WHERE canvas_id = ?').bind(canvasId)
+    ]);
 
-  const nodeStatements = Array.isArray(snapshot.nodes)
-    ? snapshot.nodes.map((node) => env.DB.prepare(
-      `INSERT INTO canvas_nodes
-       (id, canvas_id, node_id, type, position_x, position_y, width, height, hidden, z_index, data_json, style_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      crypto.randomUUID(),
-      canvasId,
-      String(node.id),
-      node.type ? String(node.type) : null,
-      Number(node.position?.x || 0),
-      Number(node.position?.y || 0),
-      nullableNumber(node.width),
-      nullableNumber(node.height),
-      node.hidden ? 1 : 0,
-      nullableNumber(node.zIndex),
-      JSON.stringify(node.data || {}),
-      JSON.stringify(node.style || {})
-    ))
-    : [];
+    const nodeStatements = Array.isArray(snapshot.nodes)
+      ? snapshot.nodes.map((node) => env.DB.prepare(
+        `INSERT INTO canvas_nodes
+         (id, canvas_id, node_id, type, position_x, position_y, width, height, hidden, z_index, data_json, style_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        crypto.randomUUID(),
+        canvasId,
+        String(node.id),
+        node.type ? String(node.type) : null,
+        Number(node.position?.x || 0),
+        Number(node.position?.y || 0),
+        nullableNumber(node.width),
+        nullableNumber(node.height),
+        node.hidden ? 1 : 0,
+        nullableNumber(node.zIndex),
+        JSON.stringify(compactCanvasNodeData(node.data || {})),
+        JSON.stringify(node.style || {})
+      ))
+      : [];
 
-  const edgeStatements = Array.isArray(snapshot.edges)
-    ? snapshot.edges.map((edge) => env.DB.prepare(
-      `INSERT INTO canvas_edges
-       (id, canvas_id, edge_id, source_node_id, target_node_id, source_handle, target_handle, type, animated, data_json, style_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      crypto.randomUUID(),
-      canvasId,
-      String(edge.id),
-      String(edge.source),
-      String(edge.target),
-      edge.sourceHandle ? String(edge.sourceHandle) : null,
-      edge.targetHandle ? String(edge.targetHandle) : null,
-      edge.type ? String(edge.type) : null,
-      edge.animated ? 1 : 0,
-      JSON.stringify(edge.data || {}),
-      JSON.stringify(edge.style || {})
-    ))
-    : [];
+    const edgeStatements = Array.isArray(snapshot.edges)
+      ? snapshot.edges.map((edge) => env.DB.prepare(
+        `INSERT INTO canvas_edges
+         (id, canvas_id, edge_id, source_node_id, target_node_id, source_handle, target_handle, type, animated, data_json, style_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        crypto.randomUUID(),
+        canvasId,
+        String(edge.id),
+        String(edge.source),
+        String(edge.target),
+        edge.sourceHandle ? String(edge.sourceHandle) : null,
+        edge.targetHandle ? String(edge.targetHandle) : null,
+        edge.type ? String(edge.type) : null,
+        edge.animated ? 1 : 0,
+        JSON.stringify(edge.data || {}),
+        JSON.stringify(edge.style || {})
+      ))
+      : [];
 
-  const statements = [...nodeStatements, ...edgeStatements];
-  if (statements.length > 0) await env.DB.batch(statements);
+    const statements = [...nodeStatements, ...edgeStatements];
+    if (statements.length > 0) await env.DB.batch(statements);
+  } catch (error) {
+    console.warn('Canvas parts index sync failed', error instanceof Error ? error.message : String(error));
+  }
 }
 
 async function requireSession(request, env) {
@@ -1201,6 +1205,24 @@ function stripRuntimeCardData(data) {
   return copy;
 }
 
+function compactCanvasNodeData(data) {
+  const copy = stripRuntimeCardData(data);
+  ['image', 'video'].forEach((key) => {
+    if (typeof copy[key] === 'string' && copy[key].startsWith('data:')) {
+      copy[`${key}InlineBytes`] = estimateDataUrlBytes(copy[key]);
+      copy[key] = '[inline-media]';
+    }
+  });
+
+  if (Array.isArray(copy.generationRefs)) {
+    copy.generationRefs = copy.generationRefs.map((ref) => (
+      typeof ref === 'string' && ref.startsWith('data:') ? '[inline-reference]' : ref
+    ));
+  }
+
+  return copy;
+}
+
 function parseCanvasRow(row, includeSnapshot = false) {
   const parsed = {
     id: row.id,
@@ -1300,6 +1322,17 @@ function json(body, status = 200, cookie) {
   return new Response(JSON.stringify(body), { status, headers });
 }
 
+function jsonError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/payload is too large|request body too large|body too large|too large/i.test(message)) {
+    return json({ error: 'Canvas is too large to save. Import fewer images or use smaller image exports.' }, 413);
+  }
+  if (/string or blob too big|database or disk is full|too many sql variables|D1_ERROR/i.test(message)) {
+    return json({ error: `Canvas storage failed: ${message}` }, 400);
+  }
+  return json({ error: 'Unexpected server error' }, 500);
+}
+
 function corsHeaders() {
   return {
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
@@ -1328,6 +1361,10 @@ function cleanText(value, maxLength) {
 
 function roundMoney(value) {
   return Math.round(Number(value || 0) * 1000000) / 1000000;
+}
+
+function estimateDataUrlBytes(value) {
+  return Math.ceil(String(value || '').length * 0.75);
 }
 
 function normalizeAvatarUrl(value) {

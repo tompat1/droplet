@@ -76,6 +76,51 @@ export function readImageFileAsDataUrl(file, options = {}) {
   });
 }
 
+export function compressImageDataUrl(dataUrl, options = {}) {
+  const maxDimension = options.maxDimension || 1200;
+  const maxBytes = options.maxBytes || DEFAULT_MAX_IMAGE_BYTES;
+  const source = String(dataUrl || '');
+
+  if (!source.startsWith('data:image/') || /^data:image\/(svg\+xml|gif)/i.test(source)) {
+    return Promise.resolve(source);
+  }
+
+  if (estimatedDataUrlBytes(source) <= maxBytes) {
+    return Promise.resolve(source);
+  }
+
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onerror = () => reject(new Error('Could not optimize that image for saving.'));
+    image.onload = () => {
+      const sourceWidth = image.naturalWidth || image.width;
+      const sourceHeight = image.naturalHeight || image.height;
+      let scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
+      let best = source;
+
+      for (let attempt = 0; attempt < 9; attempt += 1) {
+        const width = Math.max(120, Math.round(sourceWidth * scale));
+        const height = Math.max(120, Math.round(sourceHeight * scale));
+        const quality = Math.max(0.42, 0.82 - attempt * 0.065);
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = width;
+        canvas.height = height;
+        context.drawImage(image, 0, 0, width, height);
+        best = canvas.toDataURL('image/webp', quality);
+        if (estimatedDataUrlBytes(best) <= maxBytes) {
+          resolve(best);
+          return;
+        }
+        scale *= 0.78;
+      }
+
+      resolve(best);
+    };
+    image.src = source;
+  });
+}
+
 function readRawImageFile(file, maxBytes) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
