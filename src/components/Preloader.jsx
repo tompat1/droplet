@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import gsap from 'gsap';
 import assetFiles from '../assetsData.json';
-import audioTracks from '../audioData.json';
 
 export default function Preloader() {
   const [progress, setProgress] = useState(0);
@@ -91,13 +90,6 @@ export default function Preloader() {
           opacity: 0.8,
         }}
       />
-
-      {/* Hidden audio preloads */}
-      <div style={{ display: 'none' }}>
-        {audioTracks.map((t, i) => (
-          <audio key={i} src={t.src} preload="auto" />
-        ))}
-      </div>
 
       {/* Loading Bar & Progress */}
       <div style={{ zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'absolute', bottom: '25%' }}>

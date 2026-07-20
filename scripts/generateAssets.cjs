@@ -43,30 +43,3 @@ if (fs.existsSync(videosDir)) {
 
 fs.writeFileSync(outputJson, JSON.stringify(data, null, 2));
 console.log('src/assetsData.json successfully generated with categories:', Object.keys(data));
-
-// Also scan audio tracks
-const audioDir = path.join(__dirname, '../public/assets/audio');
-const audioOutputJson = path.join(__dirname, '../src/audioData.json');
-
-function formatAudioTitle(fileName) {
-  return fileName
-    .replace(/\.(mp3|ogg|wav|flac|aac|m4a)$/i, '')
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase())
-    .replace(/\bEven More\b/g, 'Even more')
-    .replace(/\s+By\s+/g, ' by ');
-}
-
-if (fs.existsSync(audioDir)) {
-  const audioFiles = fs.readdirSync(audioDir).filter(f => f.match(/\.(mp3|ogg|wav|flac|aac|m4a)$/i));
-  const tracks = audioFiles.map(f => ({
-    filename: f,
-    title: formatAudioTitle(f),
-    src: `/assets/audio/${f}`
-  }));
-  fs.writeFileSync(audioOutputJson, JSON.stringify(tracks, null, 2));
-  console.log(`src/audioData.json generated with ${tracks.length} track(s):`, audioFiles);
-} else {
-  fs.writeFileSync(audioOutputJson, JSON.stringify([], null, 2));
-  console.log('src/audioData.json generated (no audio directory found, empty playlist).');
-}
