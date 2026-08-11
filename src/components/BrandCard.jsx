@@ -388,6 +388,11 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
     deleteNodeAndEdges({ rerender: data.isGenerated === true });
   };
 
+  const handleDeleteWithoutRerender = (e) => {
+    e.stopPropagation();
+    deleteNodeAndEdges({ rerender: false });
+  };
+
   const updateCardImage = useCallback((imageUrl) => {
     const updater = data.setGlobalNodes || setNodes;
     updater((nds) => nds.map(n => n.id === id ? { ...n, data: { ...n.data, image: imageUrl } } : n));
@@ -1087,11 +1092,11 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
             </span>
             {data.isGenerated && (
               <span style={{ maxWidth: '230px', color: 'rgba(255,255,255,0.68)', fontSize: '12px', lineHeight: 1.35, textAlign: 'center' }}>
-                This render will be replaced with a fresh asset using the same prompt, provider, references, and brand guide.
+                Choose rerender to replace it with a fresh asset, or delete to remove this card from the canvas.
               </span>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
             <button 
               onClick={handleCancelDelete}
               disabled={isRerenderingDeleted}
@@ -1110,6 +1115,26 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
             >
               Cancel
             </button>
+            {data.isGenerated && (
+              <button
+                onClick={handleDeleteWithoutRerender}
+                disabled={isRerenderingDeleted}
+                style={{
+                  padding: '8px 16px',
+                  background: 'rgba(255,255,255,0.075)',
+                  border: '1px solid rgba(255,255,255,0.24)',
+                  color: 'rgba(255,255,255,0.86)',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.16)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.075)'}
+              >
+                Delete
+              </button>
+            )}
             <button 
               onClick={handleConfirmDelete}
               disabled={isRerenderingDeleted}
