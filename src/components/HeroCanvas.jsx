@@ -2544,6 +2544,11 @@ const CanvasToolbox = ({
   };
 
   const handleToggleEditMode = () => {
+    if (!user) {
+      notify('Login is required to edit the canvas.');
+      setIsEditMode(false);
+      return;
+    }
     setIsEditMode((value) => {
       const nextValue = !value;
       notify(nextValue ? 'Edit mode on. Cards and tools are unlocked.' : 'View mode on. Canvas editing is locked.');
@@ -2749,7 +2754,7 @@ const CanvasToolbox = ({
             <button type="button" onClick={handleToggleFullscreen} style={iconButtonStyle} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
               {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
             </button>
-            <button type="button" onClick={handleToggleEditMode} style={{ ...iconButtonStyle, borderColor: isEditMode ? 'rgba(75,94,250,0.75)' : iconButtonStyle.border, color: isEditMode ? '#fff' : 'rgba(255,255,255,0.62)', background: isEditMode ? 'rgba(75,94,250,0.24)' : iconButtonStyle.background, fontSize: '0.72rem' }} title="Toggle edit mode" aria-label="Toggle edit mode">ED</button>
+            <button type="button" onClick={handleToggleEditMode} disabled={!user} style={{ ...iconButtonStyle, borderColor: isEditMode ? 'rgba(75,94,250,0.75)' : iconButtonStyle.border, color: isEditMode ? '#fff' : 'rgba(255,255,255,0.62)', background: isEditMode ? 'rgba(75,94,250,0.24)' : iconButtonStyle.background, fontSize: '0.72rem', opacity: user ? 1 : 0.48, cursor: user ? 'pointer' : 'not-allowed' }} title={user ? 'Toggle edit mode' : 'Login required to edit canvas'} aria-label={user ? 'Toggle edit mode' : 'Login required to edit canvas'}>ED</button>
             {isEditMode && (
               <>
                 <button type="button" onClick={handleStartLabelPlacement} style={{ ...iconButtonStyle, borderColor: isPlacingLabel ? 'rgba(0,255,204,0.75)' : iconButtonStyle.border, color: isPlacingLabel ? '#fff' : 'rgba(255,255,255,0.68)', background: isPlacingLabel ? 'rgba(0,255,204,0.2)' : iconButtonStyle.background, fontSize: '0.62rem' }} title="Place a new label" aria-label="Place a new label">
@@ -2810,15 +2815,16 @@ const CanvasToolbox = ({
               <button
                 type="button"
                 onClick={handleToggleEditMode}
-                style={modeButton(isEditMode, '#4B5EFA')}
-                title="Toggle edit mode"
-                aria-label="Toggle edit mode"
+                disabled={!user}
+                style={{ ...modeButton(isEditMode, '#4B5EFA'), opacity: user ? 1 : 0.52, cursor: user ? 'pointer' : 'not-allowed' }}
+                title={user ? 'Toggle edit mode' : 'Login required to edit canvas'}
+                aria-label={user ? 'Toggle edit mode' : 'Login required to edit canvas'}
               >
                 <span style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '0.78rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Edit</span>
                   <span style={toggleStyle(isEditMode, '#4B5EFA')}><span style={toggleKnobStyle(isEditMode)} /></span>
                 </span>
-                <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.48)' }}>{isEditMode ? 'Cards unlocked' : 'View only'}</span>
+                <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.48)' }}>{user ? (isEditMode ? 'Cards unlocked' : 'View only') : 'Login required'}</span>
               </button>
 
               <button
@@ -4104,15 +4110,32 @@ export default function HeroCanvas() {
   }, [loadUsageSummary]);
 
   useEffect(() => {
-    const handleOpenEditor = () => setIsEditMode(true);
-    const handleToggleEditor = () => setIsEditMode((value) => !value);
+    if (!user && isEditMode) setIsEditMode(false);
+  }, [isEditMode, user]);
+
+  useEffect(() => {
+    const requireCanvasLogin = () => {
+      if (user) return true;
+      setCanvasStatus('Login is required to edit the canvas.');
+      showCanvasActionToast('Login is required to edit the canvas.');
+      setIsEditMode(false);
+      return false;
+    };
+    const handleOpenEditor = () => {
+      if (!requireCanvasLogin()) return;
+      setIsEditMode(true);
+    };
+    const handleToggleEditor = () => {
+      if (!requireCanvasLogin()) return;
+      setIsEditMode((value) => !value);
+    };
     window.addEventListener('openHeroCanvasEditor', handleOpenEditor);
     window.addEventListener('toggleHeroCanvasEditor', handleToggleEditor);
     return () => {
       window.removeEventListener('openHeroCanvasEditor', handleOpenEditor);
       window.removeEventListener('toggleHeroCanvasEditor', handleToggleEditor);
     };
-  }, []);
+  }, [showCanvasActionToast, user]);
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('heroCanvasEditModeChanged', { detail: { isEditMode } }));
