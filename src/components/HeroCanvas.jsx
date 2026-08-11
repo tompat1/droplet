@@ -937,6 +937,9 @@ const StickyNoteNode = ({ id, data, selected, width, height }) => {
   const [draftText, setDraftText] = useState(data.text || '');
   const { zoom } = useViewport();
   const canEditNote = data.isEditMode !== false;
+  const deleteTimeoutRef = useRef(null);
+  const deleteIntervalRef = useRef(null);
+  const [deleteCountdown, setDeleteCountdown] = useState(null);
   const [noteSize, setNoteSize] = useState({
     width: Number(data.noteWidth || width || NOTE_WIDTH),
     height: Number(data.noteHeight || height || NOTE_HEIGHT)
@@ -953,6 +956,19 @@ const StickyNoteNode = ({ id, data, selected, width, height }) => {
     });
   }, [data.noteHeight, data.noteWidth, height, width]);
 
+  useEffect(() => () => {
+    window.clearTimeout(deleteTimeoutRef.current);
+    window.clearInterval(deleteIntervalRef.current);
+  }, []);
+
+  const clearPendingDelete = () => {
+    window.clearTimeout(deleteTimeoutRef.current);
+    window.clearInterval(deleteIntervalRef.current);
+    deleteTimeoutRef.current = null;
+    deleteIntervalRef.current = null;
+    setDeleteCountdown(null);
+  };
+
   const updateNoteText = (text) => {
     data.setGlobalNodes?.((nds) => nds.map((node) => node.id === id ? {
       ...node,
@@ -963,15 +979,29 @@ const StickyNoteNode = ({ id, data, selected, width, height }) => {
     } : node));
   };
 
-  const deleteNote = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
+  const completeDeleteNote = () => {
+    clearPendingDelete();
     if (data.onDeleteNode) {
       data.onDeleteNode(id, 'sticky note');
       return;
     }
     data.setGlobalNodes?.((nds) => nds.filter((node) => node.id !== id));
     data.setGlobalEdges?.((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
+  };
+
+  const deleteNote = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (deleteCountdown !== null) {
+      clearPendingDelete();
+      return;
+    }
+
+    setDeleteCountdown(3);
+    deleteIntervalRef.current = window.setInterval(() => {
+      setDeleteCountdown((value) => (value && value > 1 ? value - 1 : value));
+    }, 1000);
+    deleteTimeoutRef.current = window.setTimeout(completeDeleteNote, 3000);
   };
 
   const addSiblingNote = (event) => {
@@ -1051,8 +1081,12 @@ const StickyNoteNode = ({ id, data, selected, width, height }) => {
         borderRadius: '6px 6px 18px 6px',
         background: 'linear-gradient(145deg, #fff29b 0%, #ffe066 62%, #f8c847 100%)',
         color: '#332500',
-        border: selected ? '2px solid rgba(255, 106, 0, 0.78)' : '1px solid rgba(83, 57, 0, 0.16)',
-        boxShadow: selected
+        border: deleteCountdown !== null
+          ? '2px solid rgba(184, 39, 0, 0.72)'
+          : selected ? '2px solid rgba(255, 106, 0, 0.78)' : '1px solid rgba(83, 57, 0, 0.16)',
+        boxShadow: deleteCountdown !== null
+          ? '0 18px 40px rgba(184, 39, 0, 0.26), 0 0 0 4px rgba(184,39,0,0.12)'
+          : selected
           ? '0 18px 40px rgba(255, 196, 0, 0.28), 0 0 0 4px rgba(255,106,0,0.12)'
           : '0 16px 32px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.45)',
         padding: '10px 12px 12px',
@@ -1095,8 +1129,19 @@ const StickyNoteNode = ({ id, data, selected, width, height }) => {
             <button type="button" onClick={addSiblingNote} style={controlButtonStyle} title="Add note next to this" aria-label="Add note next to this">
               +
             </button>
-            <button type="button" onClick={deleteNote} style={{ ...controlButtonStyle, background: 'rgba(255,122,92,0.34)', color: '#5c1600' }} title="Delete note" aria-label="Delete note">
-              −
+            <button
+              type="button"
+              onClick={deleteNote}
+              style={{
+                ...controlButtonStyle,
+                width: deleteCountdown !== null ? '54px' : controlButtonStyle.width,
+                background: deleteCountdown !== null ? 'rgba(184,39,0,0.7)' : 'rgba(255,122,92,0.34)',
+                color: deleteCountdown !== null ? '#fff7dd' : '#5c1600'
+              }}
+              title={deleteCountdown !== null ? 'Cancel delete' : 'Delete note'}
+              aria-label={deleteCountdown !== null ? 'Cancel delete note' : 'Delete note'}
+            >
+              {deleteCountdown !== null ? `Undo ${deleteCountdown}` : '−'}
             </button>
           </div>
         )}
