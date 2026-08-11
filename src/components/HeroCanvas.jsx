@@ -75,16 +75,16 @@ const DISPLAY_CURRENCIES = {
 };
 const CONCIERGE_GENERATION_PROVIDERS = {
   image: {
-    provider: 'openai_image',
-    label: 'ChatGPT Images',
-    shortLabel: 'ChatGPT',
+    provider: 'concierge_free_image',
+    label: 'Concierge Free Render',
+    shortLabel: 'Free Render',
     pipeline: 'image',
-    accent: '#4B5EFA'
+    accent: '#00ffcc'
   },
   video: {
-    provider: 'google_veo',
-    label: 'Google Veo',
-    shortLabel: 'Veo',
+    provider: 'concierge_free_video',
+    label: 'Concierge Free Storyboard',
+    shortLabel: 'Free Storyboard',
     pipeline: 'video',
     accent: '#00ffcc'
   }
@@ -2946,7 +2946,7 @@ export default function HeroCanvas() {
     return clientPointToCanvasPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
   }, [clientPointToCanvasPoint]);
 
-  const createConciergeAssetBranch = useCallback(async ({ prompt: rawPrompt, pipeline = 'image' } = {}) => {
+  const createConciergeAssetBranch = useCallback(async ({ prompt: rawPrompt, pipeline = 'image', providerHeaders = {} } = {}) => {
     const prompt = String(rawPrompt || '').trim();
     if (!prompt) throw new Error('Write a prompt before rendering an asset.');
     if (!user) throw new Error('Login is required before rendering assets.');
@@ -3003,7 +3003,7 @@ export default function HeroCanvas() {
           description: 'Generated from the concierge drawer.',
           image: ''
         }
-      });
+      }, { headers: providerHeaders });
 
       const isVideo = provider.pipeline === 'video';
       const title = result?.branch?.title || `${parentNode ? 'Edited' : 'Concierge'} ${isVideo ? 'Video' : 'Image'} Branch`;

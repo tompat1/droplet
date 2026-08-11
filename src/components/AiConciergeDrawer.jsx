@@ -3,7 +3,7 @@ import { Bot, ImagePlus, KeyRound, Send, Settings, Sparkles, Trash2, WandSparkle
 import { useAuth } from './AuthContext';
 import { useCanvasAssets } from './CanvasAssetsState';
 import { useSiteContent } from './SiteContentContext';
-import { askConcierge, buildDropletConciergeContext } from '../services/aiService';
+import { askConcierge, buildDropletConciergeContext, buildProviderKeyHeaders } from '../services/aiService';
 
 const PROVIDER_STORAGE_KEY = 'droplet_ai_concierge_provider_v1';
 const KEYS_STORAGE_KEY = 'droplet_ai_provider_keys_v1';
@@ -17,18 +17,24 @@ const PROMPT_CHIPS = [
 ];
 
 const PROVIDERS = [
-  { value: 'auto', label: 'Auto' },
-  { value: 'openai', label: 'OpenAI' },
+  { value: 'auto', label: 'Auto free cycle' },
+  { value: 'deepseek-free', label: 'DeepSeek R1 free' },
+  { value: 'workers-ai', label: 'Workers AI Llama' },
+  { value: 'openrouter-free', label: 'OpenRouter free' },
+  { value: 'groq-free', label: 'Groq free' },
+  { value: 'grok', label: 'Grok / xAI' },
   { value: 'gemini', label: 'Gemini' },
-  { value: 'openrouter', label: 'OpenRouter' },
-  { value: 'groq', label: 'Groq' }
+  { value: 'claude', label: 'Claude' },
+  { value: 'openai', label: 'OpenAI' }
 ];
 
 const emptyKeys = {
   openAiKey: '',
   geminiKey: '',
   openRouterKey: '',
-  groqKey: ''
+  groqKey: '',
+  grokKey: '',
+  claudeKey: ''
 };
 
 const readStoredProvider = () => {
@@ -125,7 +131,11 @@ function AiConciergeDrawerInner({ user }) {
     setCanvasActionLoading(true);
 
     try {
-      const result = await canvasActions.createAssetBranch({ prompt: actionPrompt, pipeline });
+      const result = await canvasActions.createAssetBranch({
+        prompt: actionPrompt,
+        pipeline,
+        providerHeaders: buildProviderKeyHeaders(providerKeys)
+      });
       setHistory((items) => [
         ...items,
         {
@@ -147,7 +157,7 @@ function AiConciergeDrawerInner({ user }) {
     } finally {
       setCanvasActionLoading(false);
     }
-  }, [canvasActionLoading, canvasActions, selectedAssetCount]);
+  }, [canvasActionLoading, canvasActions, providerKeys, selectedAssetCount]);
 
   const submitPrompt = useCallback(async (rawPrompt) => {
     const nextPrompt = String(rawPrompt || '').trim();
@@ -243,7 +253,7 @@ function AiConciergeDrawerInner({ user }) {
             {settingsOpen && (
               <section className="ai-concierge-settings" aria-label="Concierge provider settings">
                 <label>
-                  <span>Provider</span>
+                  <span>Agent</span>
                   <select value={provider} onChange={(event) => setProvider(event.target.value)}>
                     {PROVIDERS.map((item) => (
                       <option key={item.value} value={item.value}>{item.label}</option>
@@ -252,20 +262,28 @@ function AiConciergeDrawerInner({ user }) {
                 </label>
                 <div className="ai-key-grid">
                   <label>
-                    <span>OpenAI key</span>
-                    <input type="password" value={providerKeys.openAiKey} onChange={(event) => updateKey('openAiKey', event.target.value)} autoComplete="off" />
-                  </label>
-                  <label>
-                    <span>Gemini key</span>
-                    <input type="password" value={providerKeys.geminiKey} onChange={(event) => updateKey('geminiKey', event.target.value)} autoComplete="off" />
-                  </label>
-                  <label>
                     <span>OpenRouter key</span>
                     <input type="password" value={providerKeys.openRouterKey} onChange={(event) => updateKey('openRouterKey', event.target.value)} autoComplete="off" />
                   </label>
                   <label>
                     <span>Groq key</span>
                     <input type="password" value={providerKeys.groqKey} onChange={(event) => updateKey('groqKey', event.target.value)} autoComplete="off" />
+                  </label>
+                  <label>
+                    <span>Grok / xAI key</span>
+                    <input type="password" value={providerKeys.grokKey} onChange={(event) => updateKey('grokKey', event.target.value)} autoComplete="off" />
+                  </label>
+                  <label>
+                    <span>Gemini key</span>
+                    <input type="password" value={providerKeys.geminiKey} onChange={(event) => updateKey('geminiKey', event.target.value)} autoComplete="off" />
+                  </label>
+                  <label>
+                    <span>OpenAI key</span>
+                    <input type="password" value={providerKeys.openAiKey} onChange={(event) => updateKey('openAiKey', event.target.value)} autoComplete="off" />
+                  </label>
+                  <label>
+                    <span>Claude key</span>
+                    <input type="password" value={providerKeys.claudeKey} onChange={(event) => updateKey('claudeKey', event.target.value)} autoComplete="off" />
                   </label>
                 </div>
                 <button type="button" className="ai-key-clear" onClick={clearKeys}>

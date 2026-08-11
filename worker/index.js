@@ -8,6 +8,16 @@ const CONCIERGE_MODEL = '@cf/meta/llama-3.1-8b-instruct';
 const MAX_CONCIERGE_ASSETS = 36;
 const MAX_CONCIERGE_HISTORY = 8;
 const GENERATION_PROVIDERS = {
+  concierge_free_image: {
+    label: 'Concierge Free Render',
+    pipeline: 'image',
+    defaultModel: 'workers-ai-free'
+  },
+  concierge_free_video: {
+    label: 'Concierge Free Storyboard',
+    pipeline: 'video',
+    defaultModel: 'workers-ai-free'
+  },
   openai_image: {
     label: 'ChatGPT Images',
     pipeline: 'image',
@@ -516,7 +526,9 @@ async function createGenerationBranch(request, env, userId) {
     if (!provider) return json({ error: 'Unsupported generation provider' }, 400);
 
     let branch;
-    if (input.provider === 'openai_image') {
+    if (input.provider === 'concierge_free_image' || input.provider === 'concierge_free_video') {
+      branch = await generateConciergeFreeBranch(request, env, input);
+    } else if (input.provider === 'openai_image') {
       branch = await generateOpenAiImage(env, input);
     } else if (input.provider === 'gemini_banana_pro') {
       branch = await generateGeminiImage(env, input);
@@ -543,6 +555,33 @@ async function createGenerationBranch(request, env, userId) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('Generation branch failed', { provider: input.provider, message });
+    if (shouldUseFreeGenerationFallback(message, input)) {
+      try {
+        const fallbackInput = {
+          ...input,
+          provider: input.pipeline === 'video' ? 'concierge_free_video' : 'concierge_free_image'
+        };
+        const fallbackProvider = GENERATION_PROVIDERS[fallbackInput.provider];
+        const branch = await generateConciergeFreeBranch(request, env, fallbackInput, message);
+        const usage = estimateGenerationUsage(fallbackInput, branch, fallbackProvider);
+        await recordGenerationUsage(env, userId, fallbackInput, branch, fallbackProvider, usage);
+        return json({
+          branch: {
+            ...branch,
+            provider: fallbackInput.provider,
+            providerLabel: fallbackProvider.label,
+            pipeline: fallbackProvider.pipeline,
+            prompt: fallbackInput.prompt,
+            refs: fallbackInput.refs,
+            usage
+          },
+          usage,
+          generatedAt: new Date().toISOString()
+        }, 201);
+      } catch (fallbackError) {
+        console.warn('Free generation fallback failed', fallbackError instanceof Error ? fallbackError.message : String(fallbackError));
+      }
+    }
     const status = /required|unsupported/i.test(message) ? 400 : 502;
     return json({ error: `Generation failed: ${message}` }, status);
   }
@@ -641,6 +680,325 @@ async function recordGenerationUsage(env, userId, input, branch, provider, usage
   } catch (error) {
     console.warn('Generation usage tracking failed', error instanceof Error ? error.message : String(error));
   }
+}
+
+async function generateConciergeFreeBranch(request, env, input, fallbackReason = '') {
+  const isVideo = input.pipeline === 'video';
+  const provider = GENERATION_PROVIDERS[input.provider] || GENERATION_PROVIDERS.concierge_free_image;
+  const modelResult = await generateConciergeFreeCreativeBrief(request, env, input, fallbackReason);
+  const title = modelResult.title || `${isVideo ? 'Storyboard' : 'Image'} Concept`;
+  const description = modelResult.description || [
+    input.prompt,
+    fallbackReason ? `Paid-provider fallback: ${fallbackReason}` : '',
+    'Free concierge render: generated as an editable SVG concept from current canvas context.'
+  ].filter(Boolean).join('\n\n');
+  const imageDataUrl = makeFreeConciergeSvg({
+    title,
+    subtitle: modelResult.subtitle || provider.label,
+    prompt: input.prompt,
+    description,
+    isVideo,
+    colors: extractBrandColors(input),
+    parentTitle: input.parent?.title || '',
+    model: modelResult.model || provider.defaultModel
+  });
+
+  return {
+    title,
+    subtitle: modelResult.subtitle || `${provider.label} concept`,
+    description,
+    imageDataUrl,
+    model: modelResult.model || provider.defaultModel,
+    status: 'ready',
+    freeFallback: true,
+    operationName: ''
+  };
+}
+
+async function generateConciergeFreeCreativeBrief(request, env, input, fallbackReason = '') {
+  const systemPrompt = [
+    'You are Droplet Concierge, creating concise metadata for an editable brand asset card.',
+    'Return only JSON with keys title, subtitle, description.',
+    'Keep title under 54 characters. Keep subtitle under 70 characters.',
+    'Description should be a practical visual brief for a designer or image model.',
+    'Do not mention travel unless the prompt asks for travel creative.'
+  ].join('\n');
+  const brandNodes = Array.isArray(input.brandGuide?.nodes) ? input.brandGuide.nodes : [];
+  const userPrompt = [
+    `Prompt: ${input.prompt}`,
+    input.parent?.title ? `Selected source asset: ${input.parent.title}` : '',
+    input.parent?.description ? `Source description: ${input.parent.description}` : '',
+    brandNodes.length > 0 ? `Brand context:\n${brandNodes.map((node) => `- ${node.title || node.brandName || 'Brand guide'}: ${node.description || node.subtitle || ''}`).join('\n')}` : '',
+    fallbackReason ? `Paid provider failed with: ${fallbackReason}` : ''
+  ].filter(Boolean).join('\n\n');
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt }
+  ];
+
+  const workersModels = [
+    '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
+    '@cf/meta/llama-3.3-70b-instruct',
+    '@cf/meta/llama-3.1-8b-instruct'
+  ];
+
+  if (env.AI) {
+    for (const model of workersModels) {
+      try {
+        const payload = await env.AI.run(model, { messages, max_tokens: 900 }).catch(() => null);
+        const text = extractConciergeText(payload).replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        const parsed = parseConciergeBriefJson(text);
+        if (parsed) return { ...parsed, model };
+      } catch (error) {
+        console.warn('Free Workers AI generation brief failed', model, error instanceof Error ? error.message : String(error));
+      }
+    }
+  }
+
+  const openRouterKey = providerKey(request, env, 'X-OpenRouter-Key', ['OPENROUTER_CONCIERGE_API_KEY', 'OPENROUTER_API_KEY']);
+  if (openRouterKey) {
+    const model = cleanText(env.OPENROUTER_FREE_GENERATION_MODEL, 160) || 'deepseek/deepseek-r1:free';
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${openRouterKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://droplet.local',
+          'X-Title': 'Droplet Concierge'
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.35,
+          max_tokens: 700
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok) {
+        const parsed = parseConciergeBriefJson(payload?.choices?.[0]?.message?.content || '');
+        if (parsed) return { ...parsed, model };
+      }
+    } catch (error) {
+      console.warn('Free OpenRouter generation brief failed', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  const groqKey = providerKey(request, env, 'X-Groq-Key', ['GROQ_CONCIERGE_API_KEY', 'GROQ_API_KEY']);
+  if (groqKey) {
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${groqKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: cleanText(env.GROQ_GENERATION_BRIEF_MODEL, 160) || 'openai/gpt-oss-20b',
+          messages,
+          temperature: 0.35,
+          max_tokens: 700
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok) {
+        const parsed = parseConciergeBriefJson(payload?.choices?.[0]?.message?.content || '');
+        if (parsed) return { ...parsed, model: cleanText(env.GROQ_GENERATION_BRIEF_MODEL, 160) || 'openai/gpt-oss-20b' };
+      }
+    } catch (error) {
+      console.warn('Free Groq generation brief failed', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  const grokKey = providerKey(request, env, 'X-Grok-Key', ['GROK_CONCIERGE_API_KEY', 'GROK_API_KEY', 'XAI_CONCIERGE_API_KEY', 'XAI_API_KEY']);
+  if (grokKey) {
+    try {
+      const response = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${grokKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: cleanText(env.GROK_CONCIERGE_MODEL, 160) || 'grok-2-latest',
+          messages,
+          temperature: 0.35,
+          max_tokens: 700
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok) {
+        const parsed = parseConciergeBriefJson(payload?.choices?.[0]?.message?.content || '');
+        if (parsed) return { ...parsed, model: cleanText(env.GROK_CONCIERGE_MODEL, 160) || 'grok-2-latest' };
+      }
+    } catch (error) {
+      console.warn('Grok generation brief failed', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  const geminiKey = providerKey(request, env, 'X-Gemini-Key', ['GEMINI_CONCIERGE_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_AI_API_KEY']);
+  if (geminiKey) {
+    const model = cleanText(env.GEMINI_GENERATION_BRIEF_MODEL || env.GEMINI_CONCIERGE_MODEL, 160) || 'gemini-2.5-flash';
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: 'POST',
+        headers: {
+          'x-goog-api-key': geminiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: systemPrompt }]
+          },
+          contents: [{
+            role: 'user',
+            parts: [{ text: userPrompt }]
+          }],
+          generationConfig: {
+            temperature: 0.35,
+            maxOutputTokens: 700
+          }
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok) {
+        const parsed = parseConciergeBriefJson((payload?.candidates?.[0]?.content?.parts || []).map((part) => part.text || '').join('\n'));
+        if (parsed) return { ...parsed, model };
+      }
+    } catch (error) {
+      console.warn('Gemini generation brief failed', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  const claudeKey = providerKey(request, env, 'X-Anthropic-Key', ['ANTHROPIC_CONCIERGE_API_KEY', 'ANTHROPIC_API_KEY', 'CLAUDE_CONCIERGE_API_KEY', 'CLAUDE_API_KEY']);
+  if (claudeKey) {
+    const model = cleanText(env.CLAUDE_GENERATION_BRIEF_MODEL || env.CLAUDE_CONCIERGE_MODEL || env.ANTHROPIC_CONCIERGE_MODEL, 160) || 'claude-sonnet-4-20250514';
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': claudeKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.35,
+          max_tokens: 700,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }]
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok) {
+        const parsed = parseConciergeBriefJson((payload?.content || []).map((part) => part?.text || '').join('\n'));
+        if (parsed) return { ...parsed, model };
+      }
+    } catch (error) {
+      console.warn('Claude generation brief failed', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  return freeConciergeBriefFallback(input);
+}
+
+function parseConciergeBriefJson(value) {
+  const text = String(value || '').replace(/```(?:json)?|```/gi, '').trim();
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[0]);
+    return {
+      title: cleanText(parsed.title, 80),
+      subtitle: cleanText(parsed.subtitle, 100),
+      description: cleanText(parsed.description, 1600)
+    };
+  } catch {
+    return null;
+  }
+}
+
+function freeConciergeBriefFallback(input) {
+  const parentTitle = cleanText(input.parent?.title, 80);
+  const action = parentTitle ? `Edited ${parentTitle}` : 'Concierge Concept';
+  return {
+    title: action,
+    subtitle: input.pipeline === 'video' ? 'Free storyboard asset' : 'Free SVG concept asset',
+    description: [
+      `Creative prompt: ${input.prompt}`,
+      parentTitle ? `Source asset: ${parentTitle}` : '',
+      'Use this as a zero-credit concept card, then upgrade to a paid image/video provider only when the direction is approved.'
+    ].filter(Boolean).join('\n')
+  };
+}
+
+function makeFreeConciergeSvg({ title, subtitle, prompt, description, isVideo, colors, parentTitle, model }) {
+  const palette = colors.length > 0 ? colors : [
+    { name: 'Droplet Blue', hex: '#4B5EFA' },
+    { name: 'Signal Cyan', hex: '#00FFCC' },
+    { name: 'Warm Accent', hex: '#FF6A00' }
+  ];
+  const primary = normalizeHexColor(palette[0]?.hex) || '#4B5EFA';
+  const secondary = normalizeHexColor(palette[1]?.hex) || '#00FFCC';
+  const accent = normalizeHexColor(palette[2]?.hex) || '#FF6A00';
+  const safeTitle = escapeSvg(title || 'Concierge Concept');
+  const safeSubtitle = escapeSvg(subtitle || model || 'Free render');
+  const safePrompt = escapeSvg(prompt || '').slice(0, 260);
+  const safeDescription = escapeSvg(description || '').slice(0, 340);
+  const safeParent = escapeSvg(parentTitle || 'Canvas context');
+  const iconPath = isVideo ? 'M315 175 L385 215 L315 255 Z' : 'M350 150 L369 196 L419 197 L379 227 L393 275 L350 247 L307 275 L321 227 L281 197 L331 196 Z';
+  const swatches = palette.slice(0, 5).map((color, index) => {
+    const hex = normalizeHexColor(color.hex) || primary;
+    return `<circle cx="${72 + index * 34}" cy="344" r="12" fill="${hex}" stroke="rgba(255,255,255,.72)" stroke-width="1"/>`;
+  }).join('');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop stop-color="#05070C"/>
+        <stop offset=".52" stop-color="${primary}" stop-opacity=".42"/>
+        <stop offset="1" stop-color="${secondary}" stop-opacity=".34"/>
+      </linearGradient>
+      <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+        <stop stop-color="rgba(255,255,255,.18)"/>
+        <stop offset="1" stop-color="rgba(255,255,255,.05)"/>
+      </linearGradient>
+      <filter id="shadow"><feDropShadow dx="0" dy="24" stdDeviation="20" flood-color="#000" flood-opacity=".38"/></filter>
+    </defs>
+    <rect width="1024" height="1024" rx="54" fill="url(#bg)"/>
+    <path d="M88 202 C238 54 404 120 528 228 C650 334 792 288 936 140 L936 936 L88 936 Z" fill="rgba(0,0,0,.22)"/>
+    <rect x="72" y="78" width="880" height="868" rx="42" fill="rgba(5,7,12,.58)" stroke="rgba(255,255,255,.18)" filter="url(#shadow)"/>
+    <rect x="112" y="118" width="800" height="450" rx="34" fill="url(#panel)" stroke="rgba(255,255,255,.18)"/>
+    <circle cx="350" cy="215" r="112" fill="${accent}" fill-opacity=".2" stroke="${accent}" stroke-opacity=".7" stroke-width="3"/>
+    <path d="${iconPath}" fill="white" opacity=".92"/>
+    <text x="488" y="180" font-family="Inter, Arial, sans-serif" font-size="31" font-weight="800" fill="white">${safeSubtitle}</text>
+    <text x="488" y="228" font-family="Inter, Arial, sans-serif" font-size="21" font-weight="600" fill="rgba(255,255,255,.68)">${escapeSvg(model || 'free')}</text>
+    <text x="488" y="296" font-family="Inter, Arial, sans-serif" font-size="25" font-weight="750" fill="rgba(255,255,255,.88)">Source</text>
+    <text x="488" y="334" font-family="Inter, Arial, sans-serif" font-size="21" fill="rgba(255,255,255,.64)">${safeParent}</text>
+    ${swatches}
+    <text x="112" y="656" font-family="Inter, Arial, sans-serif" font-size="46" font-weight="900" fill="white">${safeTitle}</text>
+    <foreignObject x="112" y="704" width="800" height="112">
+      <div xmlns="http://www.w3.org/1999/xhtml" style="font: 25px/1.35 Inter, Arial, sans-serif; color: rgba(255,255,255,.78);">${safePrompt}</div>
+    </foreignObject>
+    <foreignObject x="112" y="835" width="800" height="84">
+      <div xmlns="http://www.w3.org/1999/xhtml" style="font: 18px/1.35 Inter, Arial, sans-serif; color: rgba(255,255,255,.52);">${safeDescription}</div>
+    </foreignObject>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function escapeSvg(value) {
+  return String(value || '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[char]));
+}
+
+function shouldUseFreeGenerationFallback(message, input) {
+  if (!input || input.provider === 'concierge_free_image' || input.provider === 'concierge_free_video') return false;
+  return /credit|quota|billing|insufficient_quota|rate limit|429|payment|required|exhausted|balance/i.test(String(message || ''));
 }
 
 async function generateOpenAiImage(env, input) {
@@ -795,6 +1153,21 @@ function normalizeBrandGuidePayload(value) {
 
 function estimateGenerationUsage(input, branch, provider) {
   const model = branch.model || GENERATION_PROVIDERS[input.provider]?.defaultModel || '';
+  if (input.provider === 'concierge_free_image' || input.provider === 'concierge_free_video') {
+    return {
+      provider: input.provider,
+      providerLabel: provider.label,
+      pipeline: provider.pipeline,
+      model,
+      estimatedUsd: 0,
+      currency: 'USD',
+      status: 'free',
+      outputCount: 1,
+      size: input.size,
+      quality: input.quality,
+      estimateBasis: 'Free concierge branch using Workers AI/OpenRouter/Groq text metadata and a generated SVG concept asset; no paid image/video API call.'
+    };
+  }
   if (branch.mock) {
     return {
       provider: input.provider,
@@ -1156,17 +1529,30 @@ function normalizeConciergeProvider(value) {
   const provider = cleanText(value, 80).toLowerCase();
   const aliases = {
     '': 'auto',
-    'workers-ai': 'auto',
-    cloudflare: 'auto',
-    'cloudflare-ai': 'auto',
+    cloudflare: 'workers-ai',
+    'cloudflare-ai': 'workers-ai',
     'openai-chat': 'openai',
     gemini: 'gemini',
     google: 'gemini',
-    'openrouter-free': 'openrouter',
-    'groq-free': 'groq'
+    anthropic: 'claude',
+    xai: 'grok',
+    'x-ai': 'grok',
+    deepseek: 'deepseek-free',
+    openrouter: 'openrouter-free',
+    groq: 'groq-free'
   };
   const normalized = aliases[provider] || provider || 'auto';
-  return ['auto', 'openai', 'gemini', 'openrouter', 'groq'].includes(normalized) ? normalized : 'auto';
+  return [
+    'auto',
+    'workers-ai',
+    'deepseek-free',
+    'openrouter-free',
+    'groq-free',
+    'grok',
+    'gemini',
+    'claude',
+    'openai'
+  ].includes(normalized) ? normalized : 'auto';
 }
 
 function normalizeConciergeSummary(summary) {
@@ -1289,17 +1675,20 @@ function buildDropletConciergeUserPrompt(input) {
 
 async function runDropletConciergeProvider(request, env, input, systemPrompt, userPrompt) {
   const providers = input.provider === 'auto'
-    ? ['workers-ai', 'openai', 'gemini', 'openrouter', 'groq']
+    ? ['deepseek-free', 'workers-ai', 'openrouter-free', 'groq-free', 'grok', 'gemini', 'claude', 'openai']
     : [input.provider];
 
   for (const provider of providers) {
     try {
       let result = null;
+      if (provider === 'deepseek-free') result = await runDeepSeekConcierge(request, env, systemPrompt, userPrompt);
       if (provider === 'workers-ai') result = await runWorkersAiConcierge(env, systemPrompt, userPrompt);
       if (provider === 'openai') result = await runOpenAiConcierge(request, env, systemPrompt, userPrompt);
       if (provider === 'gemini') result = await runGeminiConcierge(request, env, systemPrompt, userPrompt);
-      if (provider === 'openrouter') result = await runOpenRouterConcierge(request, env, systemPrompt, userPrompt);
-      if (provider === 'groq') result = await runGroqConcierge(request, env, systemPrompt, userPrompt);
+      if (provider === 'openrouter-free') result = await runOpenRouterConcierge(request, env, systemPrompt, userPrompt);
+      if (provider === 'groq-free') result = await runGroqConcierge(request, env, systemPrompt, userPrompt);
+      if (provider === 'grok') result = await runGrokConcierge(request, env, systemPrompt, userPrompt);
+      if (provider === 'claude') result = await runClaudeConcierge(request, env, systemPrompt, userPrompt);
       if (result?.answer) return result;
     } catch (error) {
       console.warn(`Concierge provider ${provider} failed`, error instanceof Error ? error.message : String(error));
@@ -1309,13 +1698,47 @@ async function runDropletConciergeProvider(request, env, input, systemPrompt, us
 
   if (input.provider !== 'auto') {
     return {
-      answer: `The ${input.provider} concierge provider is not configured for this session. Add the matching Worker secret or use Auto so Droplet can fall back to Workers AI and the local context summary.`,
+      answer: `The ${input.provider} concierge agent is not configured for this session. Add the matching key in Concierge settings, set the matching Worker secret, or use Auto so Droplet can fall through the free agent cycle and the local context summary.`,
       aiModel: `${input.provider}-missing-key`,
       recommendations: dropletConciergeRecommendations(input)
     };
   }
 
   return null;
+}
+
+async function runDeepSeekConcierge(request, env, systemPrompt, userPrompt) {
+  const workersModel = cleanText(env.DEEPSEEK_CONCIERGE_WORKERS_MODEL, 160) || '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
+  if (env.AI) {
+    const payload = await env.AI.run(workersModel, {
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      max_tokens: 1500
+    });
+    return {
+      answer: stripDeepSeekThinking(extractConciergeText(payload)),
+      aiModel: workersModel
+    };
+  }
+
+  const apiKey = providerKey(request, env, 'X-OpenRouter-Key', ['OPENROUTER_CONCIERGE_API_KEY', 'OPENROUTER_API_KEY']);
+  if (!apiKey) return null;
+  const model = cleanText(env.DEEPSEEK_OPENROUTER_CONCIERGE_MODEL, 160) || 'deepseek/deepseek-r1:free';
+  return runOpenAiCompatibleConcierge({
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKey,
+    model,
+    systemPrompt,
+    userPrompt,
+    aiModel: model,
+    headers: {
+      'HTTP-Referer': 'https://droplet.local',
+      'X-Title': 'Droplet Concierge'
+    },
+    cleanAnswer: stripDeepSeekThinking
+  });
 }
 
 async function runWorkersAiConcierge(env, systemPrompt, userPrompt) {
@@ -1325,7 +1748,8 @@ async function runWorkersAiConcierge(env, systemPrompt, userPrompt) {
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
-    ]
+    ],
+    max_tokens: 1200
   });
   return {
     answer: extractConciergeText(payload),
@@ -1396,47 +1820,97 @@ async function runGeminiConcierge(request, env, systemPrompt, userPrompt) {
 async function runOpenRouterConcierge(request, env, systemPrompt, userPrompt) {
   const apiKey = providerKey(request, env, 'X-OpenRouter-Key', ['OPENROUTER_CONCIERGE_API_KEY', 'OPENROUTER_API_KEY']);
   if (!apiKey) return null;
-  const model = cleanText(env.OPENROUTER_CONCIERGE_MODEL, 160) || 'meta-llama/llama-3.1-8b-instruct:free';
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
+  const model = cleanText(env.OPENROUTER_CONCIERGE_MODEL, 160) || 'openrouter/free';
+  return runOpenAiCompatibleConcierge({
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKey,
+    model,
+    systemPrompt,
+    userPrompt,
+    aiModel: model,
     headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
       'HTTP-Referer': 'https://droplet.local',
       'X-Title': 'Droplet Concierge'
     },
-    body: JSON.stringify({
-      model,
-      temperature: 0.4,
-      max_tokens: 900,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ]
-    })
   });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(providerError(payload, response.status));
-  return {
-    answer: cleanText(payload?.choices?.[0]?.message?.content, 8000),
-    aiModel: model
-  };
 }
 
 async function runGroqConcierge(request, env, systemPrompt, userPrompt) {
   const apiKey = providerKey(request, env, 'X-Groq-Key', ['GROQ_CONCIERGE_API_KEY', 'GROQ_API_KEY']);
   if (!apiKey) return null;
-  const model = cleanText(env.GROQ_CONCIERGE_MODEL, 160) || 'llama-3.1-8b-instant';
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const model = cleanText(env.GROQ_CONCIERGE_MODEL, 160) || 'openai/gpt-oss-20b';
+  return runOpenAiCompatibleConcierge({
+    url: 'https://api.groq.com/openai/v1/chat/completions',
+    apiKey,
+    model,
+    systemPrompt,
+    userPrompt,
+    aiModel: model
+  });
+}
+
+async function runGrokConcierge(request, env, systemPrompt, userPrompt) {
+  const apiKey = providerKey(request, env, 'X-Grok-Key', ['GROK_CONCIERGE_API_KEY', 'GROK_API_KEY', 'XAI_CONCIERGE_API_KEY', 'XAI_API_KEY']);
+  if (!apiKey) return null;
+  const model = cleanText(env.GROK_CONCIERGE_MODEL, 160) || 'grok-4-latest';
+  return runOpenAiCompatibleConcierge({
+    url: 'https://api.x.ai/v1/chat/completions',
+    apiKey,
+    model,
+    systemPrompt,
+    userPrompt,
+    aiModel: model
+  });
+}
+
+async function runClaudeConcierge(request, env, systemPrompt, userPrompt) {
+  const apiKey = providerKey(request, env, 'X-Anthropic-Key', ['ANTHROPIC_CONCIERGE_API_KEY', 'ANTHROPIC_API_KEY', 'CLAUDE_CONCIERGE_API_KEY', 'CLAUDE_API_KEY']);
+  if (!apiKey) return null;
+  const model = cleanText(env.CLAUDE_CONCIERGE_MODEL || env.ANTHROPIC_CONCIERGE_MODEL, 160) || 'claude-sonnet-4-20250514';
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
       model,
       temperature: 0.4,
       max_tokens: 900,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }]
+    })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(providerError(payload, response.status));
+  return {
+    answer: cleanText((payload?.content || []).map((part) => part?.text || '').join('\n'), 8000),
+    aiModel: model
+  };
+}
+
+async function runOpenAiCompatibleConcierge({
+  url,
+  apiKey,
+  model,
+  systemPrompt,
+  userPrompt,
+  aiModel,
+  headers = {},
+  cleanAnswer = (value) => cleanText(value, 8000)
+}) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      ...headers
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.4,
+      max_tokens: 900,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
@@ -1446,17 +1920,23 @@ async function runGroqConcierge(request, env, systemPrompt, userPrompt) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(providerError(payload, response.status));
   return {
-    answer: cleanText(payload?.choices?.[0]?.message?.content, 8000),
-    aiModel: model
+    answer: cleanAnswer(payload?.choices?.[0]?.message?.content || ''),
+    aiModel
   };
 }
 
 function providerKey(request, env, headerName, envNames) {
+  const requestValue = cleanText(request.headers.get(headerName), 4000);
+  if (requestValue) return requestValue;
   for (const envName of envNames) {
     const value = cleanText(env[envName], 4000);
     if (value) return value;
   }
-  return cleanText(request.headers.get(headerName), 4000);
+  return '';
+}
+
+function stripDeepSeekThinking(value) {
+  return cleanText(value, 8000).replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 }
 
 function extractConciergeText(payload) {
@@ -2012,7 +2492,7 @@ function jsonError(error) {
 function corsHeaders() {
   return {
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type,X-OpenAI-Key,X-Gemini-Key,X-OpenRouter-Key,X-Groq-Key',
+    'Access-Control-Allow-Headers': 'Content-Type,X-OpenAI-Key,X-Gemini-Key,X-OpenRouter-Key,X-Groq-Key,X-Grok-Key,X-Anthropic-Key',
     'Access-Control-Allow-Credentials': 'true'
   };
 }

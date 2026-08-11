@@ -19,6 +19,33 @@ This maps the TRIP concierge architecture to Droplet before implementation.
 - Use one submit path for the drawer, prompt chips, and future prompt entry points.
 - The system prompt must be Droplet-specific and must not include travel concierge wording.
 
+## Agent Routing
+
+The Concierge drawer supports these agent ids:
+
+- `auto`: free-first cycle, then explicit key-backed providers, then local context fallback.
+- `deepseek-free`: Workers AI DeepSeek first; OpenRouter DeepSeek free if an OpenRouter key exists.
+- `workers-ai`: Cloudflare Workers AI Llama.
+- `openrouter-free`: OpenRouter free model router.
+- `groq-free`: Groq OpenAI-compatible endpoint, defaulting to `openai/gpt-oss-20b`.
+- `grok`: xAI/Grok endpoint.
+- `gemini`: Google Gemini endpoint.
+- `claude`: Anthropic Messages endpoint.
+- `openai`: OpenAI chat endpoint, kept last in Auto.
+
+Preferred production setup is Worker secrets:
+
+```bash
+npx wrangler secret put OPENROUTER_API_KEY
+npx wrangler secret put GROQ_API_KEY
+npx wrangler secret put GROK_API_KEY
+npx wrangler secret put GEMINI_API_KEY
+npx wrangler secret put ANTHROPIC_API_KEY
+npx wrangler secret put OPENAI_API_KEY
+```
+
+Browser-entered keys are explicit bring-your-own-key overrides. The frontend stores them in local browser storage and sends them as `X-OpenRouter-Key`, `X-Groq-Key`, `X-Grok-Key`, `X-Gemini-Key`, `X-Anthropic-Key`, or `X-OpenAI-Key` only with Concierge requests.
+
 ## Droplet Context Contract
 
 The frontend posts:

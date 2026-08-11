@@ -2,7 +2,9 @@ const PROVIDER_KEY_HEADERS = {
   openAiKey: 'X-OpenAI-Key',
   geminiKey: 'X-Gemini-Key',
   openRouterKey: 'X-OpenRouter-Key',
-  groqKey: 'X-Groq-Key'
+  groqKey: 'X-Groq-Key',
+  grokKey: 'X-Grok-Key',
+  claudeKey: 'X-Anthropic-Key'
 };
 
 const textValue = (value, maxLength = 500) => String(value || '').trim().slice(0, maxLength);
@@ -114,6 +116,15 @@ export function sanitizeAssistantText(value) {
     .replace(/\n{4,}/g, '\n\n\n');
 }
 
+export function buildProviderKeyHeaders(providerKeys = {}) {
+  const headers = {};
+  Object.entries(PROVIDER_KEY_HEADERS).forEach(([key, header]) => {
+    const value = textValue(providerKeys[key], 4000);
+    if (value) headers[header] = value;
+  });
+  return headers;
+}
+
 function localConciergeFallback(prompt, context = {}) {
   const summary = context.assetSummary || {};
   const brandGuide = Array.isArray(context.brandGuides) && context.brandGuides[0];
@@ -139,11 +150,7 @@ export async function askConcierge({
   history = [],
   providerKeys = {}
 }) {
-  const headers = {};
-  Object.entries(PROVIDER_KEY_HEADERS).forEach(([key, header]) => {
-    const value = textValue(providerKeys[key], 4000);
-    if (value) headers[header] = value;
-  });
+  const headers = buildProviderKeyHeaders(providerKeys);
 
   try {
     const response = await fetch('/api/ai/concierge', {

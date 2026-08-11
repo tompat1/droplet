@@ -38,7 +38,11 @@ export const canvasApi = {
 };
 
 export const generationApi = {
-  createBranch: (input) => apiRequest('/generate/branch', { method: 'POST', body: input })
+  createBranch: (input, options = {}) => apiRequest('/generate/branch', {
+    method: 'POST',
+    body: input,
+    headers: options.headers || {}
+  })
 };
 
 export const usageApi = {
