@@ -5,6 +5,15 @@ export default function ConnectorLine({ targetId }) {
     if (targetId) {
       const target = document.getElementById(targetId);
       if (target) {
+        if (targetId === 'hero-canvas-section') {
+          const canvasViewport = document.getElementById('hero-canvas-viewport') || target;
+          const rect = canvasViewport.getBoundingClientRect();
+          window.dispatchEvent(new CustomEvent('heroCanvasConnectorScroll'));
+          const nextArrowAllowance = window.innerWidth >= 768 ? 34 : 24;
+          const targetTop = window.scrollY + rect.top + (rect.height / 2) - (window.innerHeight / 2) + nextArrowAllowance;
+          window.scrollTo({ top: targetTop, behavior: 'smooth' });
+          return;
+        }
         target.scrollIntoView({ behavior: 'smooth' });
         return;
       }

@@ -4191,6 +4191,10 @@ export default function HeroCanvas() {
   useEffect(() => {
     if (isFullscreen) return undefined;
 
+    const suppressCanvasSnap = () => {
+      canvasSnapRef.current.lastSnapAt = Date.now();
+    };
+
     const handleCanvasSnap = () => {
       if (window.innerWidth < 980) return;
       const canvasElement = containerRef.current;
@@ -4223,8 +4227,12 @@ export default function HeroCanvas() {
       });
     };
 
+    window.addEventListener('heroCanvasConnectorScroll', suppressCanvasSnap);
     window.addEventListener('scroll', handleCanvasSnap, { passive: true });
-    return () => window.removeEventListener('scroll', handleCanvasSnap);
+    return () => {
+      window.removeEventListener('heroCanvasConnectorScroll', suppressCanvasSnap);
+      window.removeEventListener('scroll', handleCanvasSnap);
+    };
   }, [isFullscreen]);
 
   const onConnect = useCallback(
@@ -4270,11 +4278,11 @@ export default function HeroCanvas() {
     <div id="hero-canvas-section" style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
       <CanvasActionToast message={canvasActionToast} />
       {!isFullscreen && (
-        <div style={{ padding: '20px 5% 0 5%', zIndex: 10, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: '40px' }}>
+        <div style={{ padding: '0 5% 0 5%', marginTop: '-34px', zIndex: 10, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: '40px' }}>
           <h1 style={{ fontSize: '3.5rem', margin: 0, whiteSpace: 'nowrap' }}>
             <EditableText contentKey="canvas.title.prefix" fallback="Fluid" /> <span className="text-gradient"><EditableText contentKey="canvas.title.accent" fallback="Node Canvas" /></span>
           </h1>
-          <p style={{ margin: 0, fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', lineHeight: '1.6', maxWidth: '650px', textAlign: 'left' }}>
+          <p style={{ margin: 0, fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', lineHeight: '1.48', maxWidth: '1080px', flex: '1 1 860px', textAlign: 'left' }}>
             <EditableText
               contentKey="canvas.description.main"
               fallback="Navigate the Droplet ecosystem through our interactive, physics-based graph. Pan, zoom, and explore"
@@ -4288,6 +4296,7 @@ export default function HeroCanvas() {
       )}
       
       <div
+        id="hero-canvas-viewport"
         ref={containerRef}
         tabIndex={0}
         onDragEnter={handleCanvasDragEnter}
@@ -4296,7 +4305,7 @@ export default function HeroCanvas() {
         onDrop={handleCanvasDrop}
         onPointerMove={handleCanvasPointerMove}
         onPointerDown={handleCanvasPointerDown}
-        style={{ width: '100%', minHeight: '500px', height: isFullscreen ? '100vh' : 'calc(100vh - 120px)', position: 'relative', backgroundColor: isFullscreen ? '#050505' : 'transparent', marginTop: '20px', outline: 'none', cursor: isPlacingLabel || isPlacingNote ? 'crosshair' : 'default' }}
+        style={{ width: '100%', minHeight: '720px', height: '100vh', position: 'relative', backgroundColor: isFullscreen ? '#050505' : 'transparent', marginTop: 0, outline: 'none', cursor: isPlacingLabel || isPlacingNote ? 'crosshair' : 'default' }}
       >
       <input
         ref={canvasUploadInputRef}
