@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import assetFiles from '../assetsData.json';
 import MediaModal from './MediaModal';
 import { defaultAvailableTags, defaultAssetTags } from '../defaultTags';
 import EditableText from './EditableText';
@@ -88,19 +87,6 @@ const galleryDomId = (src = '') => {
     hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0;
   }
   return `gallery-item-${Math.abs(hash).toString(36)}`;
-};
-
-const staticAssetToItem = (categoryTitle, filename, index) => {
-  const isVideo = categoryTitle === 'Campaign Videos' || filename.match(/\.(mp4|webm|mov)$/i);
-  const mediaSrc = isVideo ? `/assets/videos/${filename}` : `/assets/branding/${filename}`;
-  return {
-    key: `static-${categoryTitle}-${filename}-${index}`,
-    type: isVideo ? 'video' : 'image',
-    src: mediaSrc,
-    tagKey: mediaSrc,
-    title: mediaTitleFromPath(filename),
-    source: 'static'
-  };
 };
 
 const canvasMediaItemsForNode = (node) => {
@@ -204,26 +190,12 @@ const buildCanvasCategories = (canvasNodes, canvasName = '') => {
   ];
 };
 
-const buildStaticCategories = (excludedSources) => Object.keys(assetFiles)
-  .filter(key => key !== 'Canvas Ads' && key !== 'Canvas In The Wild Products' && key !== 'Canvas Products Shots')
-  .map(key => ({
-    id: `static-${key}`,
-    title: key,
-    editableTitle: true,
-    assets: assetFiles[key]
-      .map((filename, index) => staticAssetToItem(key, filename, index))
-      .filter((item) => !excludedSources.has(item.src))
-  }))
-  .filter((category) => category.assets.length > 0);
-
 export default function InteractiveGallery() {
   const galleryRef = useRef(null);
   const { canvasNodes, canvasName } = useCanvasAssets();
 
   const canvasCategories = useMemo(() => buildCanvasCategories(canvasNodes, canvasName), [canvasName, canvasNodes]);
-  const canvasSourceSet = useMemo(() => new Set(canvasCategories.flatMap((category) => category.assets.map((asset) => asset.src))), [canvasCategories]);
-  const staticCategories = useMemo(() => buildStaticCategories(canvasSourceSet), [canvasSourceSet]);
-  const categories = useMemo(() => [...canvasCategories, ...staticCategories], [canvasCategories, staticCategories]);
+  const categories = canvasCategories;
   const allAssets = useMemo(() => categories.flatMap((category) => category.assets), [categories]);
 
   const [activeIndex, setActiveIndex] = useState(null);
@@ -231,6 +203,10 @@ export default function InteractiveGallery() {
 
   const handleNext = () => setActiveIndex(prev => allAssets.length > 0 ? (prev + 1) % allAssets.length : null);
   const handlePrev = () => setActiveIndex(prev => allAssets.length > 0 ? (prev - 1 + allAssets.length) % allAssets.length : null);
+
+  useEffect(() => {
+    setActiveIndex(null);
+  }, [canvasName]);
 
   useEffect(() => {
     if (activeIndex !== null && activeIndex >= allAssets.length) {
@@ -343,7 +319,7 @@ export default function InteractiveGallery() {
         <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '1.2rem', maxWidth: '700px', margin: '0 auto', lineHeight: '1.6', marginBottom: '30px' }}>
           <EditableText
             contentKey="gallery.description"
-            fallback="Follow the paths and explore the Droplet asset system: ads, mockups, videos, merch, and brand files brought together in one polished gallery"
+            fallback="Explore only the live media cards from the current brand canvas, grouped exactly as they are connected on the canvas."
             multiline
           />
         </p>
@@ -475,6 +451,13 @@ export default function InteractiveGallery() {
         </div>
       )}
       
+      {categories.length === 0 && (
+        <div className="glass-panel" style={{ position: 'relative', zIndex: 2, maxWidth: '760px', margin: '0 auto', padding: '28px', textAlign: 'center', color: 'rgba(255,255,255,0.68)' }}>
+          <strong style={{ display: 'block', color: '#fff', fontSize: '1.15rem', marginBottom: '8px' }}>{canvasName || 'Current canvas'}</strong>
+          <span>No media cards are connected to this canvas yet.</span>
+        </div>
+      )}
+
       {categories.map((category, catIndex) => (
         <div key={catIndex} style={{ position: 'relative', zIndex: 2, marginTop: catIndex === 0 ? '0' : '120px', marginBottom: '20px' }}>
           <h3 style={{ 
