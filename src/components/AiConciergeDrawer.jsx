@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Bot, FileText, Grid3X3, ImagePlus, KeyRound, Send, Settings, Sparkles, Trash2, WandSparkles, X } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { useCanvasAssets } from './CanvasAssetsState';
@@ -87,6 +88,7 @@ export default function AiConciergeDrawer() {
 function AiConciergeDrawerInner({ user }) {
   const { canvasActions, canvasNodes, canvasEdges, canvasName } = useCanvasAssets();
   const { content, updateText } = useSiteContent();
+  const messagesRef = React.useRef(null);
   const [isOpen, setIsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
@@ -111,6 +113,13 @@ function AiConciergeDrawerInner({ user }) {
   useEffect(() => {
     localStorage.setItem(KEYS_STORAGE_KEY, JSON.stringify(providerKeys));
   }, [providerKeys]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const container = messagesRef.current;
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+  }, [history, isOpen, loading, canvasActionLoading]);
 
   const selectedAssetCount = useMemo(() => canvasNodes.filter((node) => node?.selected === true && node?.type === 'brandCard').length, [canvasNodes]);
 
@@ -287,6 +296,149 @@ function AiConciergeDrawerInner({ user }) {
   };
 
   const summary = dropletContext.context.assetSummary;
+  const drawerPortal = isOpen && typeof document !== 'undefined'
+    ? createPortal(
+      <div className="ai-concierge-shell" role="dialog" aria-modal="true" aria-label="Droplet concierge">
+        <div className="ai-concierge-backdrop" onClick={() => setIsOpen(false)} />
+        <aside className="ai-concierge-panel">
+          <header className="ai-concierge-header">
+            <div className="ai-concierge-title">
+              <span className="ai-concierge-mark"><Bot size={18} aria-hidden="true" /></span>
+              <div>
+                <h2>Droplet Concierge</h2>
+                <p>{summary.totalNodes} nodes / {summary.generatedCount} branches / {summary.brandGuideCount} guides</p>
+              </div>
+            </div>
+            <div className="ai-concierge-actions">
+              <button type="button" onClick={() => setSettingsOpen((open) => !open)} aria-label="AI settings" title="AI settings">
+                <Settings size={17} aria-hidden="true" />
+              </button>
+              <button type="button" onClick={() => setHistory([])} aria-label="Clear chat" title="Clear chat">
+                <Trash2 size={17} aria-hidden="true" />
+              </button>
+              <button type="button" onClick={() => setIsOpen(false)} aria-label="Close concierge" title="Close concierge">
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+          </header>
+
+          {settingsOpen && (
+            <section className="ai-concierge-settings" aria-label="Concierge provider settings">
+              <label>
+                <span>Agent</span>
+                <select value={provider} onChange={(event) => setProvider(event.target.value)}>
+                  {PROVIDERS.map((item) => (
+                    <option key={item.value} value={item.value}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="ai-key-grid">
+                <label>
+                  <span>OpenRouter key</span>
+                  <input type="password" value={providerKeys.openRouterKey} onChange={(event) => updateKey('openRouterKey', event.target.value)} autoComplete="off" />
+                </label>
+                <label>
+                  <span>Groq key</span>
+                  <input type="password" value={providerKeys.groqKey} onChange={(event) => updateKey('groqKey', event.target.value)} autoComplete="off" />
+                </label>
+                <label>
+                  <span>Grok / xAI key</span>
+                  <input type="password" value={providerKeys.grokKey} onChange={(event) => updateKey('grokKey', event.target.value)} autoComplete="off" />
+                </label>
+                <label>
+                  <span>Gemini key</span>
+                  <input type="password" value={providerKeys.geminiKey} onChange={(event) => updateKey('geminiKey', event.target.value)} autoComplete="off" />
+                </label>
+                <label>
+                  <span>OpenAI key</span>
+                  <input type="password" value={providerKeys.openAiKey} onChange={(event) => updateKey('openAiKey', event.target.value)} autoComplete="off" />
+                </label>
+                <label>
+                  <span>Claude key</span>
+                  <input type="password" value={providerKeys.claudeKey} onChange={(event) => updateKey('claudeKey', event.target.value)} autoComplete="off" />
+                </label>
+              </div>
+              <button type="button" className="ai-key-clear" onClick={clearKeys}>
+                <KeyRound size={15} aria-hidden="true" />
+                <span>Clear Keys</span>
+              </button>
+            </section>
+          )}
+
+          <div className="ai-concierge-messages" aria-live="polite" ref={messagesRef}>
+            {history.length === 0 && (
+              <div className="ai-concierge-empty">
+                <strong>{dropletContext.context.canvasName}</strong>
+                <span>{summary.imageCount + summary.videoCount} media assets available</span>
+                {selectedAssetCount > 0 && <span>{selectedAssetCount} selected for edits</span>}
+              </div>
+            )}
+            {history.map((item, index) => (
+              <article key={`${item.role}-${index}`} className={`ai-message ai-message-${item.role}`}>
+                <div className="ai-message-body">{item.text}</div>
+                {item.model && <div className="ai-message-model">{item.model}</div>}
+                {item.action && (
+                  <button
+                    type="button"
+                    className="ai-message-action"
+                    onClick={() => runAssetAction(item.action.prompt, item.action.pipeline)}
+                    disabled={canvasActionLoading}
+                  >
+                    <WandSparkles size={15} aria-hidden="true" />
+                    <span>{item.action.mode === 'edit' ? 'Edit Selected' : 'Render On Canvas'}</span>
+                  </button>
+                )}
+                {Array.isArray(item.plannerActions) && item.plannerActions.map((plannedAction, actionIndex) => (
+                  <button
+                    key={`${plannedAction.type}-${actionIndex}`}
+                    type="button"
+                    className="ai-message-action"
+                    onClick={() => runPlannerAction(plannedAction)}
+                    disabled={canvasActionLoading}
+                  >
+                    {plannedAction.type === 'rewrite_copy'
+                      ? <FileText size={15} aria-hidden="true" />
+                      : <Grid3X3 size={15} aria-hidden="true" />}
+                    <span>{plannedAction.label || (plannedAction.type === 'rewrite_copy' ? 'Apply Copy' : 'Organize Canvas')}</span>
+                  </button>
+                ))}
+              </article>
+            ))}
+            {(loading || canvasActionLoading) && (
+              <article className="ai-message ai-message-assistant">
+                <div className="ai-message-body">{canvasActionLoading ? 'Working on the canvas...' : 'Thinking through the canvas...'}</div>
+              </article>
+            )}
+          </div>
+
+          <div className="ai-chip-row">
+            {PROMPT_CHIPS.map((chip) => (
+              <button key={chip} type="button" onClick={() => submitPrompt(chip)} disabled={loading}>
+                {chip}
+              </button>
+            ))}
+          </div>
+
+          <form className="ai-concierge-form" onSubmit={handleSubmit}>
+            <textarea
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder={selectedAssetCount > 0 ? 'Ask, or render an edited branch from the selected asset...' : 'Ask, or render a new asset on the current canvas...'}
+              disabled={loading || canvasActionLoading}
+              rows={3}
+            />
+            <button type="submit" disabled={loading || canvasActionLoading || !prompt.trim()} aria-label="Send prompt" title="Send prompt">
+              <Send size={18} aria-hidden="true" />
+            </button>
+            <button type="button" onClick={handleRenderSubmit} disabled={loading || canvasActionLoading || !prompt.trim()} aria-label={selectedAssetCount > 0 ? 'Edit selected asset' : 'Render asset'} title={selectedAssetCount > 0 ? 'Edit selected asset' : 'Render asset'}>
+              <ImagePlus size={18} aria-hidden="true" />
+            </button>
+          </form>
+        </aside>
+      </div>,
+      document.body
+    )
+    : null;
 
   return (
     <>
@@ -301,146 +453,7 @@ function AiConciergeDrawerInner({ user }) {
         <span>Concierge</span>
       </button>
 
-      {isOpen && (
-        <div className="ai-concierge-shell" role="dialog" aria-modal="true" aria-label="Droplet concierge">
-          <div className="ai-concierge-backdrop" onClick={() => setIsOpen(false)} />
-          <aside className="ai-concierge-panel">
-            <header className="ai-concierge-header">
-              <div className="ai-concierge-title">
-                <span className="ai-concierge-mark"><Bot size={18} aria-hidden="true" /></span>
-                <div>
-                  <h2>Droplet Concierge</h2>
-                  <p>{summary.totalNodes} nodes / {summary.generatedCount} branches / {summary.brandGuideCount} guides</p>
-                </div>
-              </div>
-              <div className="ai-concierge-actions">
-                <button type="button" onClick={() => setSettingsOpen((open) => !open)} aria-label="AI settings" title="AI settings">
-                  <Settings size={17} aria-hidden="true" />
-                </button>
-                <button type="button" onClick={() => setHistory([])} aria-label="Clear chat" title="Clear chat">
-                  <Trash2 size={17} aria-hidden="true" />
-                </button>
-                <button type="button" onClick={() => setIsOpen(false)} aria-label="Close concierge" title="Close concierge">
-                  <X size={18} aria-hidden="true" />
-                </button>
-              </div>
-            </header>
-
-            {settingsOpen && (
-              <section className="ai-concierge-settings" aria-label="Concierge provider settings">
-                <label>
-                  <span>Agent</span>
-                  <select value={provider} onChange={(event) => setProvider(event.target.value)}>
-                    {PROVIDERS.map((item) => (
-                      <option key={item.value} value={item.value}>{item.label}</option>
-                    ))}
-                  </select>
-                </label>
-                <div className="ai-key-grid">
-                  <label>
-                    <span>OpenRouter key</span>
-                    <input type="password" value={providerKeys.openRouterKey} onChange={(event) => updateKey('openRouterKey', event.target.value)} autoComplete="off" />
-                  </label>
-                  <label>
-                    <span>Groq key</span>
-                    <input type="password" value={providerKeys.groqKey} onChange={(event) => updateKey('groqKey', event.target.value)} autoComplete="off" />
-                  </label>
-                  <label>
-                    <span>Grok / xAI key</span>
-                    <input type="password" value={providerKeys.grokKey} onChange={(event) => updateKey('grokKey', event.target.value)} autoComplete="off" />
-                  </label>
-                  <label>
-                    <span>Gemini key</span>
-                    <input type="password" value={providerKeys.geminiKey} onChange={(event) => updateKey('geminiKey', event.target.value)} autoComplete="off" />
-                  </label>
-                  <label>
-                    <span>OpenAI key</span>
-                    <input type="password" value={providerKeys.openAiKey} onChange={(event) => updateKey('openAiKey', event.target.value)} autoComplete="off" />
-                  </label>
-                  <label>
-                    <span>Claude key</span>
-                    <input type="password" value={providerKeys.claudeKey} onChange={(event) => updateKey('claudeKey', event.target.value)} autoComplete="off" />
-                  </label>
-                </div>
-                <button type="button" className="ai-key-clear" onClick={clearKeys}>
-                  <KeyRound size={15} aria-hidden="true" />
-                  <span>Clear Keys</span>
-                </button>
-              </section>
-            )}
-
-            <div className="ai-concierge-messages" aria-live="polite">
-              {history.length === 0 && (
-                <div className="ai-concierge-empty">
-                  <strong>{dropletContext.context.canvasName}</strong>
-                  <span>{summary.imageCount + summary.videoCount} media assets available</span>
-                  {selectedAssetCount > 0 && <span>{selectedAssetCount} selected for edits</span>}
-                </div>
-              )}
-              {history.map((item, index) => (
-                <article key={`${item.role}-${index}`} className={`ai-message ai-message-${item.role}`}>
-                  <div className="ai-message-body">{item.text}</div>
-                  {item.model && <div className="ai-message-model">{item.model}</div>}
-                  {item.action && (
-                    <button
-                      type="button"
-                      className="ai-message-action"
-                      onClick={() => runAssetAction(item.action.prompt, item.action.pipeline)}
-                      disabled={canvasActionLoading}
-                    >
-                      <WandSparkles size={15} aria-hidden="true" />
-                      <span>{item.action.mode === 'edit' ? 'Edit Selected' : 'Render On Canvas'}</span>
-                    </button>
-                  )}
-                  {Array.isArray(item.plannerActions) && item.plannerActions.map((plannedAction, actionIndex) => (
-                    <button
-                      key={`${plannedAction.type}-${actionIndex}`}
-                      type="button"
-                      className="ai-message-action"
-                      onClick={() => runPlannerAction(plannedAction)}
-                      disabled={canvasActionLoading}
-                    >
-                      {plannedAction.type === 'rewrite_copy'
-                        ? <FileText size={15} aria-hidden="true" />
-                        : <Grid3X3 size={15} aria-hidden="true" />}
-                      <span>{plannedAction.label || (plannedAction.type === 'rewrite_copy' ? 'Apply Copy' : 'Organize Canvas')}</span>
-                    </button>
-                  ))}
-                </article>
-              ))}
-              {(loading || canvasActionLoading) && (
-                <article className="ai-message ai-message-assistant">
-                  <div className="ai-message-body">{canvasActionLoading ? 'Working on the canvas...' : 'Thinking through the canvas...'}</div>
-                </article>
-              )}
-            </div>
-
-            <div className="ai-chip-row">
-              {PROMPT_CHIPS.map((chip) => (
-                <button key={chip} type="button" onClick={() => submitPrompt(chip)} disabled={loading}>
-                  {chip}
-                </button>
-              ))}
-            </div>
-
-            <form className="ai-concierge-form" onSubmit={handleSubmit}>
-              <textarea
-                value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
-                placeholder={selectedAssetCount > 0 ? 'Ask, or render an edited branch from the selected asset...' : 'Ask, or render a new asset on the current canvas...'}
-                disabled={loading || canvasActionLoading}
-                rows={3}
-              />
-              <button type="submit" disabled={loading || canvasActionLoading || !prompt.trim()} aria-label="Send prompt" title="Send prompt">
-                <Send size={18} aria-hidden="true" />
-              </button>
-              <button type="button" onClick={handleRenderSubmit} disabled={loading || canvasActionLoading || !prompt.trim()} aria-label={selectedAssetCount > 0 ? 'Edit selected asset' : 'Render asset'} title={selectedAssetCount > 0 ? 'Edit selected asset' : 'Render asset'}>
-                <ImagePlus size={18} aria-hidden="true" />
-              </button>
-            </form>
-          </aside>
-        </div>
-      )}
+      {drawerPortal}
     </>
   );
 }
