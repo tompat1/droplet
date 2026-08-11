@@ -40,6 +40,7 @@ export default function AuthControls() {
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
   const [isSavingAvatar, setIsSavingAvatar] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCanvasEditMode, setIsCanvasEditMode] = useState(false);
 
   const initials = useMemo(() => {
     const source = user?.displayName || user?.email || 'D';
@@ -62,6 +63,14 @@ export default function AuthControls() {
       });
     }
   }, [user]);
+
+  useEffect(() => {
+    const handleCanvasEditModeChange = (event) => {
+      setIsCanvasEditMode(event.detail?.isEditMode === true);
+    };
+    window.addEventListener('heroCanvasEditModeChanged', handleCanvasEditModeChange);
+    return () => window.removeEventListener('heroCanvasEditModeChanged', handleCanvasEditModeChange);
+  }, []);
 
   const handleAuthSubmit = async (event) => {
     event.preventDefault();
@@ -141,7 +150,7 @@ export default function AuthControls() {
   const handleEditCanvasShortcut = () => {
     const canvasSection = document.getElementById('hero-canvas-section');
     canvasSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    window.dispatchEvent(new CustomEvent('openHeroCanvasEditor'));
+    window.dispatchEvent(new CustomEvent('toggleHeroCanvasEditor'));
   };
 
   return (
@@ -149,9 +158,15 @@ export default function AuthControls() {
       <div className="auth-dock" aria-label="Account controls">
         {user ? (
           <>
-            <button className="edit-canvas-shortcut" onClick={handleEditCanvasShortcut} title="Edit canvas">
+            <button
+              className={`edit-canvas-shortcut ${isCanvasEditMode ? 'active' : ''}`}
+              onClick={handleEditCanvasShortcut}
+              title={isCanvasEditMode ? 'Leave canvas edit mode' : 'Enter canvas edit mode'}
+              aria-pressed={isCanvasEditMode}
+            >
               <img src="/assets/ui/edit-canvas-flash.svg" alt="" />
-              <span>Edit Canvas</span>
+              <span>{isCanvasEditMode ? 'Editing' : 'Edit Canvas'}</span>
+              <span className="edit-toggle-indicator" aria-hidden="true"><span /></span>
             </button>
             <button className="auth-pill" onClick={() => setActiveDrawer('account')} title="Account">
               <Avatar user={user} initials={initials} />

@@ -431,7 +431,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .edit-canvas-shortcut {
   min-height: 42px;
-  max-width: min(180px, calc(100vw - 180px));
+  max-width: min(210px, calc(100vw - 180px));
   border-radius: 999px;
   padding: 5px 13px 5px 6px;
   display: inline-flex;
@@ -447,10 +447,21 @@ h1, h2, h3, h4, h5, h6 {
   transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
 }
 
+.edit-canvas-shortcut.active {
+  border-color: rgba(0, 255, 204, 0.74);
+  background: rgba(0, 255, 204, 0.12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28), 0 0 22px rgba(0, 255, 204, 0.18);
+}
+
 .edit-canvas-shortcut:hover {
   transform: translateY(-1px);
   border-color: rgba(255, 106, 0, 0.72);
   background: rgba(20, 20, 25, 0.9);
+}
+
+.edit-canvas-shortcut.active:hover {
+  border-color: rgba(0, 255, 204, 0.92);
+  background: rgba(0, 255, 204, 0.16);
 }
 
 .edit-canvas-shortcut img {
@@ -467,6 +478,35 @@ h1, h2, h3, h4, h5, h6 {
   white-space: nowrap;
   font-size: 0.84rem;
   font-weight: 800;
+}
+
+.edit-toggle-indicator {
+  width: 32px;
+  height: 18px;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.edit-toggle-indicator span {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.72);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.edit-canvas-shortcut.active .edit-toggle-indicator {
+  border-color: rgba(0, 255, 204, 0.5);
+  background: rgba(0, 255, 204, 0.18);
+}
+
+.edit-canvas-shortcut.active .edit-toggle-indicator span {
+  transform: translateX(14px);
+  background: #00ffcc;
 }
 
 .auth-pill:hover,
@@ -1317,12 +1357,17 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .edit-canvas-shortcut {
-    max-width: 42px;
+    max-width: 74px;
     padding: 5px;
   }
 
   .edit-canvas-shortcut span {
     display: none;
+  }
+
+  .edit-canvas-shortcut .edit-toggle-indicator,
+  .edit-canvas-shortcut .edit-toggle-indicator span {
+    display: block;
   }
 
   .drawer-panel {

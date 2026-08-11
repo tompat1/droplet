@@ -4071,12 +4071,19 @@ export default function HeroCanvas() {
   }, [loadUsageSummary]);
 
   useEffect(() => {
-    const handleOpenEditor = () => {
-      setIsEditMode(true);
-    };
+    const handleOpenEditor = () => setIsEditMode(true);
+    const handleToggleEditor = () => setIsEditMode((value) => !value);
     window.addEventListener('openHeroCanvasEditor', handleOpenEditor);
-    return () => window.removeEventListener('openHeroCanvasEditor', handleOpenEditor);
+    window.addEventListener('toggleHeroCanvasEditor', handleToggleEditor);
+    return () => {
+      window.removeEventListener('openHeroCanvasEditor', handleOpenEditor);
+      window.removeEventListener('toggleHeroCanvasEditor', handleToggleEditor);
+    };
   }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('heroCanvasEditModeChanged', { detail: { isEditMode } }));
+  }, [isEditMode]);
 
   useEffect(() => {
     const handlePaste = (event) => {
