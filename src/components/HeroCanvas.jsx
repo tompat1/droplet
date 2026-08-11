@@ -1603,6 +1603,7 @@ const sanitizeNodeForSave = (node) => {
   delete data.setGlobalEdges;
   delete data.onToggleCollapse;
   delete data.onGenerationUsageUpdate;
+  delete data.onGenerationError;
   delete data.isHighlighted;
   delete data.isDropTarget;
   delete data.isParentCollapsed;
@@ -3770,6 +3771,12 @@ export default function HeroCanvas() {
     showCanvasActionToast(`Deleted ${label}.`);
   }, [pushUndoAction, setPersistentEdges, setPersistentNodes, showCanvasActionToast]);
 
+  const handleGenerationError = useCallback((message) => {
+    const displayMessage = message || 'Generation failed.';
+    setCanvasStatus(displayMessage);
+    showCanvasActionToast(displayMessage);
+  }, [showCanvasActionToast]);
+
   const startLabelPlacement = useCallback(() => {
     setIsEditMode(true);
     setIsPlacingNote(false);
@@ -4023,6 +4030,7 @@ export default function HeroCanvas() {
             setGlobalNodes: setPersistentNodes,
             setGlobalEdges: setPersistentEdges,
             onGenerationUsageUpdate: loadUsageSummary,
+            onGenerationError: handleGenerationError,
             pushUndoAction,
             onCreateSiblingNote: createSiblingNote,
             onDeleteNode: deleteCanvasNode,
@@ -4050,7 +4058,7 @@ export default function HeroCanvas() {
         }
       };
     }));
-  }, [activeDropLabelId, collapsedBranches, createSiblingNote, deleteCanvasNode, setNodes, setEdges, isEditMode, loadUsageSummary, pushUndoAction, setPersistentEdges, setPersistentNodes]);
+  }, [activeDropLabelId, collapsedBranches, createSiblingNote, deleteCanvasNode, handleGenerationError, setNodes, setEdges, isEditMode, loadUsageSummary, pushUndoAction, setPersistentEdges, setPersistentNodes]);
 
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);

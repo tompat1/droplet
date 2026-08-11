@@ -83,6 +83,8 @@ const API_KEY_PROVIDER_KEYS = [
   'google_veo'
 ];
 
+const generatedNodeId = (prefix = 'generated') => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
 const isBrandGuideNode = (node) => {
   const nodeData = node?.data || {};
   return node?.type === 'brandCard' && (
@@ -238,9 +240,105 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
   };
 
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteCountdown, setDeleteCountdown] = useState(5);
+  const [deleteCountdown, setDeleteCountdown] = useState(3);
+  const [isRerenderingDeleted, setIsRerenderingDeleted] = useState(false);
 
-  const deleteNodeAndEdges = useCallback(() => {
+  const rerenderDeletedGeneratedNode = useCallback(async (deletedNode, deletedEdges) => {
+    const deletedData = deletedNode.data || {};
+    const providerKey = deletedData.generationProvider;
+    const provider = GENERATION_PROVIDERS[providerKey];
+    const prompt = String(deletedData.generationPrompt || '').trim();
+    if (!provider || !prompt) return;
+
+    setIsRerenderingDeleted(true);
+    try {
+      const sourceNodes = getNodes().filter((node) => node.id !== deletedNode.id);
+      const parentNode = sourceNodes.find((node) => node.id === deletedData.generatedFromNodeId) || null;
+      const guideIds = new Set(Array.isArray(deletedData.generationBrandGuideNodeIds) ? deletedData.generationBrandGuideNodeIds : []);
+      const brandGuideNodes = sourceNodes.filter((node) => guideIds.has(node.id));
+      const brandGuide = {
+        nodes: brandGuideNodes.map(brandGuidePayloadFromNode)
+      };
+      const refs = Array.from(new Set(Array.isArray(deletedData.generationRefs) ? deletedData.generationRefs : []));
+      const result = await generationApi.createBranch({
+        provider: providerKey,
+        pipeline: provider.pipeline,
+        prompt,
+        refs,
+        brandGuide,
+        parent: parentNode ? {
+          id: parentNode.id,
+          title: parentNode.data?.title || '',
+          subtitle: parentNode.data?.subtitle || '',
+          description: parentNode.data?.description || '',
+          image: parentNode.data?.image || ''
+        } : {
+          id: deletedData.generatedFromNodeId || 'rerender',
+          title: deletedData.title || 'Deleted render',
+          subtitle: deletedData.subtitle || '',
+          description: deletedData.description || '',
+          image: ''
+        }
+      });
+
+      const isVideo = provider.pipeline === 'video';
+      const title = result?.branch?.title || `${isVideo ? 'Video' : 'Image'} Rerender`;
+      const mediaUrl = result?.branch?.imageDataUrl || result?.branch?.imageUrl || result?.branch?.posterUrl || '';
+      const newId = generatedNodeId('rerendered');
+      const newNode = {
+        ...deletedNode,
+        id: newId,
+        selected: true,
+        data: {
+          ...deletedData,
+          title,
+          subtitle: result?.branch?.subtitle || `${provider.label} rerender`,
+          description: result?.branch?.description || prompt,
+          image: mediaUrl || makeGeneratedPlaceholder({
+            isVideo,
+            title,
+            prompt,
+            providerLabel: provider.shortLabel
+          }),
+          video: result?.branch?.videoUrl || undefined,
+          generationModel: result?.branch?.model || '',
+          generationStatus: result?.branch?.status || (result?.mock ? 'mock' : 'ready'),
+          generationOperationName: result?.branch?.operationName || '',
+          generationMock: result?.mock === true || result?.branch?.mock === true,
+          generationUsage: result?.usage || result?.branch?.usage || null,
+          generationRerenderedFromNodeId: deletedNode.id,
+          generationRerenderedAt: new Date().toISOString(),
+          setGlobalNodes: data.setGlobalNodes,
+          setGlobalEdges: data.setGlobalEdges
+        }
+      };
+      const sourceEdge = deletedEdges.find((edge) => edge.target === deletedNode.id && edge.source !== deletedNode.id);
+      const labelEdge = deletedEdges.find((edge) => edge.target === deletedNode.id && edge.data?.isLabelLink);
+      const nextEdges = [
+        sourceEdge ? { ...sourceEdge, id: `e-${sourceEdge.source}-${newId}`, target: newId, style: { ...(sourceEdge.style || {}), stroke: provider.accent } } : null,
+        labelEdge ? { ...labelEdge, id: `label-${labelEdge.source}-${newId}`, target: newId } : null
+      ].filter(Boolean);
+
+      const nodeUpdater = data.setGlobalNodes || setNodes;
+      const edgeUpdater = data.setGlobalEdges || setEdges;
+      nodeUpdater((nds) => [...nds.map((node) => ({ ...node, selected: false })), newNode]);
+      if (nextEdges.length) edgeUpdater((eds) => [...eds, ...nextEdges]);
+      data.onGenerationUsageUpdate?.(result?.usage || result?.branch?.usage);
+      window.requestAnimationFrame(() => {
+        setCenter(newNode.position.x + 160, newNode.position.y + 180, { zoom: 0.9, duration: 700 });
+      });
+    } catch (error) {
+      const nodeUpdater = data.setGlobalNodes || setNodes;
+      const edgeUpdater = data.setGlobalEdges || setEdges;
+      nodeUpdater((nds) => [...nds, deletedNode]);
+      edgeUpdater((eds) => [...eds, ...deletedEdges]);
+      data.onGenerationError?.(error instanceof Error ? error.message : 'Rerender failed');
+    } finally {
+      setIsRerenderingDeleted(false);
+    }
+  }, [data, getNodes, setCenter, setEdges, setNodes]);
+
+  const deleteNodeAndEdges = useCallback(({ rerender = false } = {}) => {
     const deletedNode = getNode(id);
     const deletedEdges = getEdges().filter(edge => edge.source === id || edge.target === id);
     if (deletedNode) {
@@ -256,22 +354,26 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
     const edgeUpdater = data.setGlobalEdges || setEdges;
     nodeUpdater((nds) => nds.filter(n => n.id !== id));
     edgeUpdater((eds) => eds.filter(edge => edge.source !== id && edge.target !== id));
-  }, [data, getEdges, getNode, id, setEdges, setNodes]);
+
+    if (rerender && deletedNode?.data?.isGenerated && deletedNode.data?.generationProvider && deletedNode.data?.generationPrompt) {
+      rerenderDeletedGeneratedNode(deletedNode, deletedEdges);
+    }
+  }, [data, getEdges, getNode, id, rerenderDeletedGeneratedNode, setEdges, setNodes]);
 
   useEffect(() => {
     let timer;
     if (isDeleting && deleteCountdown > 0) {
       timer = setTimeout(() => setDeleteCountdown(c => c - 1), 1000);
     } else if (isDeleting && deleteCountdown === 0) {
-      deleteNodeAndEdges();
+      deleteNodeAndEdges({ rerender: data.isGenerated === true });
     }
     return () => clearTimeout(timer);
-  }, [deleteCountdown, deleteNodeAndEdges, isDeleting]);
+  }, [data.isGenerated, deleteCountdown, deleteNodeAndEdges, isDeleting]);
 
   const handleDeleteInitiate = (e) => {
     e.stopPropagation();
     setIsDeleting(true);
-    setDeleteCountdown(5);
+    setDeleteCountdown(3);
   };
 
   const handleCancelDelete = (e) => {
@@ -281,7 +383,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
   const handleConfirmDelete = (e) => {
     e.stopPropagation();
-    deleteNodeAndEdges();
+    deleteNodeAndEdges({ rerender: data.isGenerated === true });
   };
 
   const updateCardImage = useCallback((imageUrl) => {
@@ -918,11 +1020,19 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1.5s linear infinite' }}>
               <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
             </svg>
-            <span style={{ fontSize: '18px', fontWeight: 'bold' }}>Deleting in {deleteCountdown}...</span>
+            <span style={{ fontSize: '18px', fontWeight: 'bold', textAlign: 'center' }}>
+              {isRerenderingDeleted ? 'Rerendering...' : data.isGenerated ? `Rerendering in ${deleteCountdown}...` : `Deleting in ${deleteCountdown}...`}
+            </span>
+            {data.isGenerated && (
+              <span style={{ maxWidth: '230px', color: 'rgba(255,255,255,0.68)', fontSize: '12px', lineHeight: 1.35, textAlign: 'center' }}>
+                This render will be replaced with a fresh asset using the same prompt, provider, references, and brand guide.
+              </span>
+            )}
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
             <button 
               onClick={handleCancelDelete}
+              disabled={isRerenderingDeleted}
               style={{ 
                 padding: '8px 20px', 
                 background: 'rgba(255,255,255,0.1)', 
@@ -940,6 +1050,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
             </button>
             <button 
               onClick={handleConfirmDelete}
+              disabled={isRerenderingDeleted}
               style={{ 
                 padding: '8px 20px', 
                 background: 'rgba(255,50,50,0.15)', 
@@ -953,7 +1064,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,50,50,0.3)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,50,50,0.15)'}
             >
-              Delete
+              {data.isGenerated ? 'Rerender Now' : 'Delete'}
             </button>
           </div>
         </div>
