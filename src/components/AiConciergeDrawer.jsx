@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bot, FileText, Grid3X3, ImagePlus, KeyRound, Send, Settings, Sparkles, Trash2, WandSparkles, X } from 'lucide-react';
+import { Bot, FileText, Grid3X3, ImagePlus, KeyRound, Send, Settings, Trash2, WandSparkles, X } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { useCanvasAssets } from './CanvasAssetsState';
 import { useSiteContent } from './SiteContentContext';
@@ -113,6 +113,12 @@ function AiConciergeDrawerInner({ user }) {
   useEffect(() => {
     localStorage.setItem(KEYS_STORAGE_KEY, JSON.stringify(providerKeys));
   }, [providerKeys]);
+
+  useEffect(() => {
+    const handleOpenConcierge = () => setIsOpen(true);
+    window.addEventListener('openDropletConcierge', handleOpenConcierge);
+    return () => window.removeEventListener('openDropletConcierge', handleOpenConcierge);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -449,20 +455,5 @@ function AiConciergeDrawerInner({ user }) {
     )
     : null;
 
-  return (
-    <>
-      <button
-        type="button"
-        className="ai-concierge-launch"
-        onClick={() => setIsOpen(true)}
-        aria-label="Open Droplet concierge"
-        title="Open Droplet concierge"
-      >
-        <Sparkles size={18} aria-hidden="true" />
-        <span>Concierge</span>
-      </button>
-
-      {drawerPortal}
-    </>
-  );
+  return drawerPortal;
 }

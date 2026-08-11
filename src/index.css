@@ -999,28 +999,6 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.8rem;
 }
 
-.ai-concierge-launch {
-  position: fixed;
-  right: 20px;
-  bottom: 20px;
-  z-index: 12000;
-  min-height: 44px;
-  border: 1px solid rgba(0, 255, 204, 0.38);
-  border-radius: 8px;
-  background: rgba(6, 8, 12, 0.88);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 14px;
-  font-weight: 850;
-  cursor: pointer;
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.36), 0 0 22px rgba(0, 255, 204, 0.14);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-
 .ai-concierge-shell {
   position: fixed;
   inset: 0;
@@ -1377,11 +1355,6 @@ h1, h2, h3, h4, h5, h6 {
   .admin-user-row {
     grid-template-columns: 30px minmax(0, 1fr) 86px 38px;
     gap: 8px;
-  }
-
-  .ai-concierge-launch {
-    right: 12px;
-    bottom: 12px;
   }
 
   .ai-concierge-panel {
