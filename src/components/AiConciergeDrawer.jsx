@@ -121,6 +121,15 @@ function AiConciergeDrawerInner({ user }) {
     container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
   }, [history, isOpen, loading, canvasActionLoading]);
 
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
+
   const selectedAssetCount = useMemo(() => canvasNodes.filter((node) => node?.selected === true && node?.type === 'brandCard').length, [canvasNodes]);
 
   const runAssetAction = useCallback(async (rawPrompt, pipeline = 'image') => {
