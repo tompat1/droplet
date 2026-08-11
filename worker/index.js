@@ -712,7 +712,7 @@ async function generateConciergeFreeBranch(request, env, input, fallbackReason =
     prompt: input.prompt,
     description,
     isVideo,
-    colors: extractBrandColors(input),
+    colors: brandColorsPrioritizedForPrompt(input),
     parentTitle: input.parent?.title || '',
     model: modelResult.model || provider.defaultModel
   });
@@ -1473,6 +1473,47 @@ function mapPromptColorsToBrand(input) {
   });
 }
 
+function brandColorsPrioritizedForPrompt(input) {
+  const brandColors = extractBrandColors(input);
+  const mappedColors = mapPromptColorsToBrand(input);
+  if (mappedColors.length === 0) return brandColors;
+
+  const mappedKeys = new Set(mappedColors.map((color) => color.hex || color.name?.toLowerCase()).filter(Boolean));
+  const rest = brandColors.filter((color) => !mappedKeys.has(color.hex || color.name?.toLowerCase()));
+  return [...mappedColors.map((color) => ({ name: color.name, hex: color.hex })), ...rest];
+}
+
+function colorLabel(color) {
+  return [color?.name, color?.hex].filter(Boolean).join(' ').trim();
+}
+
+function colorAliasesForRequestedColor(requested) {
+  return (COLOR_WORD_ALIASES[requested] || [requested]).join(', ');
+}
+
+function brandColorLockSection(input) {
+  const requestedColors = detectRequestedColorWords(input.prompt);
+  if (requestedColors.length === 0) return '';
+
+  const brandColors = extractBrandColors(input);
+  const colorMappings = mapPromptColorsToBrand(input);
+  if (brandColors.length === 0) {
+    return [
+      'Strict brand color lock:',
+      `The prompt mentions color words: ${requestedColors.join(', ')}.`,
+      'No structured brand palette was included in this request, so do not invent generic color values.',
+      'Use only the closest matching swatch visible in the connected brand guide reference image. If the exact swatch cannot be confidently identified, preserve the existing asset color instead of guessing.'
+    ].join('\n');
+  }
+
+  return [
+    'Strict brand color lock:',
+    'Resolve user color words to the brand palette before rendering. These substitutions are authoritative:',
+    ...colorMappings.map((color) => `- ${colorAliasesForRequestedColor(color.requested)} => ${colorLabel(color)} only.`),
+    'Do not use generic color interpretations, provider defaults, or nearby non-brand colors.'
+  ].join('\n');
+}
+
 function nearestBrandColor(requested, brandColors) {
   const reference = hexToRgb(COLOR_REFERENCE_HEX[requested]);
   if (!reference) return null;
@@ -1506,8 +1547,7 @@ function colorDistance(a, b) {
 }
 
 function brandColorPromptSection(input) {
-  const brandColors = extractBrandColors(input);
-  const colorMappings = mapPromptColorsToBrand(input);
+  const brandColors = brandColorsPrioritizedForPrompt(input);
   if (brandColors.length === 0) {
     return 'Brand color rule: If the user asks for any color, resolve it against the visible branding guide image and brand rules instead of inventing a generic color.';
   }
@@ -1515,11 +1555,7 @@ function brandColorPromptSection(input) {
   const palette = brandColors
     .map((color, index) => `${index + 1}. ${[color.name, color.hex].filter(Boolean).join(' ')}`)
     .join('\n');
-  const mappings = colorMappings.length > 0
-    ? `\nRequested color mapping:\n${colorMappings.map((color) => `- "${color.requested}" must use ${[color.name, color.hex].filter(Boolean).join(' ')}`).join('\n')}`
-    : '';
-
-  return `Brand color rule: Match all prompt color requests to the brand palette below. Use exact hex values when available; do not substitute generic colors.\nBrand palette:\n${palette}${mappings}`;
+  return `Brand color rule: Match all prompt color requests to the brand palette below. Use exact hex values when available; do not substitute generic colors.\nBrand palette:\n${palette}`;
 }
 
 function withReferenceContext(input) {
@@ -1539,6 +1575,8 @@ function withReferenceContext(input) {
     sections.push(`Brand source of truth. Treat the connected brand guide as mandatory governance for all color, typography, logos, spacing, layout, product styling, image treatment, copy tone, and visual hierarchy decisions. Do not invent alternate logo marks, substitute off-brand fonts, or use generic colors when brand colors/rules are present:\n${guideContext}`);
   }
   sections.push(brandColorPromptSection(input));
+  const colorLock = brandColorLockSection(input);
+  if (colorLock) sections.push(colorLock);
   if (input.refs.length > 0) {
     sections.push(`Reference image URLs:\n${input.refs.map((ref, index) => `${index + 1}. ${ref}`).join('\n')}`);
   }
