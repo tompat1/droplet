@@ -187,6 +187,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
   const [isHoveringImage, setIsHoveringImage] = useState(false);
   const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
+  const [imagePreviewPortalTarget, setImagePreviewPortalTarget] = useState(null);
 
   // Generative UI State
   const [genState, setGenState] = useState('idle'); // idle | pipeline | prompt | generating
@@ -436,11 +437,19 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
   useEffect(() => {
     if (!isImagePreviewOpen) return undefined;
+    setImagePreviewPortalTarget(document.fullscreenElement || document.body);
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') setIsImagePreviewOpen(false);
     };
+    const handleFullscreenChange = () => {
+      setImagePreviewPortalTarget(document.fullscreenElement || document.body);
+    };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
   }, [isImagePreviewOpen]);
 
   const handleReferenceUpload = async (event) => {
@@ -783,7 +792,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         </div>
       )}
 
-      {isImagePreviewOpen && createPortal(
+      {isImagePreviewOpen && imagePreviewPortalTarget && createPortal(
         <div
           role="dialog"
           aria-modal="true"
