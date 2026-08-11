@@ -732,7 +732,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               {data.isCollapsed ? '+' : '−'}
             </button>
           )}
-          {(isEditMode || data.isGenerated) && (
+          {isEditMode && (
             <button 
               onClick={handleDeleteInitiate}
               style={{ 
