@@ -11,6 +11,12 @@
 	"ai": {
 		"binding": "AI"
 	},
+	"vars": {
+		"CLOUDFLARE_WORKERS_AI_MONTHLY_BUDGET_USD": "0",
+		"CLOUDFLARE_WORKERS_AI_MONTHLY_REQUEST_LIMIT": "0",
+		"DEEPSEEK_MONTHLY_BUDGET_USD": "0",
+		"DEEPSEEK_MONTHLY_REQUEST_LIMIT": "1000"
+	},
 	"d1_databases": [
 		{
 			"binding": "DB",

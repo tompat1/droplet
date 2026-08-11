@@ -69,6 +69,19 @@ const OPENAI_IMAGE_PRICE_ESTIMATES_USD = {
 const DEFAULT_IMAGE_SIZE = '1024x1024';
 const DEFAULT_IMAGE_QUALITY = 'medium';
 const DEFAULT_VEO_SECONDS = 8;
+const CLOUDFLARE_AI_USAGE_PROVIDERS = new Set([
+  'cloudflare_flux_klein',
+  'cloudflare_flux_schnell',
+  'concierge_free_image',
+  'concierge_free_video',
+  'workers-ai',
+  'deepseek-workers-ai'
+]);
+const DEEPSEEK_USAGE_PROVIDERS = new Set([
+  'deepseek-free',
+  'deepseek-workers-ai',
+  'deepseek-openrouter-free'
+]);
 const COLOR_WORD_ALIASES = {
   red: ['red', 'crimson', 'scarlet'],
   orange: ['orange', 'ember', 'tangerine'],
@@ -637,6 +650,14 @@ async function getUsageSummary(env, userId) {
     recent = { results: [] };
   }
 
+  const providerRows = (byProvider.results || []).map((row) => ({
+    provider: row.provider,
+    providerLabel: row.provider_label,
+    pipeline: row.pipeline,
+    requestCount: Number(row.request_count || 0),
+    estimatedUsd: roundMoney(row.estimated_usd || 0)
+  }));
+
   return json({
     currency: 'USD',
     summary: {
@@ -645,13 +666,8 @@ async function getUsageSummary(env, userId) {
       imageCount: Number(totals?.image_count || 0),
       videoCount: Number(totals?.video_count || 0)
     },
-    byProvider: byProvider.results.map((row) => ({
-      provider: row.provider,
-      providerLabel: row.provider_label,
-      pipeline: row.pipeline,
-      requestCount: Number(row.request_count || 0),
-      estimatedUsd: roundMoney(row.estimated_usd || 0)
-    })),
+    budgets: buildUsageBudgets(env, providerRows),
+    byProvider: providerRows,
     recent: recent.results.map((row) => ({
       id: row.id,
       provider: row.provider,
@@ -666,6 +682,68 @@ async function getUsageSummary(env, userId) {
       createdAt: row.created_at
     }))
   });
+}
+
+function buildUsageBudgets(env, providerRows) {
+  const cloudflare = summarizeUsageBucket(providerRows, (row) => CLOUDFLARE_AI_USAGE_PROVIDERS.has(row.provider));
+  const deepseek = summarizeUsageBucket(providerRows, (row) => DEEPSEEK_USAGE_PROVIDERS.has(row.provider));
+  return {
+    cloudflareWorkersAi: usageBudgetRow({
+      id: 'cloudflare-workers-ai',
+      label: 'Cloudworker AI Free',
+      usage: cloudflare,
+      budgetUsd: monthlyBudgetUsd(env, 'CLOUDFLARE_WORKERS_AI_MONTHLY_BUDGET_USD', 0),
+      requestLimit: monthlyRequestLimit(env, 'CLOUDFLARE_WORKERS_AI_MONTHLY_REQUEST_LIMIT', 0)
+    }),
+    deepseek: usageBudgetRow({
+      id: 'deepseek',
+      label: 'DeepSeek',
+      usage: deepseek,
+      budgetUsd: monthlyBudgetUsd(env, 'DEEPSEEK_MONTHLY_BUDGET_USD', 0),
+      requestLimit: monthlyRequestLimit(env, 'DEEPSEEK_MONTHLY_REQUEST_LIMIT', 1000)
+    })
+  };
+}
+
+function summarizeUsageBucket(providerRows, predicate) {
+  return providerRows
+    .filter(predicate)
+    .reduce((usage, row) => ({
+      requestCount: usage.requestCount + Number(row.requestCount || 0),
+      estimatedUsd: roundMoney(usage.estimatedUsd + Number(row.estimatedUsd || 0))
+    }), { requestCount: 0, estimatedUsd: 0 });
+}
+
+function usageBudgetRow({ id, label, usage, budgetUsd, requestLimit }) {
+  const spendMode = budgetUsd > 0;
+  const requestMode = !spendMode && requestLimit > 0;
+  const ratio = spendMode
+    ? usage.estimatedUsd / budgetUsd
+    : requestMode
+      ? usage.requestCount / requestLimit
+      : null;
+  return {
+    id,
+    label,
+    mode: spendMode ? 'spend' : requestMode ? 'requests' : 'tracked',
+    usedUsd: roundMoney(usage.estimatedUsd),
+    budgetUsd: roundMoney(budgetUsd),
+    remainingUsd: spendMode ? roundMoney(Math.max(0, budgetUsd - usage.estimatedUsd)) : null,
+    requestCount: usage.requestCount,
+    requestLimit,
+    remainingRequests: requestMode ? Math.max(0, requestLimit - usage.requestCount) : null,
+    ratio: Number.isFinite(ratio) ? ratio : null
+  };
+}
+
+function monthlyBudgetUsd(env, key, fallback) {
+  const value = Number(env?.[key]);
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function monthlyRequestLimit(env, key, fallback) {
+  const value = Number(env?.[key]);
+  return Number.isFinite(value) && value >= 0 ? Math.round(value) : fallback;
 }
 
 async function recordGenerationUsage(env, userId, input, branch, provider, usage) {
@@ -1718,6 +1796,7 @@ async function aiConciergeHandler(request, env, user) {
   const actions = await planDropletConciergeActions(env, input);
 
   if (providerResult) {
+    await recordConciergeUsage(env, user?.id, input, providerResult, systemPrompt, userPrompt);
     return json({
       success: true,
       answer: providerResult.answer,
@@ -2122,7 +2201,13 @@ async function runDropletConciergeProvider(request, env, input, systemPrompt, us
       if (provider === 'groq-free') result = await runGroqConcierge(request, env, systemPrompt, userPrompt);
       if (provider === 'grok') result = await runGrokConcierge(request, env, systemPrompt, userPrompt);
       if (provider === 'claude') result = await runClaudeConcierge(request, env, systemPrompt, userPrompt);
-      if (result?.answer) return result;
+      if (result?.answer) {
+        return {
+          ...result,
+          provider: result.usageProvider || provider,
+          providerLabel: result.usageProviderLabel || conciergeProviderLabel(provider)
+        };
+      }
     } catch (error) {
       console.warn(`Concierge provider ${provider} failed`, error instanceof Error ? error.message : String(error));
       if (input.provider !== 'auto') break;
@@ -2133,11 +2218,88 @@ async function runDropletConciergeProvider(request, env, input, systemPrompt, us
     return {
       answer: `The ${input.provider} concierge agent is not configured for this session. Add the matching key in Concierge settings, set the matching Worker secret, or use Auto so Droplet can fall through the free agent cycle and the local context summary.`,
       aiModel: `${input.provider}-missing-key`,
+      provider: input.provider,
+      providerLabel: conciergeProviderLabel(input.provider),
       recommendations: dropletConciergeRecommendations(input)
     };
   }
 
   return null;
+}
+
+function conciergeProviderLabel(provider) {
+  const labels = {
+    'deepseek-free': 'DeepSeek',
+    'deepseek-workers-ai': 'DeepSeek via Workers AI',
+    'deepseek-openrouter-free': 'DeepSeek via OpenRouter',
+    'workers-ai': 'Cloudflare Workers AI',
+    'openrouter-free': 'OpenRouter Free',
+    'groq-free': 'Groq Free',
+    grok: 'Grok',
+    gemini: 'Gemini',
+    claude: 'Claude',
+    openai: 'OpenAI'
+  };
+  return labels[provider] || provider || 'Concierge';
+}
+
+async function recordConciergeUsage(env, userId, input, providerResult, systemPrompt, userPrompt) {
+  if (!userId || !providerResult?.answer) return;
+  const provider = cleanText(providerResult.provider || input.provider || 'auto', 120);
+  const usage = estimateConciergeTextUsage(provider, providerResult);
+  try {
+    await env.DB.prepare(
+      `INSERT INTO generation_usage
+       (id, user_id, provider, provider_label, pipeline, model, status, prompt_chars, reference_count, output_count, output_size, output_quality, estimated_usd, estimate_basis)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      crypto.randomUUID(),
+      userId,
+      provider,
+      cleanText(providerResult.providerLabel || conciergeProviderLabel(provider), 160),
+      'text',
+      cleanText(providerResult.aiModel, 180),
+      usage.status,
+      String(systemPrompt || '').length + String(userPrompt || '').length,
+      Number(input.context?.assets?.length || 0) + Number(input.context?.brandGuides?.length || 0),
+      1,
+      'text',
+      '',
+      usage.estimatedUsd,
+      usage.estimateBasis
+    ).run();
+  } catch (error) {
+    console.warn('Concierge usage tracking failed', error instanceof Error ? error.message : String(error));
+  }
+}
+
+function estimateConciergeTextUsage(provider, providerResult) {
+  if (DEEPSEEK_USAGE_PROVIDERS.has(provider)) {
+    return {
+      estimatedUsd: 0,
+      status: 'tracked',
+      estimateBasis: 'DeepSeek concierge text call tracked as a free/zero-dollar agent route; account-level provider quotas may still apply outside Droplet.'
+    };
+  }
+  if (provider === 'workers-ai') {
+    return {
+      estimatedUsd: 0,
+      status: 'tracked',
+      estimateBasis: 'Cloudflare Workers AI concierge text call tracked without a per-token estimate.'
+    };
+  }
+  if (String(providerResult.aiModel || '').includes('missing-key')) {
+    return {
+      estimatedUsd: 0,
+      status: 'missing-key',
+      estimateBasis: 'Concierge provider was selected but no usable API key was configured.'
+    };
+  }
+  return {
+    estimatedUsd: 0,
+    status: 'tracked',
+    estimateBasis: 'Concierge text call tracked; no text pricing estimate configured for this provider.'
+  };
 }
 
 async function runDeepSeekConcierge(request, env, systemPrompt, userPrompt) {
@@ -2152,14 +2314,16 @@ async function runDeepSeekConcierge(request, env, systemPrompt, userPrompt) {
     });
     return {
       answer: stripDeepSeekThinking(extractConciergeText(payload)),
-      aiModel: workersModel
+      aiModel: workersModel,
+      usageProvider: 'deepseek-workers-ai',
+      usageProviderLabel: 'DeepSeek via Workers AI'
     };
   }
 
   const apiKey = providerKey(request, env, 'X-OpenRouter-Key', ['OPENROUTER_CONCIERGE_API_KEY', 'OPENROUTER_API_KEY']);
   if (!apiKey) return null;
   const model = cleanText(env.DEEPSEEK_OPENROUTER_CONCIERGE_MODEL, 160) || 'deepseek/deepseek-r1:free';
-  return runOpenAiCompatibleConcierge({
+  const result = await runOpenAiCompatibleConcierge({
     url: 'https://openrouter.ai/api/v1/chat/completions',
     apiKey,
     model,
@@ -2172,6 +2336,11 @@ async function runDeepSeekConcierge(request, env, systemPrompt, userPrompt) {
     },
     cleanAnswer: stripDeepSeekThinking
   });
+  return result ? {
+    ...result,
+    usageProvider: 'deepseek-openrouter-free',
+    usageProviderLabel: 'DeepSeek via OpenRouter'
+  } : null;
 }
 
 async function runWorkersAiConcierge(env, systemPrompt, userPrompt) {

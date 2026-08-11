@@ -418,6 +418,8 @@ const formatSpend = (usdValue, currencyCode = 'USD') => {
   return `${currency.symbol}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
+const formatUsageCount = (value) => Number(value || 0).toLocaleString();
+
 const MultiSelectHint = ({ interactionMode }) => {
   const [isHovered, setIsHovered] = useState(false);
   const kbdStyle = { background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace' };
@@ -2240,7 +2242,37 @@ const GenerationSpendPanel = ({
 }) => {
   const summary = usageSummary?.summary || {};
   const providers = usageSummary?.byProvider || [];
+  const budgetSummary = usageSummary?.budgets || {};
   const totalUsd = Number(summary.estimatedUsd || 0);
+  const usageBudgets = [
+    {
+      key: 'cloudflareWorkersAi',
+      accent: '#ffb84d',
+      label: 'Cloudworker AI',
+      data: budgetSummary.cloudflareWorkersAi || {
+        mode: 'tracked',
+        usedUsd: 0,
+        budgetUsd: 0,
+        remainingUsd: null,
+        requestCount: 0,
+        ratio: 0
+      }
+    },
+    {
+      key: 'deepseek',
+      accent: '#17d6b5',
+      label: 'DeepSeek',
+      data: budgetSummary.deepseek || {
+        mode: 'requests',
+        usedUsd: 0,
+        budgetUsd: 0,
+        requestCount: 0,
+        requestLimit: 1000,
+        remainingRequests: 1000,
+        ratio: 0
+      }
+    }
+  ];
 
   const panelStyle = {
     width: '100%',
@@ -2318,6 +2350,42 @@ const GenerationSpendPanel = ({
           ))}
         </div>
       )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {usageBudgets.map(({ key, label, accent, data }) => {
+          const ratio = Number.isFinite(data.ratio) ? Math.max(0, Math.min(1, data.ratio)) : 0;
+          const percent = Math.round(ratio * 100);
+          const isSpendMode = data.mode === 'spend';
+          const isRequestMode = data.mode === 'requests';
+          const primary = isSpendMode
+            ? `${formatSpend(data.usedUsd, usageCurrency)} / ${formatSpend(data.budgetUsd, usageCurrency)}`
+            : isRequestMode
+              ? `${formatUsageCount(data.requestCount)} / ${formatUsageCount(data.requestLimit)} req`
+              : `${formatSpend(data.usedUsd, usageCurrency)} est`;
+          const secondary = isSpendMode
+            ? `${formatSpend(data.remainingUsd, usageCurrency)} left`
+            : isRequestMode
+              ? `${formatUsageCount(data.remainingRequests)} req left`
+              : `${formatUsageCount(data.requestCount)} req tracked`;
+          const percentLabel = data.mode === 'tracked' ? 'free allocation' : `${percent}% used`;
+
+          return (
+            <div key={key} style={{ borderRadius: '10px', border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.045)', padding: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', fontSize: '0.7rem' }}>
+                <span style={{ color: '#fff', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.label || label}</span>
+                <strong style={{ color: 'rgba(255,255,255,0.84)', whiteSpace: 'nowrap' }}>{primary}</strong>
+              </div>
+              <div style={{ marginTop: '7px', height: '6px', borderRadius: '999px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }} aria-label={`${label} usage ${percent}%`}>
+                <div style={{ width: `${percent}%`, height: '100%', borderRadius: '999px', background: accent, boxShadow: `0 0 14px ${accent}66` }} />
+              </div>
+              <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', color: 'rgba(255,255,255,0.46)', fontSize: '0.64rem', fontWeight: 800 }}>
+                <span>{secondary}</span>
+                <span>{percentLabel}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
         <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.42)', lineHeight: 1.35 }}>
