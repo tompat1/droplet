@@ -7,6 +7,7 @@ export function CanvasAssetsProvider({ children }) {
     canvasEdges: [],
     canvasName: ''
   });
+  const [canvasActions, setCanvasActionsState] = useState({});
 
   const setCanvasSnapshot = useCallback(({ nodes = [], edges = [], canvasName = '' }) => {
     setSnapshot({
@@ -16,10 +17,16 @@ export function CanvasAssetsProvider({ children }) {
     });
   }, []);
 
+  const setCanvasActions = useCallback((actions = {}) => {
+    setCanvasActionsState(actions);
+  }, []);
+
   const value = useMemo(() => ({
     ...snapshot,
-    setCanvasSnapshot
-  }), [setCanvasSnapshot, snapshot]);
+    canvasActions,
+    setCanvasSnapshot,
+    setCanvasActions
+  }), [canvasActions, setCanvasActions, setCanvasSnapshot, snapshot]);
 
   return (
     <CanvasAssetsContext.Provider value={value}>

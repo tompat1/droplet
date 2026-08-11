@@ -4,6 +4,9 @@ const MAX_JSON_BYTES = 8_000_000;
 const PBKDF2_ITERATIONS = 100000;
 const CANVAS_ASSET_CHUNK_CHARS = 64000;
 const CANVAS_ASSET_REF_FLAG = '__dropletCanvasAsset';
+const CONCIERGE_MODEL = '@cf/meta/llama-3.1-8b-instruct';
+const MAX_CONCIERGE_ASSETS = 36;
+const MAX_CONCIERGE_HISTORY = 8;
 const GENERATION_PROVIDERS = {
   openai_image: {
     label: 'ChatGPT Images',
@@ -144,6 +147,10 @@ async function routeApi(request, env, url) {
 
   if (request.method === 'GET' && path === '/usage/summary') {
     return getUsageSummary(env, session.user.id);
+  }
+
+  if (request.method === 'POST' && path === '/ai/concierge') {
+    return aiConciergeHandler(request, env, session.user);
   }
 
   if (path.startsWith('/admin/')) {
@@ -1091,6 +1098,421 @@ function providerError(payload, status) {
   return `Provider request failed with ${status}`;
 }
 
+async function aiConciergeHandler(request, env, user) {
+  const body = await readJson(request);
+  const input = normalizeDropletConciergePayload(body, user);
+  if (!input.prompt) return json({ error: 'Prompt is required' }, 400);
+
+  const systemPrompt = buildDropletConciergeSystemPrompt(input);
+  const userPrompt = buildDropletConciergeUserPrompt(input);
+  const providerResult = await runDropletConciergeProvider(request, env, input, systemPrompt, userPrompt);
+
+  if (providerResult) {
+    return json({
+      success: true,
+      answer: providerResult.answer,
+      aiModel: providerResult.aiModel,
+      recommendations: providerResult.recommendations || dropletConciergeRecommendations(input)
+    });
+  }
+
+  return json({
+    success: true,
+    answer: dropletConciergeFallback(input),
+    aiModel: 'droplet-concierge-fallback',
+    recommendations: dropletConciergeRecommendations(input)
+  });
+}
+
+function normalizeDropletConciergePayload(body, user) {
+  const provider = normalizeConciergeProvider(body.provider);
+  const project = body.project && typeof body.project === 'object' ? body.project : {};
+  const context = body.context && typeof body.context === 'object' ? body.context : {};
+
+  return {
+    prompt: cleanText(body.prompt, 4000),
+    provider,
+    project: {
+      id: cleanText(project.id, 120) || 'droplet',
+      name: cleanText(project.name, 160) || 'Droplet',
+      canvasName: cleanText(project.canvasName, 160) || cleanText(context.canvasName, 160) || 'Fluid Node Canvas',
+      userRole: cleanText(project.userRole || user?.role, 80) || 'user'
+    },
+    context: {
+      canvasName: cleanText(context.canvasName || project.canvasName, 160) || 'Fluid Node Canvas',
+      assetSummary: normalizeConciergeSummary(context.assetSummary),
+      groups: normalizeConciergeGroups(context.groups),
+      assets: normalizeConciergeArray(context.assets, normalizeConciergeAsset, MAX_CONCIERGE_ASSETS),
+      brandGuides: normalizeConciergeArray(context.brandGuides, normalizeConciergeAsset, 8),
+      generatedMedia: normalizeConciergeArray(context.generatedMedia, normalizeConciergeAsset, 12),
+      siteContent: normalizeConciergeArray(context.siteContent, normalizeConciergeContentBlock, 24),
+      pipelines: normalizeTextArray(context.pipelines, 12, 120),
+      history: normalizeConciergeArray(context.history, normalizeConciergeHistoryItem, MAX_CONCIERGE_HISTORY)
+    }
+  };
+}
+
+function normalizeConciergeProvider(value) {
+  const provider = cleanText(value, 80).toLowerCase();
+  const aliases = {
+    '': 'auto',
+    'workers-ai': 'auto',
+    cloudflare: 'auto',
+    'cloudflare-ai': 'auto',
+    'openai-chat': 'openai',
+    gemini: 'gemini',
+    google: 'gemini',
+    'openrouter-free': 'openrouter',
+    'groq-free': 'groq'
+  };
+  const normalized = aliases[provider] || provider || 'auto';
+  return ['auto', 'openai', 'gemini', 'openrouter', 'groq'].includes(normalized) ? normalized : 'auto';
+}
+
+function normalizeConciergeSummary(summary) {
+  const input = summary && typeof summary === 'object' ? summary : {};
+  return {
+    totalNodes: numberInRange(input.totalNodes, 0, 10000),
+    totalEdges: numberInRange(input.totalEdges, 0, 10000),
+    imageCount: numberInRange(input.imageCount, 0, 10000),
+    videoCount: numberInRange(input.videoCount, 0, 10000),
+    generatedCount: numberInRange(input.generatedCount, 0, 10000),
+    brandGuideCount: numberInRange(input.brandGuideCount, 0, 1000)
+  };
+}
+
+function normalizeConciergeGroups(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value)
+    .slice(0, 32)
+    .map(([key, count]) => [cleanText(key, 80), numberInRange(count, 0, 10000)])
+    .filter(([key]) => key));
+}
+
+function normalizeConciergeArray(value, normalizer, limit) {
+  return Array.isArray(value) ? value.slice(0, limit).map(normalizer).filter(Boolean) : [];
+}
+
+function normalizeTextArray(value, limit, maxLength) {
+  return Array.isArray(value)
+    ? value.map((item) => cleanText(item, maxLength)).filter(Boolean).slice(0, limit)
+    : [];
+}
+
+function normalizeConciergeAsset(asset) {
+  if (!asset || typeof asset !== 'object') return null;
+  return {
+    id: cleanText(asset.id, 120),
+    type: cleanText(asset.type, 80),
+    title: cleanText(asset.title, 160),
+    subtitle: cleanText(asset.subtitle, 160),
+    description: cleanText(asset.description, 700),
+    nodeGroup: cleanText(asset.nodeGroup, 120),
+    brandName: cleanText(asset.brandName, 120),
+    isBrandGuide: asset.isBrandGuide === true,
+    isGenerated: asset.isGenerated === true,
+    generationProvider: cleanText(asset.generationProvider, 120),
+    generationPrompt: cleanText(asset.generationPrompt, 500),
+    generationStatus: cleanText(asset.generationStatus, 80),
+    image: asset.image ? '[image-reference]' : '',
+    video: asset.video ? '[video-reference]' : '',
+    colors: normalizeConciergeArray(asset.colors, normalizeConciergeColor, 12)
+  };
+}
+
+function normalizeConciergeColor(color) {
+  if (!color || typeof color !== 'object') return null;
+  return {
+    name: cleanText(color.name, 80),
+    hex: normalizeHexColor(color.hex)
+  };
+}
+
+function normalizeConciergeContentBlock(block) {
+  if (!block || typeof block !== 'object') return null;
+  return {
+    key: cleanText(block.key, 120),
+    value: cleanText(block.value, 900),
+    updatedAt: cleanText(block.updatedAt, 80)
+  };
+}
+
+function normalizeConciergeHistoryItem(item) {
+  if (!item || typeof item !== 'object') return null;
+  return {
+    role: item.role === 'assistant' ? 'assistant' : 'user',
+    text: cleanText(item.text, 1200)
+  };
+}
+
+function numberInRange(value, min, max) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return min;
+  return Math.min(max, Math.max(min, Math.round(number)));
+}
+
+function buildDropletConciergeSystemPrompt(input) {
+  const summary = input.context.assetSummary;
+  const compactContext = JSON.stringify({
+    project: input.project,
+    canvasName: input.context.canvasName,
+    assetSummary: summary,
+    groups: input.context.groups,
+    brandGuides: input.context.brandGuides,
+    generatedMedia: input.context.generatedMedia,
+    assets: input.context.assets,
+    siteContent: input.context.siteContent,
+    pipelines: input.context.pipelines
+  }, null, 2);
+
+  return [
+    'You are Droplet Concierge, a creative/operator assistant embedded in the Droplet brand canvas and site workflow.',
+    'Help with brand systems, site content, canvas assets, generated media branches, prompt writing, user intent, production pipelines, and next-best creative actions.',
+    'Do not use travel-concierge framing, destinations, POIs, itineraries, weather, or event wording unless the user explicitly asks for travel content as creative material.',
+    'Use only the provided Droplet context as current state. If context is missing, say what you need and make a pragmatic next step from available information.',
+    'Prioritize concrete actions: what to edit, what to generate, what to organize, what copy to tighten, what reference to use, and what risk to watch.',
+    'Never invent fake canvas nodes, provider results, saved state, costs, or files. Do not claim something is on the canvas unless it appears in context.',
+    'Keep answers concise and structured. Prefer 3 to 6 bullets or a short ordered action list.',
+    `Current Droplet context:\n${compactContext}`
+  ].join('\n\n');
+}
+
+function buildDropletConciergeUserPrompt(input) {
+  const history = input.context.history
+    .map((item) => `${item.role}: ${item.text}`)
+    .join('\n');
+  return [
+    history ? `Recent chat:\n${history}` : '',
+    `User prompt:\n${input.prompt}`
+  ].filter(Boolean).join('\n\n');
+}
+
+async function runDropletConciergeProvider(request, env, input, systemPrompt, userPrompt) {
+  const providers = input.provider === 'auto'
+    ? ['workers-ai', 'openai', 'gemini', 'openrouter', 'groq']
+    : [input.provider];
+
+  for (const provider of providers) {
+    try {
+      let result = null;
+      if (provider === 'workers-ai') result = await runWorkersAiConcierge(env, systemPrompt, userPrompt);
+      if (provider === 'openai') result = await runOpenAiConcierge(request, env, systemPrompt, userPrompt);
+      if (provider === 'gemini') result = await runGeminiConcierge(request, env, systemPrompt, userPrompt);
+      if (provider === 'openrouter') result = await runOpenRouterConcierge(request, env, systemPrompt, userPrompt);
+      if (provider === 'groq') result = await runGroqConcierge(request, env, systemPrompt, userPrompt);
+      if (result?.answer) return result;
+    } catch (error) {
+      console.warn(`Concierge provider ${provider} failed`, error instanceof Error ? error.message : String(error));
+      if (input.provider !== 'auto') break;
+    }
+  }
+
+  if (input.provider !== 'auto') {
+    return {
+      answer: `The ${input.provider} concierge provider is not configured for this session. Add the matching Worker secret or use Auto so Droplet can fall back to Workers AI and the local context summary.`,
+      aiModel: `${input.provider}-missing-key`,
+      recommendations: dropletConciergeRecommendations(input)
+    };
+  }
+
+  return null;
+}
+
+async function runWorkersAiConcierge(env, systemPrompt, userPrompt) {
+  if (!env.AI) return null;
+  const model = cleanText(env.CONCIERGE_AI_MODEL, 160) || CONCIERGE_MODEL;
+  const payload = await env.AI.run(model, {
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ]
+  });
+  return {
+    answer: extractConciergeText(payload),
+    aiModel: model
+  };
+}
+
+async function runOpenAiConcierge(request, env, systemPrompt, userPrompt) {
+  const apiKey = providerKey(request, env, 'X-OpenAI-Key', ['OPENAI_CONCIERGE_API_KEY', 'OPENAI_API_KEY']);
+  if (!apiKey) return null;
+  const model = cleanText(env.OPENAI_CONCIERGE_MODEL || env.OPENAI_CHAT_MODEL, 160) || 'gpt-4.1-mini';
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.4,
+      max_tokens: 900,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ]
+    })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(providerError(payload, response.status));
+  return {
+    answer: cleanText(payload?.choices?.[0]?.message?.content, 8000),
+    aiModel: model
+  };
+}
+
+async function runGeminiConcierge(request, env, systemPrompt, userPrompt) {
+  const apiKey = providerKey(request, env, 'X-Gemini-Key', ['GEMINI_CONCIERGE_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_AI_API_KEY']);
+  if (!apiKey) return null;
+  const model = cleanText(env.GEMINI_CONCIERGE_MODEL, 160) || 'gemini-2.5-flash';
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    method: 'POST',
+    headers: {
+      'x-goog-api-key': apiKey,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      system_instruction: {
+        parts: [{ text: systemPrompt }]
+      },
+      contents: [{
+        role: 'user',
+        parts: [{ text: userPrompt }]
+      }],
+      generationConfig: {
+        temperature: 0.4,
+        maxOutputTokens: 900
+      }
+    })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(providerError(payload, response.status));
+  return {
+    answer: cleanText((payload?.candidates?.[0]?.content?.parts || []).map((part) => part.text || '').join('\n'), 8000),
+    aiModel: model
+  };
+}
+
+async function runOpenRouterConcierge(request, env, systemPrompt, userPrompt) {
+  const apiKey = providerKey(request, env, 'X-OpenRouter-Key', ['OPENROUTER_CONCIERGE_API_KEY', 'OPENROUTER_API_KEY']);
+  if (!apiKey) return null;
+  const model = cleanText(env.OPENROUTER_CONCIERGE_MODEL, 160) || 'meta-llama/llama-3.1-8b-instruct:free';
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://droplet.local',
+      'X-Title': 'Droplet Concierge'
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.4,
+      max_tokens: 900,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ]
+    })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(providerError(payload, response.status));
+  return {
+    answer: cleanText(payload?.choices?.[0]?.message?.content, 8000),
+    aiModel: model
+  };
+}
+
+async function runGroqConcierge(request, env, systemPrompt, userPrompt) {
+  const apiKey = providerKey(request, env, 'X-Groq-Key', ['GROQ_CONCIERGE_API_KEY', 'GROQ_API_KEY']);
+  if (!apiKey) return null;
+  const model = cleanText(env.GROQ_CONCIERGE_MODEL, 160) || 'llama-3.1-8b-instant';
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.4,
+      max_tokens: 900,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ]
+    })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(providerError(payload, response.status));
+  return {
+    answer: cleanText(payload?.choices?.[0]?.message?.content, 8000),
+    aiModel: model
+  };
+}
+
+function providerKey(request, env, headerName, envNames) {
+  for (const envName of envNames) {
+    const value = cleanText(env[envName], 4000);
+    if (value) return value;
+  }
+  return cleanText(request.headers.get(headerName), 4000);
+}
+
+function extractConciergeText(payload) {
+  if (typeof payload?.response === 'string') return cleanText(payload.response, 8000);
+  if (typeof payload?.result?.response === 'string') return cleanText(payload.result.response, 8000);
+  if (typeof payload?.text === 'string') return cleanText(payload.text, 8000);
+  if (typeof payload === 'string') return cleanText(payload, 8000);
+  return cleanText((payload?.choices?.[0]?.message?.content || ''), 8000);
+}
+
+function dropletConciergeFallback(input) {
+  const summary = input.context.assetSummary;
+  const firstBrandGuide = input.context.brandGuides[0];
+  const contentCount = input.context.siteContent.length;
+  const mediaCount = summary.imageCount + summary.videoCount;
+
+  return [
+    `I can work from the current "${input.context.canvasName}" Droplet canvas.`,
+    '',
+    `What I see: ${summary.totalNodes} canvas items, ${mediaCount} media assets, ${summary.generatedCount} generated branches, ${summary.brandGuideCount} brand guide node${summary.brandGuideCount === 1 ? '' : 's'}, and ${contentCount} editable site copy block${contentCount === 1 ? '' : 's'}.`,
+    firstBrandGuide ? `Use "${firstBrandGuide.title || firstBrandGuide.brandName || 'the brand guide'}" as the source of truth for colors, tone, typography, and layout decisions.` : 'Add or mark a brand guide/source-of-truth node if you want stricter creative direction.',
+    '',
+    'Next best action:',
+    `1. Translate the prompt into a compact creative brief: ${input.prompt}`,
+    '2. Choose the strongest canvas reference or brand-guide node before generating.',
+    '3. Create one focused image branch and one copy variation, then keep the stronger direction as a child node.',
+    '4. Save the canvas once the direction is worth preserving.'
+  ].join('\n');
+}
+
+function dropletConciergeRecommendations(input) {
+  const recommendations = [
+    {
+      title: 'Tighten the prompt',
+      description: 'Turn the request into subject, audience, composition, exact copy, and what must remain unchanged.'
+    },
+    {
+      title: 'Use source-of-truth nodes',
+      description: 'Anchor generation to brand guide cards, palette nodes, and strongest product references.'
+    },
+    {
+      title: 'Create a comparison branch',
+      description: 'Generate one visual branch and one copy branch so the next decision is visible on canvas.'
+    }
+  ];
+
+  if (input.context.assetSummary.brandGuideCount === 0) {
+    recommendations.unshift({
+      title: 'Add a brand guide',
+      description: 'A source-of-truth node will make color, typography, and tone decisions more consistent.'
+    });
+  }
+
+  return recommendations.slice(0, 4);
+}
+
 async function syncCanvasParts(env, canvasId, snapshot) {
   try {
     await env.DB.batch([
@@ -1590,7 +2012,7 @@ function jsonError(error) {
 function corsHeaders() {
   return {
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type,X-OpenAI-Key,X-Gemini-Key,X-OpenRouter-Key,X-Groq-Key',
     'Access-Control-Allow-Credentials': 'true'
   };
 }

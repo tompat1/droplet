@@ -1,0 +1,4 @@
+interface:
+  display_name: "TRIP AI Concierge"
+  short_description: "Port TRIP concierge AI wiring"
+  default_prompt: "Use $trip-ai-concierge to port the TRIP AI Concierge wiring into another application."

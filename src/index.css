@@ -959,6 +959,292 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.8rem;
 }
 
+.ai-concierge-launch {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 12000;
+  min-height: 44px;
+  border: 1px solid rgba(0, 255, 204, 0.38);
+  border-radius: 8px;
+  background: rgba(6, 8, 12, 0.88);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  font-weight: 850;
+  cursor: pointer;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.36), 0 0 22px rgba(0, 255, 204, 0.14);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.ai-concierge-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 13000;
+  pointer-events: none;
+}
+
+.ai-concierge-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
+}
+
+.ai-concierge-panel {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  bottom: 16px;
+  width: min(440px, calc(100vw - 32px));
+  pointer-events: auto;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: linear-gradient(145deg, rgba(12, 13, 18, 0.96), rgba(5, 7, 11, 0.98));
+  color: #fff;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.56), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  overflow: hidden;
+}
+
+.ai-concierge-header,
+.ai-concierge-settings,
+.ai-chip-row,
+.ai-concierge-form {
+  padding: 14px;
+}
+
+.ai-concierge-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ai-concierge-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-concierge-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: #00ffcc;
+  background: rgba(0, 255, 204, 0.12);
+  border: 1px solid rgba(0, 255, 204, 0.24);
+  flex: 0 0 auto;
+}
+
+.ai-concierge-title h2 {
+  font-size: 1rem;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.ai-concierge-title p {
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 0.76rem;
+}
+
+.ai-concierge-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-concierge-actions button,
+.ai-concierge-form button,
+.ai-key-clear {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.ai-concierge-settings {
+  display: grid;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.ai-concierge-settings label {
+  display: grid;
+  gap: 6px;
+}
+
+.ai-concierge-settings span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.ai-concierge-settings select,
+.ai-concierge-settings input,
+.ai-concierge-form textarea {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.36);
+  color: #fff;
+  outline: none;
+  font: 500 0.88rem/1.45 inherit;
+}
+
+.ai-concierge-settings select,
+.ai-concierge-settings input {
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.ai-key-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ai-key-clear {
+  width: max-content;
+  padding: 0 10px;
+  display: inline-flex;
+  gap: 7px;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.ai-concierge-messages {
+  min-height: 0;
+  overflow: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ai-concierge-empty {
+  min-height: 74px;
+  border: 1px solid rgba(0, 255, 204, 0.16);
+  border-radius: 8px;
+  background: rgba(0, 255, 204, 0.055);
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 12px;
+}
+
+.ai-concierge-empty strong {
+  font-size: 0.95rem;
+}
+
+.ai-concierge-empty span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.82rem;
+}
+
+.ai-message {
+  max-width: 92%;
+  border-radius: 8px;
+  padding: 10px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ai-message-user {
+  align-self: flex-end;
+  background: rgba(75, 94, 250, 0.2);
+  border-color: rgba(75, 94, 250, 0.35);
+}
+
+.ai-message-assistant {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ai-message-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.ai-message-model {
+  margin-top: 7px;
+  color: rgba(0, 255, 204, 0.62);
+  font-size: 0.68rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.ai-chip-row {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ai-chip-row button {
+  flex: 0 0 auto;
+  max-width: 220px;
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.82);
+  padding: 0 10px;
+  font-size: 0.78rem;
+  font-weight: 750;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-concierge-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ai-concierge-form textarea {
+  min-height: 58px;
+  max-height: 150px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.ai-concierge-form button {
+  width: 42px;
+  height: 42px;
+  align-self: end;
+  background: rgba(0, 255, 204, 0.16);
+  border-color: rgba(0, 255, 204, 0.38);
+  color: #00ffcc;
+}
+
+.ai-concierge-form button:disabled,
+.ai-chip-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 @media (max-width: 560px) {
   .auth-dock {
     top: 12px;
@@ -985,6 +1271,20 @@ h1, h2, h3, h4, h5, h6 {
   .admin-user-row {
     grid-template-columns: 30px minmax(0, 1fr) 86px 38px;
     gap: 8px;
+  }
+
+  .ai-concierge-launch {
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .ai-concierge-panel {
+    inset: 8px;
+    width: auto;
+  }
+
+  .ai-key-grid {
+    grid-template-columns: 1fr;
   }
 }
 

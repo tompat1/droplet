@@ -22,7 +22,7 @@ import { defaultAssetTags } from '../defaultTags';
 import { useAuth } from './AuthContext';
 import EditableText from './EditableText';
 import { useCanvasAssets } from './CanvasAssetsState';
-import { canvasApi, usageApi } from '../lib/apiClient';
+import { canvasApi, generationApi, usageApi } from '../lib/apiClient';
 import { compressImageDataUrl, readImageFileAsDataUrl } from '../lib/mediaFiles';
 
 const FullscreenIcon = () => (
@@ -72,6 +72,22 @@ const DISPLAY_CURRENCIES = {
   NOK: { label: 'NOK', symbol: 'kr', rate: 10.75 },
   DKK: { label: 'DKK', symbol: 'kr', rate: 6.86 },
   GBP: { label: 'GBP', symbol: '£', rate: 0.79 }
+};
+const CONCIERGE_GENERATION_PROVIDERS = {
+  image: {
+    provider: 'openai_image',
+    label: 'ChatGPT Images',
+    shortLabel: 'ChatGPT',
+    pipeline: 'image',
+    accent: '#4B5EFA'
+  },
+  video: {
+    provider: 'google_veo',
+    label: 'Google Veo',
+    shortLabel: 'Veo',
+    pipeline: 'video',
+    accent: '#00ffcc'
+  }
 };
 
 const titleFromFileName = (fileName = 'Imported Image') => {

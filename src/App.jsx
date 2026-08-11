@@ -8,6 +8,7 @@ import { AuthProvider } from './components/AuthProvider';
 import { SiteContentProvider } from './components/SiteContentProvider';
 import { CanvasAssetsProvider } from './components/CanvasAssetsProvider';
 import DropletLoader from './components/DropletLoader';
+import AiConciergeDrawer from './components/AiConciergeDrawer';
 
 import Overhero from './components/Overhero';
 import CoreValues from './components/CoreValues';
@@ -59,6 +60,7 @@ function App() {
             </Suspense>
             <ConnectorLine targetId="asset-gallery" />
             <InteractiveGallery />
+            <AiConciergeDrawer />
           </CanvasAssetsProvider>
           <CallToAction />
         </main>

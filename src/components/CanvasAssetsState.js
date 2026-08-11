@@ -4,7 +4,9 @@ export const CanvasAssetsContext = createContext({
   canvasNodes: [],
   canvasEdges: [],
   canvasName: '',
-  setCanvasSnapshot: () => {}
+  canvasActions: {},
+  setCanvasSnapshot: () => {},
+  setCanvasActions: () => {}
 });
 
 export function useCanvasAssets() {
