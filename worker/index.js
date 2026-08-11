@@ -13,10 +13,30 @@ const GENERATION_PROVIDERS = {
     pipeline: 'image',
     defaultModel: '@cf/black-forest-labs/flux-2-klein-4b'
   },
+  cloudflare_flux_klein_9b: {
+    label: 'Cloudflare FLUX.2 Klein 9B',
+    pipeline: 'image',
+    defaultModel: '@cf/black-forest-labs/flux-2-klein-9b'
+  },
   cloudflare_flux_schnell: {
     label: 'Cloudflare FLUX Schnell',
     pipeline: 'image',
     defaultModel: '@cf/black-forest-labs/flux-1-schnell'
+  },
+  cloudflare_sdxl: {
+    label: 'Cloudflare SDXL',
+    pipeline: 'image',
+    defaultModel: '@cf/stabilityai/stable-diffusion-xl-base-1.0'
+  },
+  cloudflare_sdxl_lightning: {
+    label: 'Cloudflare SDXL Lightning',
+    pipeline: 'image',
+    defaultModel: '@cf/bytedance/stable-diffusion-xl-lightning'
+  },
+  cloudflare_sd_img2img: {
+    label: 'Cloudflare SD Img2Img',
+    pipeline: 'image',
+    defaultModel: '@cf/runwayml/stable-diffusion-v1-5-img2img'
   },
   concierge_free_image: {
     label: 'Concierge Free Render',
@@ -42,6 +62,11 @@ const GENERATION_PROVIDERS = {
     label: 'Google Veo',
     pipeline: 'video',
     defaultModel: 'veo-3.1-generate-preview'
+  },
+  grok_image: {
+    label: 'Grok Images',
+    pipeline: 'image',
+    defaultModel: 'grok-imagine-image-quality'
   }
 };
 const OPENAI_IMAGE_PRICE_ESTIMATES_USD = {
@@ -71,7 +96,11 @@ const DEFAULT_IMAGE_QUALITY = 'medium';
 const DEFAULT_VEO_SECONDS = 8;
 const CLOUDFLARE_AI_USAGE_PROVIDERS = new Set([
   'cloudflare_flux_klein',
+  'cloudflare_flux_klein_9b',
   'cloudflare_flux_schnell',
+  'cloudflare_sdxl',
+  'cloudflare_sdxl_lightning',
+  'cloudflare_sd_img2img',
   'concierge_free_image',
   'concierge_free_video',
   'workers-ai',
@@ -551,8 +580,16 @@ async function createGenerationBranch(request, env, userId) {
     let branch;
     if (input.provider === 'cloudflare_flux_klein') {
       branch = await generateCloudflareFluxKlein(env, input);
+    } else if (input.provider === 'cloudflare_flux_klein_9b') {
+      branch = await generateCloudflareFluxKlein9b(env, input);
     } else if (input.provider === 'cloudflare_flux_schnell') {
       branch = await generateCloudflareFluxSchnell(env, input);
+    } else if (input.provider === 'cloudflare_sdxl') {
+      branch = await generateCloudflareSdxl(env, input);
+    } else if (input.provider === 'cloudflare_sdxl_lightning') {
+      branch = await generateCloudflareSdxlLightning(env, input);
+    } else if (input.provider === 'cloudflare_sd_img2img') {
+      branch = await generateCloudflareSdImg2Img(env, input);
     } else if (input.provider === 'concierge_free_image' || input.provider === 'concierge_free_video') {
       branch = await generateConciergeFreeBranch(request, env, input);
     } else if (input.provider === 'openai_image') {
@@ -561,6 +598,8 @@ async function createGenerationBranch(request, env, userId) {
       branch = await generateGeminiImage(env, input);
     } else if (input.provider === 'google_veo') {
       branch = await generateGoogleVeo(env, input);
+    } else if (input.provider === 'grok_image') {
+      branch = await generateGrokImage(env, input);
     }
 
     const usage = estimateGenerationUsage(input, branch, provider);
@@ -1096,6 +1135,22 @@ function shouldUseFreeGenerationFallback(message, input) {
 async function generateCloudflareFluxKlein(env, input) {
   if (!env.AI) throw new Error('Workers AI binding AI is not configured');
   const model = cleanText(env.CLOUDFLARE_FLUX_KLEIN_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_flux_klein.defaultModel;
+  return generateCloudflareFluxMultipart(env, input, model, {
+    titleWithRefs: 'FLUX Reference Image Branch',
+    title: 'FLUX Image Branch'
+  });
+}
+
+async function generateCloudflareFluxKlein9b(env, input) {
+  if (!env.AI) throw new Error('Workers AI binding AI is not configured');
+  const model = cleanText(env.CLOUDFLARE_FLUX_KLEIN_9B_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_flux_klein_9b.defaultModel;
+  return generateCloudflareFluxMultipart(env, input, model, {
+    titleWithRefs: 'FLUX 9B Reference Image Branch',
+    title: 'FLUX 9B Image Branch'
+  });
+}
+
+async function generateCloudflareFluxMultipart(env, input, model, titles) {
   const prompt = buildCloudflareImagePrompt(input);
   const form = new FormData();
   form.append('prompt', prompt);
@@ -1124,7 +1179,7 @@ async function generateCloudflareFluxKlein(env, input) {
   if (!imageBase64) throw new Error('Cloudflare FLUX did not return image data');
 
   return {
-    title: referenceCount > 0 ? 'FLUX Reference Image Branch' : 'FLUX Image Branch',
+    title: referenceCount > 0 ? titles.titleWithRefs : titles.title,
     subtitle: `Generated with ${model}`,
     description: input.prompt,
     imageDataUrl: `data:image/jpeg;base64,${imageBase64}`,
@@ -1149,6 +1204,77 @@ async function generateCloudflareFluxSchnell(env, input) {
     subtitle: `Generated with ${model}`,
     description: input.prompt,
     imageDataUrl: `data:image/jpeg;base64,${imageBase64}`,
+    model,
+    status: 'ready'
+  };
+}
+
+async function generateCloudflareSdxl(env, input) {
+  if (!env.AI) throw new Error('Workers AI binding AI is not configured');
+  const model = cleanText(env.CLOUDFLARE_SDXL_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_sdxl.defaultModel;
+  const payload = await env.AI.run(model, {
+    prompt: buildCloudflareImagePrompt(input),
+    width: cloudflareImageDimension(input.size, 'width'),
+    height: cloudflareImageDimension(input.size, 'height'),
+    guidance: cloudflareGuidance(input.quality),
+    num_steps: cloudflareFluxSteps(input.quality) + 8,
+    seed: Math.floor(Math.random() * 1000000000)
+  });
+  const imageDataUrl = await cloudflareImagePayloadDataUrl(payload);
+
+  return {
+    title: 'SDXL Image Branch',
+    subtitle: `Generated with ${model}`,
+    description: input.prompt,
+    imageDataUrl,
+    model,
+    status: 'ready'
+  };
+}
+
+async function generateCloudflareSdxlLightning(env, input) {
+  if (!env.AI) throw new Error('Workers AI binding AI is not configured');
+  const model = cleanText(env.CLOUDFLARE_SDXL_LIGHTNING_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_sdxl_lightning.defaultModel;
+  const payload = await env.AI.run(model, {
+    prompt: buildCloudflareImagePrompt(input),
+    width: cloudflareImageDimension(input.size, 'width'),
+    height: cloudflareImageDimension(input.size, 'height'),
+    seed: Math.floor(Math.random() * 1000000000)
+  });
+  const imageDataUrl = await cloudflareImagePayloadDataUrl(payload);
+
+  return {
+    title: 'SDXL Lightning Branch',
+    subtitle: `Generated with ${model}`,
+    description: input.prompt,
+    imageDataUrl,
+    model,
+    status: 'ready'
+  };
+}
+
+async function generateCloudflareSdImg2Img(env, input) {
+  if (!env.AI) throw new Error('Workers AI binding AI is not configured');
+  const model = cleanText(env.CLOUDFLARE_SD_IMG2IMG_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_sd_img2img.defaultModel;
+  const reference = await firstReferenceImageBase64(input);
+  if (!reference) throw new Error('Cloudflare SD Img2Img requires a source image or uploaded reference');
+  const payload = await env.AI.run(model, {
+    prompt: buildCloudflareImagePrompt(input),
+    image_b64: reference,
+    width: cloudflareImageDimension(input.size, 'width'),
+    height: cloudflareImageDimension(input.size, 'height'),
+    num_steps: 20,
+    strength: input.quality === 'low' ? 0.48 : input.quality === 'high' ? 0.78 : 0.62,
+    guidance: cloudflareGuidance(input.quality) + 2,
+    seed: Math.floor(Math.random() * 1000000000)
+  });
+  const imageDataUrl = await cloudflareImagePayloadDataUrl(payload);
+
+  return {
+    title: 'SD Img2Img Branch',
+    subtitle: `Generated with ${model}`,
+    description: input.prompt,
+    imageDataUrl,
     model,
     status: 'ready'
   };
@@ -1228,6 +1354,41 @@ async function generateGeminiImage(env, input) {
     subtitle: `Generated with ${model}`,
     description: payload?.output_text || payload?.outputText || input.prompt,
     imageDataUrl: `data:${mimeType};base64,${imageBase64}`,
+    model,
+    status: 'ready'
+  };
+}
+
+async function generateGrokImage(env, input) {
+  const apiKey = String(env.XAI_API_KEY || env.GROK_API_KEY || '');
+  const model = String(env.GROK_IMAGE_MODEL || GENERATION_PROVIDERS.grok_image.defaultModel);
+  if (!apiKey) return mockGenerationBranch(input, model, 'XAI_API_KEY is not configured');
+
+  const response = await fetch('https://api.x.ai/v1/images/generations', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model,
+      prompt: withReferenceContext(input),
+      n: 1,
+      response_format: 'url'
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(providerError(payload, response.status));
+
+  const imageUrl = payload?.data?.[0]?.url || payload?.url || '';
+  if (!imageUrl) throw new Error('Grok did not return image data');
+
+  return {
+    title: 'Grok Image Branch',
+    subtitle: `Generated with ${model}`,
+    description: input.prompt,
+    imageUrl,
     model,
     status: 'ready'
   };
@@ -1344,6 +1505,26 @@ function estimateGenerationUsage(input, branch, provider) {
       estimateBasis: 'Cloudflare Workers AI FLUX.1 Schnell estimate using 512px tiles and diffusion steps; may be covered by Workers AI free allocation.'
     };
   }
+  if ([
+    'cloudflare_flux_klein_9b',
+    'cloudflare_sdxl',
+    'cloudflare_sdxl_lightning',
+    'cloudflare_sd_img2img'
+  ].includes(input.provider)) {
+    return {
+      provider: input.provider,
+      providerLabel: provider.label,
+      pipeline: provider.pipeline,
+      model,
+      estimatedUsd: 0,
+      currency: 'USD',
+      status: 'free-allocation',
+      outputCount: 1,
+      size: input.size,
+      quality: input.quality,
+      estimateBasis: 'Cloudflare Workers AI image call tracked under free-allocation mode; no per-model dollar estimate is configured in Droplet for this renderer.'
+    };
+  }
   if (input.provider === 'concierge_free_image' || input.provider === 'concierge_free_video') {
     return {
       provider: input.provider,
@@ -1423,6 +1604,22 @@ function estimateGenerationUsage(input, branch, provider) {
       outputCount: 1,
       durationSeconds: seconds,
       estimateBasis: `Google Veo estimate at $${pricePerSecond.toFixed(2)}/second for ${seconds}s; final charge applies only if provider completes the video.`
+    };
+  }
+
+  if (input.provider === 'grok_image') {
+    return {
+      provider: input.provider,
+      providerLabel: provider.label,
+      pipeline: provider.pipeline,
+      model,
+      estimatedUsd: 0,
+      currency: 'USD',
+      status: 'key-backed',
+      outputCount: 1,
+      size: input.size,
+      quality: input.quality,
+      estimateBasis: 'Grok image call uses xAI API key billing/credits; no dollar estimate is configured in Droplet.'
     };
   }
 
@@ -1742,6 +1939,39 @@ function extractCloudflareImageBase64(payload) {
   if (typeof payload?.data?.image === 'string') return payload.data.image;
   if (Array.isArray(payload?.images) && typeof payload.images[0] === 'string') return payload.images[0];
   return '';
+}
+
+async function cloudflareImagePayloadDataUrl(payload, fallbackMime = 'image/png') {
+  const imageBase64 = extractCloudflareImageBase64(payload);
+  if (imageBase64) return `data:${fallbackMime};base64,${imageBase64}`;
+  if (payload instanceof Response) {
+    const contentType = payload.headers.get('content-type') || fallbackMime;
+    return `data:${contentType};base64,${arrayBufferToBase64(await payload.arrayBuffer())}`;
+  }
+  if (payload instanceof ReadableStream || payload instanceof ArrayBuffer || ArrayBuffer.isView(payload) || payload instanceof Blob) {
+    const response = new Response(payload);
+    const contentType = response.headers.get('content-type') || fallbackMime;
+    return `data:${contentType};base64,${arrayBufferToBase64(await response.arrayBuffer())}`;
+  }
+  throw new Error('Cloudflare image model did not return image data');
+}
+
+async function firstReferenceImageBase64(input) {
+  const url = cloudflareReferenceUrls(input)[0];
+  if (!url) return '';
+  const blob = await referenceUrlToBlob(url);
+  if (!blob) return '';
+  return arrayBufferToBase64(await blob.arrayBuffer());
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return btoa(binary);
 }
 
 function normalizeUrlList(value) {

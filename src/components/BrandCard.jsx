@@ -11,11 +11,35 @@ const GENERATION_PROVIDERS = {
     pipeline: 'image',
     accent: '#f5d76e'
   },
+  cloudflare_flux_klein_9b: {
+    label: 'Cloudflare FLUX.2 Klein 9B',
+    shortLabel: 'FLUX 9B',
+    pipeline: 'image',
+    accent: '#ffb84d'
+  },
   cloudflare_flux_schnell: {
     label: 'Cloudflare FLUX Schnell',
     shortLabel: 'FLUX',
     pipeline: 'image',
     accent: '#00ffcc'
+  },
+  cloudflare_sdxl: {
+    label: 'Cloudflare SDXL',
+    shortLabel: 'SDXL',
+    pipeline: 'image',
+    accent: '#8fd3ff'
+  },
+  cloudflare_sdxl_lightning: {
+    label: 'Cloudflare SDXL Lightning',
+    shortLabel: 'Lightning',
+    pipeline: 'image',
+    accent: '#ffe66d'
+  },
+  cloudflare_sd_img2img: {
+    label: 'Cloudflare SD Img2Img',
+    shortLabel: 'Img2Img',
+    pipeline: 'image',
+    accent: '#92ffb8'
   },
   openai_image: {
     label: 'ChatGPT Images',
@@ -34,8 +58,30 @@ const GENERATION_PROVIDERS = {
     shortLabel: 'Veo',
     pipeline: 'video',
     accent: '#00ffcc'
+  },
+  grok_image: {
+    label: 'Grok Images',
+    shortLabel: 'Grok',
+    pipeline: 'image',
+    accent: '#ffffff'
   }
 };
+
+const FREE_IMAGE_PROVIDER_KEYS = [
+  'cloudflare_flux_klein',
+  'cloudflare_flux_klein_9b',
+  'cloudflare_flux_schnell',
+  'cloudflare_sdxl',
+  'cloudflare_sdxl_lightning',
+  'cloudflare_sd_img2img'
+];
+
+const API_KEY_PROVIDER_KEYS = [
+  'openai_image',
+  'gemini_banana_pro',
+  'grok_image',
+  'google_veo'
+];
 
 const isBrandGuideNode = (node) => {
   const nodeData = node?.data || {};
@@ -355,7 +401,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
   };
 
   const handleGenerateRun = async () => {
-    const providerKey = genProvider || (genPipeline === 'video' ? 'google_veo' : 'openai_image');
+    const providerKey = genProvider || (genPipeline === 'video' ? 'google_veo' : 'cloudflare_flux_klein');
     const provider = GENERATION_PROVIDERS[providerKey] || GENERATION_PROVIDERS.openai_image;
     const prompt = genPrompt.trim() || `Generate a ${provider.pipeline} branch from ${data.title}`;
     setGenError('');
@@ -698,27 +744,52 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         {genState === 'pipeline' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
             <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 'bold' }}>Select AI Pipeline:</span>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
-              <button 
-                onClick={(e) => { e.stopPropagation(); setGenProvider('cloudflare_flux_klein'); setGenPipeline('image'); setGenState('prompt'); }}
-                style={{ padding: '8px', background: 'rgba(245, 215, 110, 0.18)', border: '1px solid rgba(245, 215, 110, 0.5)', borderRadius: '6px', color: 'white', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold', textAlign: 'left' }}
-              >Cloudflare FLUX.2 Klein</button>
-              <button 
-                onClick={(e) => { e.stopPropagation(); setGenProvider('cloudflare_flux_schnell'); setGenPipeline('image'); setGenState('prompt'); }}
-                style={{ padding: '8px', background: 'rgba(0, 255, 204, 0.16)', border: '1px solid rgba(0, 255, 204, 0.44)', borderRadius: '6px', color: 'white', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold', textAlign: 'left' }}
-              >Cloudflare FLUX Schnell</button>
-              <button 
-                onClick={(e) => { e.stopPropagation(); setGenProvider('openai_image'); setGenPipeline('image'); setGenState('prompt'); }}
-                style={{ padding: '8px', background: 'rgba(75, 94, 250, 0.2)', border: '1px solid rgba(75, 94, 250, 0.5)', borderRadius: '6px', color: 'white', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold', textAlign: 'left' }}
-              >ChatGPT Images</button>
-              <button 
-                onClick={(e) => { e.stopPropagation(); setGenProvider('gemini_banana_pro'); setGenPipeline('image'); setGenState('prompt'); }}
-                style={{ padding: '8px', background: 'rgba(255, 159, 28, 0.18)', border: '1px solid rgba(255, 159, 28, 0.48)', borderRadius: '6px', color: 'white', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold', textAlign: 'left' }}
-              >Gemini Banana Pro</button>
-              <button 
-                onClick={(e) => { e.stopPropagation(); setGenProvider('google_veo'); setGenPipeline('video'); setGenState('prompt'); }}
-                style={{ padding: '8px', background: 'rgba(0, 255, 204, 0.2)', border: '1px solid rgba(0, 255, 204, 0.5)', borderRadius: '6px', color: 'white', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold', textAlign: 'left' }}
-              >Google Veo</button>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <span style={{ fontSize: '10px', color: 'rgba(0,255,204,0.75)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cloudworker free allocation</span>
+              <select
+                value={FREE_IMAGE_PROVIDER_KEYS.includes(genProvider) ? genProvider : ''}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  const providerKey = e.target.value;
+                  if (!providerKey) return;
+                  const provider = GENERATION_PROVIDERS[providerKey];
+                  setGenProvider(providerKey);
+                  setGenPipeline(provider.pipeline);
+                  setGenState('prompt');
+                }}
+                style={{ minHeight: '36px', borderRadius: '7px', border: '1px solid rgba(0,255,204,0.34)', background: 'rgba(0,255,204,0.08)', color: '#fff', padding: '0 9px', fontSize: '12px', fontWeight: 850, outline: 'none', cursor: 'pointer' }}
+                aria-label="Select Cloudworker free allocation image pipeline"
+              >
+                <option value="">Choose a Cloudworker renderer...</option>
+                {FREE_IMAGE_PROVIDER_KEYS.map((providerKey) => (
+                  <option key={providerKey} value={providerKey}>{GENERATION_PROVIDERS[providerKey].label}</option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <span style={{ fontSize: '10px', color: 'rgba(255,184,77,0.78)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>API-key renderers</span>
+              <select
+                value={API_KEY_PROVIDER_KEYS.includes(genProvider) ? genProvider : ''}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  const providerKey = e.target.value;
+                  if (!providerKey) return;
+                  const provider = GENERATION_PROVIDERS[providerKey];
+                  setGenProvider(providerKey);
+                  setGenPipeline(provider.pipeline);
+                  setGenState('prompt');
+                }}
+                style={{ minHeight: '36px', borderRadius: '7px', border: '1px solid rgba(255,184,77,0.34)', background: 'rgba(255,184,77,0.08)', color: '#fff', padding: '0 9px', fontSize: '12px', fontWeight: 850, outline: 'none', cursor: 'pointer' }}
+                aria-label="Select API key renderer"
+              >
+                <option value="">Choose a key-backed renderer...</option>
+                {API_KEY_PROVIDER_KEYS.map((providerKey) => (
+                  <option key={providerKey} value={providerKey}>{GENERATION_PROVIDERS[providerKey].label}</option>
+                ))}
+              </select>
+            </label>
+            <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.48)', lineHeight: 1.35 }}>
+              DeepSeek is used as a text/planning agent, not an image renderer. Cloudworker options render first through the Workers AI free allocation.
             </div>
             <button 
               onClick={(e) => { e.stopPropagation(); setGenState('idle'); setGenProvider(null); setGenPipeline(null); setGenError(''); }}
