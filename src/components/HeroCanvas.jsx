@@ -2534,6 +2534,10 @@ const CanvasToolbox = ({
   };
 
   const handleOpenConcierge = () => {
+    if (!user) {
+      notify('Login is required to use Concierge.');
+      return;
+    }
     window.dispatchEvent(new CustomEvent('openDropletConcierge'));
     notify('Concierge opened for this canvas.');
   };
@@ -2747,9 +2751,11 @@ const CanvasToolbox = ({
             <button type="button" onClick={handleUploadImagesClick} style={iconButtonStyle} title="Upload images to canvas" aria-label="Upload images to canvas">
               <UploadIcon />
             </button>
-            <button type="button" onClick={handleOpenConcierge} style={{ ...iconButtonStyle, borderColor: 'rgba(0,255,204,0.52)', background: 'rgba(0,255,204,0.13)', color: '#00ffcc' }} title="Open canvas concierge" aria-label="Open canvas concierge">
-              <SparklesIcon />
-            </button>
+            {user && (
+              <button type="button" onClick={handleOpenConcierge} style={{ ...iconButtonStyle, borderColor: 'rgba(0,255,204,0.52)', background: 'rgba(0,255,204,0.13)', color: '#00ffcc' }} title="Open canvas concierge" aria-label="Open canvas concierge">
+                <SparklesIcon />
+              </button>
+            )}
             <button type="button" onClick={handleZoomToActualSize} style={{ ...iconButtonStyle, fontSize: '0.78rem', fontFamily: 'monospace' }} title="Zoom 1:1" aria-label="Zoom 1:1">1:1</button>
             <button type="button" onClick={handleToggleFullscreen} style={iconButtonStyle} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
               {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
@@ -2802,9 +2808,11 @@ const CanvasToolbox = ({
               <button type="button" onClick={handleUploadImagesClick} style={iconButtonStyle} title="Upload images to canvas" aria-label="Upload images to canvas">
                 <UploadIcon />
               </button>
-              <button type="button" onClick={handleOpenConcierge} style={{ ...iconButtonStyle, borderColor: 'rgba(0,255,204,0.52)', background: 'rgba(0,255,204,0.13)', color: '#00ffcc' }} title="Open canvas concierge" aria-label="Open canvas concierge">
-                <SparklesIcon />
-              </button>
+              {user && (
+                <button type="button" onClick={handleOpenConcierge} style={{ ...iconButtonStyle, borderColor: 'rgba(0,255,204,0.52)', background: 'rgba(0,255,204,0.13)', color: '#00ffcc' }} title="Open canvas concierge" aria-label="Open canvas concierge">
+                  <SparklesIcon />
+                </button>
+              )}
               <button type="button" onClick={handleZoomToActualSize} style={{ ...iconButtonStyle, fontSize: '0.78rem', fontFamily: 'monospace' }} title="Zoom 1:1" aria-label="Zoom 1:1">1:1</button>
               <button type="button" onClick={handleToggleFullscreen} style={iconButtonStyle} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
                 {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
@@ -2841,19 +2849,21 @@ const CanvasToolbox = ({
                 <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.48)' }}>{interactionMode === 'pan' ? 'Drag moves view' : 'Drag selects'}</span>
               </button>
 
-              <button
-                type="button"
-                onClick={handleOpenConcierge}
-                style={modeButton(false, '#00ffcc')}
-                title="Open canvas concierge"
-                aria-label="Open canvas concierge"
-              >
-                <span style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Concierge</span>
-                  <SparklesIcon />
-                </span>
-                <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.48)' }}>Canvas assistant</span>
-              </button>
+              {user && (
+                <button
+                  type="button"
+                  onClick={handleOpenConcierge}
+                  style={modeButton(false, '#00ffcc')}
+                  title="Open canvas concierge"
+                  aria-label="Open canvas concierge"
+                >
+                  <span style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Concierge</span>
+                    <SparklesIcon />
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.48)' }}>Canvas assistant</span>
+                </button>
+              )}
             </div>
 
             {isEditMode && (
