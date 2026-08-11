@@ -36,6 +36,62 @@ const GENERATION_PROVIDERS = {
     accent: '#00ffcc'
   }
 };
+
+const isBrandGuideNode = (node) => {
+  const nodeData = node?.data || {};
+  return node?.type === 'brandCard' && (
+    nodeData.isBrandGuideSource === true ||
+    nodeData.sourceOfTruth === true ||
+    nodeData.referenceRole === 'brand-guide' ||
+    Array.isArray(nodeData.colors)
+  );
+};
+
+const labelMemberIdsFromNodes = (labelNode, nodes) => {
+  const memberIds = new Set(Array.isArray(labelNode?.data?.memberIds) ? labelNode.data.memberIds : []);
+  nodes.forEach((node) => {
+    if (node.type === 'brandCard' && node.data?.labelGroupId === labelNode.id) {
+      memberIds.add(node.id);
+    }
+  });
+  return [...memberIds];
+};
+
+const brandGuideNodesForAsset = (assetNode, nodes) => {
+  const allGuideNodes = nodes.filter(isBrandGuideNode);
+  if (!assetNode) return allGuideNodes;
+
+  const scopedGuideIds = new Set();
+  if (isBrandGuideNode(assetNode)) scopedGuideIds.add(assetNode.id);
+  const labelId = assetNode.data?.labelGroupId;
+  if (labelId) {
+    const labelNode = nodes.find((node) => node.id === labelId && node.type === 'labelNode');
+    if (labelNode) {
+      labelMemberIdsFromNodes(labelNode, nodes).forEach((memberId) => {
+        const memberNode = nodes.find((node) => node.id === memberId);
+        if (isBrandGuideNode(memberNode)) scopedGuideIds.add(memberId);
+      });
+      (Array.isArray(labelNode.data?.sourceOfTruthNodeIds) ? labelNode.data.sourceOfTruthNodeIds : [])
+        .forEach((sourceId) => scopedGuideIds.add(sourceId));
+    }
+  }
+
+  const scopedGuideNodes = allGuideNodes.filter((node) => scopedGuideIds.has(node.id));
+  return scopedGuideNodes.length > 0 ? scopedGuideNodes : allGuideNodes;
+};
+
+const brandGuidePayloadFromNode = (node) => ({
+  id: node.id,
+  title: node.data?.title || '',
+  subtitle: node.data?.subtitle || '',
+  description: node.data?.description || '',
+  image: node.data?.image || '',
+  brandName: node.data?.brandName || '',
+  colors: Array.isArray(node.data?.colors) ? node.data.colors : [],
+  labelGroupId: node.data?.labelGroupId || '',
+  labelTitle: node.data?.labelTitle || ''
+});
+
 const PROMPT_HELP_SECTIONS = [
   {
     title: 'Creative brief',
@@ -289,6 +345,9 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         generationMock: result?.mock === true || result?.branch?.mock === true,
         generationUsage: result?.usage || result?.branch?.usage || null,
         nodeGroup: `generated-${id}`,
+        labelGroupId: parentNode.data?.labelGroupId || undefined,
+        labelTitle: parentNode.data?.labelTitle || undefined,
+        sourceFolderName: parentNode.data?.sourceFolderName || undefined,
         setGlobalNodes: data.setGlobalNodes,
         setGlobalEdges: data.setGlobalEdges
       }
@@ -311,24 +370,13 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
       const existingNodes = getNodes();
       const branchIndex = existingNodes.filter((node) => node.data?.generatedFromNodeId === id).length;
-      const brandGuideNodes = existingNodes.filter((node) => {
-        const nodeData = node.data || {};
-        return nodeData.isBrandGuideSource === true || nodeData.sourceOfTruth === true || nodeData.referenceRole === 'brand-guide' || Array.isArray(nodeData.colors);
-      });
+      const brandGuideNodes = brandGuideNodesForAsset(parentNode, existingNodes);
       const brandGuideRefs = brandGuideNodes
         .map((node) => node.data?.image)
         .filter(Boolean);
       const mergedRefs = Array.from(new Set([...brandGuideRefs, ...genRefs]));
       const brandGuide = {
-        nodes: brandGuideNodes.map((node) => ({
-          id: node.id,
-          title: node.data?.title || '',
-          subtitle: node.data?.subtitle || '',
-          description: node.data?.description || '',
-          image: node.data?.image || '',
-          brandName: node.data?.brandName || '',
-          colors: Array.isArray(node.data?.colors) ? node.data.colors : []
-        }))
+        nodes: brandGuideNodes.map(brandGuidePayloadFromNode)
       };
       const result = await generationApi.createBranch({
         provider: providerKey,
@@ -353,11 +401,20 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       const newEdge = { 
         id: `e-${id}-${newNode.id}`, source: String(id), target: String(newNode.id), type: 'smoothstep', animated: true, style: { stroke: provider.accent, strokeWidth: 4 } 
       };
+      const labelEdge = parentNode.data?.labelGroupId ? {
+        id: `label-${parentNode.data.labelGroupId}-${newNode.id}`,
+        source: String(parentNode.data.labelGroupId),
+        target: String(newNode.id),
+        type: 'smoothstep',
+        animated: true,
+        data: { isLabelLink: true, labelId: parentNode.data.labelGroupId },
+        style: { stroke: 'rgba(0,255,204,0.72)', strokeWidth: 3 }
+      } : null;
       
       const nodeUpdater = data.setGlobalNodes || setNodes;
       const edgeUpdater = data.setGlobalEdges || setEdges;
       nodeUpdater(nds => [...nds, newNode]);
-      edgeUpdater(eds => [...eds, newEdge]);
+      edgeUpdater(eds => [...eds, ...[newEdge, labelEdge].filter(Boolean)]);
       
       setGenState('idle');
       setGenProvider(null);

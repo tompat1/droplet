@@ -1221,7 +1221,9 @@ function normalizeBrandGuidePayload(value) {
       description: cleanText(node.description, 1200),
       image: normalizeReferenceUrl(node.image),
       brandName: cleanText(node.brandName, 180),
-      colors: normalizeBrandColors(node.colors)
+      colors: normalizeBrandColors(node.colors),
+      labelGroupId: cleanText(node.labelGroupId, 160),
+      labelTitle: cleanText(node.labelTitle, 180)
     }))
   };
 }
@@ -1390,10 +1392,11 @@ function normalizeDurationSeconds(value) {
 }
 
 function geminiInteractionInput(input) {
-  if (input.refs.length === 0) return input.prompt;
+  const prompt = withReferenceContext(input);
+  if (input.refs.length === 0) return prompt;
   return [
     ...input.refs.map((uri) => ({ type: 'image', uri, mime_type: inferImageMimeType(uri) })),
-    { type: 'text', text: input.prompt }
+    { type: 'text', text: prompt }
   ];
 }
 
@@ -1525,6 +1528,7 @@ function withReferenceContext(input) {
     .filter((node) => node.title || node.description || node.brandName)
     .map((node, index) => [
       `${index + 1}. ${node.title || node.brandName || 'Brand guide'}`,
+      node.labelTitle ? `Connected group: ${node.labelTitle}` : '',
       node.subtitle ? `Role: ${node.subtitle}` : '',
       node.description ? `Rules: ${node.description}` : ''
     ].filter(Boolean).join('\n'))
@@ -1532,7 +1536,7 @@ function withReferenceContext(input) {
 
   const sections = [input.prompt];
   if (guideContext) {
-    sections.push(`Brand source of truth. Treat this as the governing reference for all style, typography, color, logo, layout, and tone decisions:\n${guideContext}`);
+    sections.push(`Brand source of truth. Treat the connected brand guide as mandatory governance for all color, typography, logos, spacing, layout, product styling, image treatment, copy tone, and visual hierarchy decisions. Do not invent alternate logo marks, substitute off-brand fonts, or use generic colors when brand colors/rules are present:\n${guideContext}`);
   }
   sections.push(brandColorPromptSection(input));
   if (input.refs.length > 0) {

@@ -283,6 +283,52 @@ const labelMemberIdsFromNodes = (labelNode, nodes) => {
   return [...memberIds];
 };
 
+const isBrandGuideNode = (node) => {
+  const nodeData = node?.data || {};
+  return node?.type === 'brandCard' && (
+    nodeData.isBrandGuideSource === true ||
+    nodeData.sourceOfTruth === true ||
+    nodeData.referenceRole === 'brand-guide' ||
+    Array.isArray(nodeData.colors)
+  );
+};
+
+const brandGuidePayloadFromNode = (node) => ({
+  id: node.id,
+  title: node.data?.title || '',
+  subtitle: node.data?.subtitle || '',
+  description: node.data?.description || '',
+  image: node.data?.image || '',
+  brandName: node.data?.brandName || '',
+  colors: Array.isArray(node.data?.colors) ? node.data.colors : [],
+  labelGroupId: node.data?.labelGroupId || '',
+  labelTitle: node.data?.labelTitle || ''
+});
+
+const brandGuideNodesForAssets = (assetNodes, nodes) => {
+  const allGuideNodes = nodes.filter(isBrandGuideNode);
+  const assets = Array.isArray(assetNodes) ? assetNodes.filter(Boolean) : [];
+  if (assets.length === 0) return allGuideNodes;
+
+  const scopedGuideIds = new Set();
+  assets.forEach((assetNode) => {
+    if (isBrandGuideNode(assetNode)) scopedGuideIds.add(assetNode.id);
+    const labelId = assetNode.data?.labelGroupId;
+    if (!labelId) return;
+    const labelNode = nodes.find((node) => node.id === labelId && node.type === 'labelNode');
+    if (!labelNode) return;
+    labelMemberIdsFromNodes(labelNode, nodes).forEach((memberId) => {
+      const memberNode = nodes.find((node) => node.id === memberId);
+      if (isBrandGuideNode(memberNode)) scopedGuideIds.add(memberId);
+    });
+    (Array.isArray(labelNode.data?.sourceOfTruthNodeIds) ? labelNode.data.sourceOfTruthNodeIds : [])
+      .forEach((sourceId) => scopedGuideIds.add(sourceId));
+  });
+
+  const scopedGuideNodes = allGuideNodes.filter((node) => scopedGuideIds.has(node.id));
+  return scopedGuideNodes.length > 0 ? scopedGuideNodes : allGuideNodes;
+};
+
 const shouldOptimizeDataUrl = (value) => (
   typeof value === 'string' &&
   value.startsWith('data:image/') &&
@@ -802,6 +848,7 @@ const NodeSearch = () => {
 
 const LabelNode = ({ id, data, selected, isConnectable }) => {
   const memberCount = Array.isArray(data.memberIds) ? data.memberIds.length : 0;
+  const sourceTruthCount = Array.isArray(data.sourceOfTruthNodeIds) ? data.sourceOfTruthNodeIds.length : 0;
   const isDropTarget = data.isDropTarget === true;
   const { zoom } = useViewport();
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
@@ -926,7 +973,9 @@ const LabelNode = ({ id, data, selected, isConnectable }) => {
         )}
       </div>
       <div style={{ marginTop: '10px', fontSize: '0.76rem', color: 'rgba(255,255,255,0.58)' }}>
-        {isDropTarget ? 'Drop to connect and arrange' : memberCount === 1 ? '1 card connected' : `${memberCount} cards connected`}
+        {isDropTarget
+          ? 'Drop to connect and arrange'
+          : `${sourceTruthCount > 0 ? `${sourceTruthCount} guide${sourceTruthCount === 1 ? '' : 's'} / ` : ''}${memberCount === 1 ? '1 card connected' : `${memberCount} cards connected`}`}
       </div>
       <Handle type="source" position={Position.Right} isConnectable={isConnectable} style={{ background: '#050505', border: '2px solid rgba(0,255,204,0.75)' }} />
     </div>
@@ -3000,13 +3049,10 @@ export default function HeroCanvas() {
     const sourceNodes = nodesRef.current;
     const selectedSet = new Set(selectedCardIds);
     const selectedCards = sourceNodes.filter((node) => selectedSet.has(node.id) && node.type === 'brandCard');
-    const brandGuideNodes = sourceNodes.filter((node) => {
-      const nodeData = node.data || {};
-      return nodeData.isBrandGuideSource === true || nodeData.sourceOfTruth === true || nodeData.referenceRole === 'brand-guide' || Array.isArray(nodeData.colors);
-    });
+    const parentNode = selectedCards[0] || null;
+    const brandGuideNodes = brandGuideNodesForAssets(parentNode ? [parentNode] : selectedCards, sourceNodes);
     const referenceNodes = [...selectedCards, ...brandGuideNodes];
     const refs = Array.from(new Set(referenceNodes.map((node) => node.data?.image).filter(Boolean)));
-    const parentNode = selectedCards[0] || null;
     const originPoint = parentNode
       ? { x: Number(parentNode.position?.x || 0) + 430, y: Number(parentNode.position?.y || 0) }
       : containerCenterCanvasPoint();
@@ -3014,15 +3060,7 @@ export default function HeroCanvas() {
       ? sourceNodes.filter((node) => node.data?.generatedFromNodeId === parentNode.id).length
       : sourceNodes.filter((node) => node.data?.generatedFromNodeId === 'concierge').length;
     const brandGuide = {
-      nodes: brandGuideNodes.map((node) => ({
-        id: node.id,
-        title: node.data?.title || '',
-        subtitle: node.data?.subtitle || '',
-        description: node.data?.description || '',
-        image: node.data?.image || '',
-        brandName: node.data?.brandName || '',
-        colors: Array.isArray(node.data?.colors) ? node.data.colors : []
-      }))
+      nodes: brandGuideNodes.map(brandGuidePayloadFromNode)
     };
 
     setCanvasStatus(`${parentNode ? 'Editing selected asset' : 'Rendering asset'} with ${provider.label}...`);
@@ -3084,7 +3122,10 @@ export default function HeroCanvas() {
           generationOperationName: result?.branch?.operationName || '',
           generationMock: result?.mock === true || result?.branch?.mock === true,
           generationUsage: result?.usage || result?.branch?.usage || null,
-          nodeGroup: parentNode ? `generated-${parentNode.id}` : 'generated-concierge'
+          nodeGroup: parentNode ? `generated-${parentNode.id}` : 'generated-concierge',
+          labelGroupId: parentNode?.data?.labelGroupId || undefined,
+          labelTitle: parentNode?.data?.labelTitle || undefined,
+          sourceFolderName: parentNode?.data?.sourceFolderName || undefined
         }
       };
       const newEdge = parentNode ? {
@@ -3095,9 +3136,18 @@ export default function HeroCanvas() {
         animated: true,
         style: { stroke: provider.accent, strokeWidth: 4 }
       } : null;
+      const labelEdge = parentNode?.data?.labelGroupId ? {
+        id: `label-${parentNode.data.labelGroupId}-${newNodeId}`,
+        source: String(parentNode.data.labelGroupId),
+        target: String(newNodeId),
+        type: 'smoothstep',
+        animated: true,
+        data: { isLabelLink: true, labelId: parentNode.data.labelGroupId },
+        style: { stroke: 'rgba(0,255,204,0.72)', strokeWidth: 3 }
+      } : null;
 
       setPersistentNodes((nds) => [...nds.map((node) => ({ ...node, selected: false })), newNode]);
-      if (newEdge) setPersistentEdges((eds) => [...eds, newEdge]);
+      if (newEdge || labelEdge) setPersistentEdges((eds) => [...eds, ...[newEdge, labelEdge].filter(Boolean)]);
       setSelectedNodeIds([newNodeId]);
       setIsEditMode(true);
       loadUsageSummary();
@@ -3457,6 +3507,10 @@ export default function HeroCanvas() {
 
       const existingMemberIds = Array.isArray(labelNode.data?.memberIds) ? labelNode.data.memberIds : [];
       const nextMemberIds = [...new Set([...existingMemberIds, ...uniqueCardIds])];
+      const nextSourceOfTruthNodeIds = nextMemberIds.filter((memberId) => {
+        const memberNode = nds.find((candidate) => candidate.id === memberId);
+        return isBrandGuideNode(memberNode);
+      });
       const orderedMembers = nds
         .filter((node) => nextMemberIds.includes(node.id) && node.type === 'brandCard')
         .sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
@@ -3478,7 +3532,10 @@ export default function HeroCanvas() {
             ...node,
             data: {
               ...node.data,
-              memberIds
+              memberIds,
+              sourceOfTruthNodeIds: node.id === labelId
+                ? nextSourceOfTruthNodeIds
+                : (Array.isArray(node.data?.sourceOfTruthNodeIds) ? node.data.sourceOfTruthNodeIds.filter((sourceId) => !uniqueCardIds.includes(sourceId)) : [])
             }
           };
         }
@@ -3554,6 +3611,7 @@ export default function HeroCanvas() {
       data: {
         title,
         memberIds: selectedCardIds,
+        sourceOfTruthNodeIds: selectedCards.filter(isBrandGuideNode).map((node) => node.id),
         nodeGroup: 'labels'
       },
       selected: true
