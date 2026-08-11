@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
 import { generationApi } from '../lib/apiClient';
 import { downloadMediaSource, mediaFilename, readImageFileAsDataUrl } from '../lib/mediaFiles';
@@ -185,6 +186,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
   const [tempDesc, setTempDesc] = useState(data.description || '');
 
   const [isHoveringImage, setIsHoveringImage] = useState(false);
+  const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
 
   // Generative UI State
   const [genState, setGenState] = useState('idle'); // idle | pipeline | prompt | generating
@@ -420,6 +422,21 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
     const extension = type === 'video' ? 'mp4' : (source?.startsWith('data:image/png') ? 'png' : 'webp');
     downloadMediaSource(source, mediaFilename(data.title || `${type}-${id}`, extension));
   };
+
+  const openImagePreview = (event) => {
+    event.stopPropagation();
+    if (!data.image) return;
+    setIsImagePreviewOpen(true);
+  };
+
+  useEffect(() => {
+    if (!isImagePreviewOpen) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setIsImagePreviewOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isImagePreviewOpen]);
 
   const handleReferenceUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -721,9 +738,19 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         <div 
           onMouseEnter={() => setIsHoveringImage(true)}
           onMouseLeave={() => setIsHoveringImage(false)}
-          style={{ width: '100%', height: '180px', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px', position: 'relative' }}
+          onClick={isEditMode ? openImagePreview : undefined}
+          style={{ width: '100%', height: '180px', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px', position: 'relative', cursor: isEditMode ? 'zoom-in' : 'default' }}
         >
           <img src={data.image} alt={data.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <button
+            type="button"
+            onClick={openImagePreview}
+            title="View full image"
+            aria-label="View full image"
+            style={{ position: 'absolute', top: '8px', right: '48px', zIndex: 3, width: '32px', height: '32px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.22)', background: 'rgba(0,0,0,0.52)', color: '#fff', display: 'grid', placeItems: 'center', cursor: 'zoom-in', opacity: isHoveringImage || data.isGenerated ? 1 : 0, transition: 'opacity 0.2s', backdropFilter: 'blur(6px)' }}
+          >
+            ⛶
+          </button>
           <button
             type="button"
             onClick={(event) => handleDownloadMedia(event, data.image, 'image')}
@@ -743,9 +770,44 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               <button type="button" onClick={handleImageUrlChange} style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.22)', background: 'rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', fontWeight: 800 }}>
                 URL
               </button>
+              <button type="button" onClick={openImagePreview} style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.22)', background: 'rgba(0,0,0,0.44)', color: '#fff', cursor: 'zoom-in', fontWeight: 800 }}>
+                View
+              </button>
             </div>
           )}
         </div>
+      )}
+
+      {isImagePreviewOpen && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Full image preview for ${data.title || 'asset'}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            setIsImagePreviewOpen(false);
+          }}
+          style={{ position: 'fixed', inset: 0, zIndex: 5000, background: 'rgba(0,0,0,0.84)', backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '28px' }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{ width: 'min(96vw, 1400px)', height: 'min(88vh, 980px)', display: 'flex', flexDirection: 'column', gap: '12px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', color: '#fff' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.52)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Full Image</div>
+                <div style={{ fontSize: '1rem', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.title || 'Canvas Asset'}</div>
+              </div>
+              <button type="button" onClick={() => setIsImagePreviewOpen(false)} style={{ width: '42px', height: '42px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: '1.4rem', lineHeight: 1 }} aria-label="Close full image preview">
+                ×
+              </button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(10,10,15,0.82)', display: 'grid', placeItems: 'center' }}>
+              <img src={data.image} alt={data.title || 'Canvas asset'} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {data.video && (
