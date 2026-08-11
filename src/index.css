@@ -1192,6 +1192,28 @@ h1, h2, h3, h4, h5, h6 {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
+.ai-message-action {
+  margin-top: 9px;
+  min-height: 34px;
+  border: 1px solid rgba(0, 255, 204, 0.34);
+  border-radius: 8px;
+  background: rgba(0, 255, 204, 0.12);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 10px;
+  font-size: 0.76rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.ai-message-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.54;
+}
+
 .ai-chip-row {
   display: flex;
   gap: 7px;
@@ -1218,7 +1240,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .ai-concierge-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 42px;
+  grid-template-columns: minmax(0, 1fr) 42px 42px;
   gap: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }

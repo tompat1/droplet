@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bot, KeyRound, Send, Settings, Sparkles, Trash2, X } from 'lucide-react';
+import { Bot, ImagePlus, KeyRound, Send, Settings, Sparkles, Trash2, WandSparkles, X } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { useCanvasAssets } from './CanvasAssetsState';
 import { useSiteContent } from './SiteContentContext';
@@ -9,7 +9,8 @@ const PROVIDER_STORAGE_KEY = 'droplet_ai_concierge_provider_v1';
 const KEYS_STORAGE_KEY = 'droplet_ai_provider_keys_v1';
 
 const PROMPT_CHIPS = [
-  'What should I generate next from this canvas?',
+  'Render a campaign image from this canvas.',
+  'Edit the selected asset into a premium ad variant.',
   'Turn the strongest nodes into a campaign direction.',
   'Find gaps in the brand system.',
   'Tighten the editable site copy.'
@@ -47,6 +48,18 @@ const readStoredKeys = () => {
   }
 };
 
+const assetActionPattern = /\b(render|generate|create|make|edit|remix|variant|iterate|revise|rework|asset|image|visual|poster|ad|campaign|video|shot)\b/i;
+
+const detectAssetAction = (value, selectedCount = 0) => {
+  const text = String(value || '').trim();
+  if (!text || !assetActionPattern.test(text)) return null;
+  const pipeline = /\b(video|motion|clip|film|reel)\b/i.test(text) ? 'video' : 'image';
+  const mode = selectedCount > 0 && /\b(edit|remix|variant|iterate|revise|rework|change|selected|this)\b/i.test(text)
+    ? 'edit'
+    : 'render';
+  return { mode, pipeline, prompt: text };
+};
+
 export default function AiConciergeDrawer() {
   const { user } = useAuth();
   if (!user) return null;
@@ -54,13 +67,14 @@ export default function AiConciergeDrawer() {
 }
 
 function AiConciergeDrawerInner({ user }) {
-  const { canvasNodes, canvasEdges, canvasName } = useCanvasAssets();
+  const { canvasActions, canvasNodes, canvasEdges, canvasName } = useCanvasAssets();
   const { content } = useSiteContent();
   const [isOpen, setIsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [canvasActionLoading, setCanvasActionLoading] = useState(false);
   const [provider, setProvider] = useState(readStoredProvider);
   const [providerKeys, setProviderKeys] = useState(readStoredKeys);
 
@@ -79,6 +93,61 @@ function AiConciergeDrawerInner({ user }) {
   useEffect(() => {
     localStorage.setItem(KEYS_STORAGE_KEY, JSON.stringify(providerKeys));
   }, [providerKeys]);
+
+  const selectedAssetCount = useMemo(() => canvasNodes.filter((node) => node?.selected === true && node?.type === 'brandCard').length, [canvasNodes]);
+
+  const runAssetAction = useCallback(async (rawPrompt, pipeline = 'image') => {
+    const actionPrompt = String(rawPrompt || '').trim();
+    if (!actionPrompt || canvasActionLoading) return;
+
+    if (!canvasActions?.createAssetBranch) {
+      setHistory((items) => [
+        ...items,
+        {
+          role: 'assistant',
+          text: 'The canvas is still loading. Try again once the Fluid Node Canvas is visible.'
+        }
+      ]);
+      return;
+    }
+
+    setHistory((items) => [
+      ...items,
+      { role: 'user', text: actionPrompt },
+      {
+        role: 'assistant',
+        text: selectedAssetCount > 0
+          ? `Creating an edited branch from ${selectedAssetCount} selected asset${selectedAssetCount === 1 ? '' : 's'}...`
+          : 'Rendering a new asset on the current canvas...'
+      }
+    ]);
+    setPrompt('');
+    setCanvasActionLoading(true);
+
+    try {
+      const result = await canvasActions.createAssetBranch({ prompt: actionPrompt, pipeline });
+      setHistory((items) => [
+        ...items,
+        {
+          role: 'assistant',
+          text: selectedAssetCount > 0
+            ? `Done. I added "${result.title}" as an edited branch${result.parentTitle ? ` from "${result.parentTitle}"` : ''}.`
+            : `Done. I rendered "${result.title}" on the canvas.`,
+          model: result.model || result.provider || 'canvas-generation'
+        }
+      ]);
+    } catch (error) {
+      setHistory((items) => [
+        ...items,
+        {
+          role: 'assistant',
+          text: error instanceof Error ? error.message : 'I could not render that asset.'
+        }
+      ]);
+    } finally {
+      setCanvasActionLoading(false);
+    }
+  }, [canvasActionLoading, canvasActions, selectedAssetCount]);
 
   const submitPrompt = useCallback(async (rawPrompt) => {
     const nextPrompt = String(rawPrompt || '').trim();
@@ -99,21 +168,28 @@ function AiConciergeDrawerInner({ user }) {
       history: recentHistory
     });
 
+    const action = detectAssetAction(nextPrompt, selectedAssetCount);
     setHistory((items) => [
       ...items,
       {
         role: 'assistant',
         text: result.answer || 'No answer returned.',
         model: result.aiModel,
-        warning: result.warning
+        warning: result.warning,
+        action
       }
     ]);
     setLoading(false);
-  }, [dropletContext, history, loading, provider, providerKeys]);
+  }, [dropletContext, history, loading, provider, providerKeys, selectedAssetCount]);
 
   const handleSubmit = (event) => {
     event.preventDefault();
     submitPrompt(prompt);
+  };
+
+  const handleRenderSubmit = () => {
+    const action = detectAssetAction(prompt, selectedAssetCount);
+    runAssetAction(prompt, action?.pipeline || 'image');
   };
 
   const updateKey = (key, value) => {
@@ -204,17 +280,29 @@ function AiConciergeDrawerInner({ user }) {
                 <div className="ai-concierge-empty">
                   <strong>{dropletContext.context.canvasName}</strong>
                   <span>{summary.imageCount + summary.videoCount} media assets available</span>
+                  {selectedAssetCount > 0 && <span>{selectedAssetCount} selected for edits</span>}
                 </div>
               )}
               {history.map((item, index) => (
                 <article key={`${item.role}-${index}`} className={`ai-message ai-message-${item.role}`}>
                   <div className="ai-message-body">{item.text}</div>
                   {item.model && <div className="ai-message-model">{item.model}</div>}
+                  {item.action && (
+                    <button
+                      type="button"
+                      className="ai-message-action"
+                      onClick={() => runAssetAction(item.action.prompt, item.action.pipeline)}
+                      disabled={canvasActionLoading}
+                    >
+                      <WandSparkles size={15} aria-hidden="true" />
+                      <span>{item.action.mode === 'edit' ? 'Edit Selected' : 'Render On Canvas'}</span>
+                    </button>
+                  )}
                 </article>
               ))}
-              {loading && (
+              {(loading || canvasActionLoading) && (
                 <article className="ai-message ai-message-assistant">
-                  <div className="ai-message-body">Thinking through the canvas...</div>
+                  <div className="ai-message-body">{canvasActionLoading ? 'Working on the canvas...' : 'Thinking through the canvas...'}</div>
                 </article>
               )}
             </div>
@@ -231,12 +319,15 @@ function AiConciergeDrawerInner({ user }) {
               <textarea
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
-                placeholder="Ask about the current canvas..."
-                disabled={loading}
+                placeholder={selectedAssetCount > 0 ? 'Ask, or render an edited branch from the selected asset...' : 'Ask, or render a new asset on the current canvas...'}
+                disabled={loading || canvasActionLoading}
                 rows={3}
               />
-              <button type="submit" disabled={loading || !prompt.trim()} aria-label="Send prompt" title="Send prompt">
+              <button type="submit" disabled={loading || canvasActionLoading || !prompt.trim()} aria-label="Send prompt" title="Send prompt">
                 <Send size={18} aria-hidden="true" />
+              </button>
+              <button type="button" onClick={handleRenderSubmit} disabled={loading || canvasActionLoading || !prompt.trim()} aria-label={selectedAssetCount > 0 ? 'Edit selected asset' : 'Render asset'} title={selectedAssetCount > 0 ? 'Edit selected asset' : 'Render asset'}>
+                <ImagePlus size={18} aria-hidden="true" />
               </button>
             </form>
           </aside>

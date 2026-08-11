@@ -128,6 +128,23 @@ const safeFileName = (value, fallback = 'fluid-node-canvas') => {
   return cleaned || fallback;
 };
 
+const escapeSvgText = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;'
+}[char]));
+
+const makeConciergeGeneratedPlaceholder = ({ isVideo, title, prompt, providerLabel = '' }) => {
+  const escapedTitle = escapeSvgText(title).slice(0, 80);
+  const escapedPrompt = escapeSvgText(prompt).slice(0, 86);
+  const escapedProvider = escapeSvgText(providerLabel).slice(0, 42);
+  const accent = isVideo ? '#00ffcc' : '#4B5EFA';
+  const path = isVideo ? 'M-24-36l72 36-72 36z' : 'M0-48l14 34h37L21 8l11 36L0 23l-32 21l11-36l-30-22h37z';
+  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#090b10"/><stop offset="1" stop-color="${accent}" stop-opacity=".48"/></linearGradient><filter id="s"><feDropShadow dx="0" dy="16" stdDeviation="14" flood-color="#000" flood-opacity=".35"/></filter></defs><rect width="640" height="420" rx="26" fill="url(#g)"/><g filter="url(#s)" transform="translate(320 176)"><circle r="82" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.28)" stroke-width="2"/><path d="${path}" fill="white" opacity=".92"/></g><text x="320" y="286" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="800" fill="rgba(255,255,255,.72)">${escapedProvider}</text><text x="320" y="318" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" fill="white">${escapedTitle}</text><text x="320" y="352" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="15" fill="rgba(255,255,255,.68)">${escapedPrompt}</text></svg>`)}`;
+};
+
 const downloadJsonFile = (fileName, value) => {
   const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -2783,7 +2800,7 @@ const CanvasToolbox = ({
 
 export default function HeroCanvas() {
   const { user } = useAuth();
-  const { setCanvasSnapshot } = useCanvasAssets();
+  const { setCanvasActions, setCanvasSnapshot } = useCanvasAssets();
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [activeIndex, setActiveIndex] = useState(null);
@@ -2928,6 +2945,146 @@ export default function HeroCanvas() {
     if (!rect) return clientPointToCanvasPoint(window.innerWidth / 2, window.innerHeight / 2);
     return clientPointToCanvasPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
   }, [clientPointToCanvasPoint]);
+
+  const createConciergeAssetBranch = useCallback(async ({ prompt: rawPrompt, pipeline = 'image' } = {}) => {
+    const prompt = String(rawPrompt || '').trim();
+    if (!prompt) throw new Error('Write a prompt before rendering an asset.');
+    if (!user) throw new Error('Login is required before rendering assets.');
+
+    const provider = CONCIERGE_GENERATION_PROVIDERS[pipeline] || CONCIERGE_GENERATION_PROVIDERS.image;
+    const sourceNodes = nodesRef.current;
+    const selectedSet = new Set(selectedCardIds);
+    const selectedCards = sourceNodes.filter((node) => selectedSet.has(node.id) && node.type === 'brandCard');
+    const brandGuideNodes = sourceNodes.filter((node) => {
+      const nodeData = node.data || {};
+      return nodeData.isBrandGuideSource === true || nodeData.sourceOfTruth === true || nodeData.referenceRole === 'brand-guide' || Array.isArray(nodeData.colors);
+    });
+    const referenceNodes = [...selectedCards, ...brandGuideNodes];
+    const refs = Array.from(new Set(referenceNodes.map((node) => node.data?.image).filter(Boolean)));
+    const parentNode = selectedCards[0] || null;
+    const originPoint = parentNode
+      ? { x: Number(parentNode.position?.x || 0) + 430, y: Number(parentNode.position?.y || 0) }
+      : containerCenterCanvasPoint();
+    const branchIndex = parentNode
+      ? sourceNodes.filter((node) => node.data?.generatedFromNodeId === parentNode.id).length
+      : sourceNodes.filter((node) => node.data?.generatedFromNodeId === 'concierge').length;
+    const brandGuide = {
+      nodes: brandGuideNodes.map((node) => ({
+        id: node.id,
+        title: node.data?.title || '',
+        subtitle: node.data?.subtitle || '',
+        description: node.data?.description || '',
+        image: node.data?.image || '',
+        brandName: node.data?.brandName || '',
+        colors: Array.isArray(node.data?.colors) ? node.data.colors : []
+      }))
+    };
+
+    setCanvasStatus(`${parentNode ? 'Editing selected asset' : 'Rendering asset'} with ${provider.label}...`);
+    showCanvasActionToast(parentNode ? 'Concierge is creating an edited branch.' : 'Concierge is rendering a new asset.');
+
+    try {
+      const result = await generationApi.createBranch({
+        provider: provider.provider,
+        pipeline: provider.pipeline,
+        prompt,
+        refs,
+        brandGuide,
+        parent: parentNode ? {
+          id: parentNode.id,
+          title: parentNode.data?.title || '',
+          subtitle: parentNode.data?.subtitle || '',
+          description: parentNode.data?.description || '',
+          image: parentNode.data?.image || ''
+        } : {
+          id: 'concierge',
+          title: 'Droplet Concierge',
+          subtitle: 'Canvas operation',
+          description: 'Generated from the concierge drawer.',
+          image: ''
+        }
+      });
+
+      const isVideo = provider.pipeline === 'video';
+      const title = result?.branch?.title || `${parentNode ? 'Edited' : 'Concierge'} ${isVideo ? 'Video' : 'Image'} Branch`;
+      const mediaUrl = result?.branch?.imageDataUrl || result?.branch?.imageUrl || result?.branch?.posterUrl || '';
+      const newNodeId = `concierge-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const offsetY = branchIndex === 0 ? 0 : Math.ceil(branchIndex / 2) * 330 * (branchIndex % 2 === 0 ? -1 : 1);
+      const newNode = {
+        id: newNodeId,
+        type: 'brandCard',
+        position: { x: originPoint.x, y: originPoint.y + offsetY },
+        selected: true,
+        data: {
+          title,
+          subtitle: result?.branch?.subtitle || `${provider.label} via Concierge`,
+          description: result?.branch?.description || prompt,
+          image: mediaUrl || makeConciergeGeneratedPlaceholder({
+            isVideo,
+            title,
+            prompt,
+            providerLabel: provider.shortLabel
+          }),
+          video: result?.branch?.videoUrl || undefined,
+          isGenerated: true,
+          generatedFromNodeId: parentNode?.id || 'concierge',
+          generationPipeline: provider.pipeline,
+          generationProvider: provider.provider,
+          generationProviderLabel: provider.label,
+          generationModel: result?.branch?.model || '',
+          generationPrompt: prompt,
+          generationRefs: refs,
+          generationBrandGuideNodeIds: brandGuide.nodes.map((node) => node.id),
+          generationStatus: result?.branch?.status || (result?.mock ? 'mock' : 'ready'),
+          generationOperationName: result?.branch?.operationName || '',
+          generationMock: result?.mock === true || result?.branch?.mock === true,
+          generationUsage: result?.usage || result?.branch?.usage || null,
+          nodeGroup: parentNode ? `generated-${parentNode.id}` : 'generated-concierge'
+        }
+      };
+      const newEdge = parentNode ? {
+        id: `e-${parentNode.id}-${newNodeId}`,
+        source: String(parentNode.id),
+        target: String(newNodeId),
+        type: 'smoothstep',
+        animated: true,
+        style: { stroke: provider.accent, strokeWidth: 4 }
+      } : null;
+
+      setPersistentNodes((nds) => [...nds.map((node) => ({ ...node, selected: false })), newNode]);
+      if (newEdge) setPersistentEdges((eds) => [...eds, newEdge]);
+      setSelectedNodeIds([newNodeId]);
+      setIsEditMode(true);
+      loadUsageSummary();
+      window.requestAnimationFrame(() => {
+        reactFlowInstanceRef.current?.setCenter?.(newNode.position.x + 160, newNode.position.y + 180, { zoom: 0.9, duration: 700 });
+      });
+
+      const message = parentNode ? `Edited branch added from ${parentNode.data?.title || 'selected asset'}.` : 'Concierge asset rendered on canvas.';
+      setCanvasStatus(message);
+      showCanvasActionToast(message);
+      return {
+        nodeId: newNodeId,
+        title,
+        status: newNode.data.generationStatus,
+        model: newNode.data.generationModel,
+        provider: provider.label,
+        parentTitle: parentNode?.data?.title || ''
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Concierge asset generation failed.';
+      setCanvasStatus(message);
+      showCanvasActionToast(message);
+      throw error;
+    }
+  }, [containerCenterCanvasPoint, loadUsageSummary, selectedCardIds, setPersistentEdges, setPersistentNodes, showCanvasActionToast, user]);
+
+  useEffect(() => {
+    setCanvasActions({
+      createAssetBranch: createConciergeAssetBranch
+    });
+    return () => setCanvasActions({});
+  }, [createConciergeAssetBranch, setCanvasActions]);
 
   const createImportedImageCards = useCallback(async (files, originPoint, source = 'upload') => {
     const imageFiles = imageFilesFromList(files).slice(0, MAX_IMPORT_FILES);
