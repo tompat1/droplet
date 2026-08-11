@@ -66,6 +66,14 @@ const detectAssetAction = (value, selectedCount = 0) => {
   return { mode, pipeline, prompt: text };
 };
 
+const canvasActionFromPlanner = (actions = [], selectedCount = 0) => {
+  const action = actions.find((item) => item?.type === 'create_asset' || item?.type === 'edit_asset');
+  if (!action?.prompt) return null;
+  const pipeline = action.pipeline === 'video' ? 'video' : 'image';
+  const mode = action.type === 'edit_asset' || selectedCount > 0 ? 'edit' : 'render';
+  return { mode, pipeline, prompt: action.prompt };
+};
+
 export default function AiConciergeDrawer() {
   const { user } = useAuth();
   if (!user) return null;
@@ -178,7 +186,7 @@ function AiConciergeDrawerInner({ user }) {
       history: recentHistory
     });
 
-    const action = detectAssetAction(nextPrompt, selectedAssetCount);
+    const action = canvasActionFromPlanner(result.actions, selectedAssetCount) || detectAssetAction(nextPrompt, selectedAssetCount);
     setHistory((items) => [
       ...items,
       {

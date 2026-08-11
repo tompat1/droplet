@@ -75,11 +75,11 @@ const DISPLAY_CURRENCIES = {
 };
 const CONCIERGE_GENERATION_PROVIDERS = {
   image: {
-    provider: 'concierge_free_image',
-    label: 'Concierge Free Render',
-    shortLabel: 'Free Render',
+    provider: 'cloudflare_flux_klein',
+    label: 'Cloudflare FLUX.2 Klein',
+    shortLabel: 'FLUX Klein',
     pipeline: 'image',
-    accent: '#00ffcc'
+    accent: '#f5d76e'
   },
   video: {
     provider: 'concierge_free_video',

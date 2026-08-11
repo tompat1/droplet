@@ -5,6 +5,18 @@ import { downloadMediaSource, mediaFilename, readImageFileAsDataUrl } from '../l
 import DropletLoader from './DropletLoader';
 
 const GENERATION_PROVIDERS = {
+  cloudflare_flux_klein: {
+    label: 'Cloudflare FLUX.2 Klein',
+    shortLabel: 'FLUX Klein',
+    pipeline: 'image',
+    accent: '#f5d76e'
+  },
+  cloudflare_flux_schnell: {
+    label: 'Cloudflare FLUX Schnell',
+    shortLabel: 'FLUX',
+    pipeline: 'image',
+    accent: '#00ffcc'
+  },
   openai_image: {
     label: 'ChatGPT Images',
     shortLabel: 'ChatGPT',
@@ -631,17 +643,25 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
             <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 'bold' }}>Select AI Pipeline:</span>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
               <button 
+                onClick={(e) => { e.stopPropagation(); setGenProvider('cloudflare_flux_klein'); setGenPipeline('image'); setGenState('prompt'); }}
+                style={{ padding: '8px', background: 'rgba(245, 215, 110, 0.18)', border: '1px solid rgba(245, 215, 110, 0.5)', borderRadius: '6px', color: 'white', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold', textAlign: 'left' }}
+              >Cloudflare FLUX.2 Klein</button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setGenProvider('cloudflare_flux_schnell'); setGenPipeline('image'); setGenState('prompt'); }}
+                style={{ padding: '8px', background: 'rgba(0, 255, 204, 0.16)', border: '1px solid rgba(0, 255, 204, 0.44)', borderRadius: '6px', color: 'white', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold', textAlign: 'left' }}
+              >Cloudflare FLUX Schnell</button>
+              <button 
                 onClick={(e) => { e.stopPropagation(); setGenProvider('openai_image'); setGenPipeline('image'); setGenState('prompt'); }}
                 style={{ padding: '8px', background: 'rgba(75, 94, 250, 0.2)', border: '1px solid rgba(75, 94, 250, 0.5)', borderRadius: '6px', color: 'white', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold', textAlign: 'left' }}
-              >🖼️ ChatGPT Images</button>
+              >ChatGPT Images</button>
               <button 
                 onClick={(e) => { e.stopPropagation(); setGenProvider('gemini_banana_pro'); setGenPipeline('image'); setGenState('prompt'); }}
                 style={{ padding: '8px', background: 'rgba(255, 159, 28, 0.18)', border: '1px solid rgba(255, 159, 28, 0.48)', borderRadius: '6px', color: 'white', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold', textAlign: 'left' }}
-              >🍌 Gemini Banana Pro</button>
+              >Gemini Banana Pro</button>
               <button 
                 onClick={(e) => { e.stopPropagation(); setGenProvider('google_veo'); setGenPipeline('video'); setGenState('prompt'); }}
                 style={{ padding: '8px', background: 'rgba(0, 255, 204, 0.2)', border: '1px solid rgba(0, 255, 204, 0.5)', borderRadius: '6px', color: 'white', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 'bold', textAlign: 'left' }}
-              >🎥 Google Veo</button>
+              >Google Veo</button>
             </div>
             <button 
               onClick={(e) => { e.stopPropagation(); setGenState('idle'); setGenProvider(null); setGenPipeline(null); setGenError(''); }}

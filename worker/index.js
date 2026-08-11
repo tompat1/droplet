@@ -8,6 +8,16 @@ const CONCIERGE_MODEL = '@cf/meta/llama-3.1-8b-instruct';
 const MAX_CONCIERGE_ASSETS = 36;
 const MAX_CONCIERGE_HISTORY = 8;
 const GENERATION_PROVIDERS = {
+  cloudflare_flux_klein: {
+    label: 'Cloudflare FLUX.2 Klein',
+    pipeline: 'image',
+    defaultModel: '@cf/black-forest-labs/flux-2-klein-4b'
+  },
+  cloudflare_flux_schnell: {
+    label: 'Cloudflare FLUX Schnell',
+    pipeline: 'image',
+    defaultModel: '@cf/black-forest-labs/flux-1-schnell'
+  },
   concierge_free_image: {
     label: 'Concierge Free Render',
     pipeline: 'image',
@@ -526,7 +536,11 @@ async function createGenerationBranch(request, env, userId) {
     if (!provider) return json({ error: 'Unsupported generation provider' }, 400);
 
     let branch;
-    if (input.provider === 'concierge_free_image' || input.provider === 'concierge_free_video') {
+    if (input.provider === 'cloudflare_flux_klein') {
+      branch = await generateCloudflareFluxKlein(env, input);
+    } else if (input.provider === 'cloudflare_flux_schnell') {
+      branch = await generateCloudflareFluxSchnell(env, input);
+    } else if (input.provider === 'concierge_free_image' || input.provider === 'concierge_free_video') {
       branch = await generateConciergeFreeBranch(request, env, input);
     } else if (input.provider === 'openai_image') {
       branch = await generateOpenAiImage(env, input);
@@ -998,7 +1012,68 @@ function escapeSvg(value) {
 
 function shouldUseFreeGenerationFallback(message, input) {
   if (!input || input.provider === 'concierge_free_image' || input.provider === 'concierge_free_video') return false;
-  return /credit|quota|billing|insufficient_quota|rate limit|429|payment|required|exhausted|balance/i.test(String(message || ''));
+  return /credit|quota|billing|insufficient_quota|rate limit|429|payment|required|exhausted|balance|not configured|binding/i.test(String(message || ''));
+}
+
+async function generateCloudflareFluxKlein(env, input) {
+  if (!env.AI) throw new Error('Workers AI binding AI is not configured');
+  const model = cleanText(env.CLOUDFLARE_FLUX_KLEIN_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_flux_klein.defaultModel;
+  const prompt = buildCloudflareImagePrompt(input);
+  const form = new FormData();
+  form.append('prompt', prompt);
+  form.append('width', String(cloudflareImageDimension(input.size, 'width')));
+  form.append('height', String(cloudflareImageDimension(input.size, 'height')));
+  form.append('guidance', String(cloudflareGuidance(input.quality)));
+
+  const referenceUrls = cloudflareReferenceUrls(input);
+  let referenceCount = 0;
+  for (const url of referenceUrls) {
+    if (referenceCount >= 4) break;
+    const blob = await referenceUrlToBlob(url);
+    if (!blob) continue;
+    form.append(`input_image_${referenceCount}`, blob, `reference-${referenceCount}.${blobExtension(blob.type)}`);
+    referenceCount += 1;
+  }
+
+  const formResponse = new Response(form);
+  const payload = await env.AI.run(model, {
+    multipart: {
+      body: formResponse.body,
+      contentType: formResponse.headers.get('content-type')
+    }
+  });
+  const imageBase64 = extractCloudflareImageBase64(payload);
+  if (!imageBase64) throw new Error('Cloudflare FLUX did not return image data');
+
+  return {
+    title: referenceCount > 0 ? 'FLUX Reference Image Branch' : 'FLUX Image Branch',
+    subtitle: `Generated with ${model}`,
+    description: input.prompt,
+    imageDataUrl: `data:image/jpeg;base64,${imageBase64}`,
+    model,
+    status: 'ready'
+  };
+}
+
+async function generateCloudflareFluxSchnell(env, input) {
+  if (!env.AI) throw new Error('Workers AI binding AI is not configured');
+  const model = cleanText(env.CLOUDFLARE_FLUX_SCHNELL_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_flux_schnell.defaultModel;
+  const payload = await env.AI.run(model, {
+    prompt: buildCloudflareImagePrompt(input),
+    steps: cloudflareFluxSteps(input.quality),
+    seed: Math.floor(Math.random() * 1000000000)
+  });
+  const imageBase64 = extractCloudflareImageBase64(payload);
+  if (!imageBase64) throw new Error('Cloudflare FLUX did not return image data');
+
+  return {
+    title: 'FLUX Schnell Image Branch',
+    subtitle: `Generated with ${model}`,
+    description: input.prompt,
+    imageDataUrl: `data:image/jpeg;base64,${imageBase64}`,
+    model,
+    status: 'ready'
+  };
 }
 
 async function generateOpenAiImage(env, input) {
@@ -1153,6 +1228,42 @@ function normalizeBrandGuidePayload(value) {
 
 function estimateGenerationUsage(input, branch, provider) {
   const model = branch.model || GENERATION_PROVIDERS[input.provider]?.defaultModel || '';
+  if (input.provider === 'cloudflare_flux_klein') {
+    const outputTiles = cloudflareTileCount(input.size);
+    const referenceTiles = Math.min(4, input.refs.length + (input.parent?.image ? 1 : 0));
+    const estimatedUsd = roundMoney((outputTiles * 0.000287) + (referenceTiles * 0.000059));
+    return {
+      provider: input.provider,
+      providerLabel: provider.label,
+      pipeline: provider.pipeline,
+      model,
+      estimatedUsd,
+      currency: 'USD',
+      status: 'estimated',
+      outputCount: 1,
+      size: input.size,
+      quality: input.quality,
+      estimateBasis: 'Cloudflare Workers AI FLUX.2 Klein estimate using 512px output tiles plus reference image tiles; may be covered by Workers AI free allocation.'
+    };
+  }
+  if (input.provider === 'cloudflare_flux_schnell') {
+    const outputTiles = cloudflareTileCount(input.size);
+    const steps = cloudflareFluxSteps(input.quality);
+    const estimatedUsd = roundMoney((outputTiles * 0.0000528) + (steps * 0.0001056));
+    return {
+      provider: input.provider,
+      providerLabel: provider.label,
+      pipeline: provider.pipeline,
+      model,
+      estimatedUsd,
+      currency: 'USD',
+      status: 'estimated',
+      outputCount: 1,
+      size: input.size,
+      quality: input.quality,
+      estimateBasis: 'Cloudflare Workers AI FLUX.1 Schnell estimate using 512px tiles and diffusion steps; may be covered by Workers AI free allocation.'
+    };
+  }
   if (input.provider === 'concierge_free_image' || input.provider === 'concierge_free_video') {
     return {
       provider: input.provider,
@@ -1431,18 +1542,101 @@ function withReferenceContext(input) {
   return sections.join('\n\n');
 }
 
+function buildCloudflareImagePrompt(input) {
+  return cleanText([
+    withReferenceContext(input),
+    'Output a polished, production-ready brand/campaign image. Preserve the source brand identity, keep typography intentional, and avoid distorted logos or unreadable text.'
+  ].join('\n\n'), 2048);
+}
+
+function cloudflareReferenceUrls(input) {
+  const guideImages = Array.isArray(input.brandGuide?.nodes)
+    ? input.brandGuide.nodes.map((node) => node.image).filter(Boolean)
+    : [];
+  return Array.from(new Set([
+    input.parent?.image,
+    ...input.refs,
+    ...guideImages
+  ].filter(Boolean))).slice(0, 4);
+}
+
+function cloudflareImageDimensions(size) {
+  const match = String(size || DEFAULT_IMAGE_SIZE).match(/^(\d+)x(\d+)$/);
+  const width = match ? Number(match[1]) : 1024;
+  const height = match ? Number(match[2]) : 1024;
+  return {
+    width: Math.min(1920, Math.max(256, width)),
+    height: Math.min(1920, Math.max(256, height))
+  };
+}
+
+function cloudflareImageDimension(size, axis) {
+  return cloudflareImageDimensions(size)[axis] || 1024;
+}
+
+function cloudflareTileCount(size) {
+  const { width, height } = cloudflareImageDimensions(size);
+  return Math.ceil(width / 512) * Math.ceil(height / 512);
+}
+
+function cloudflareFluxSteps(quality) {
+  if (quality === 'low') return 4;
+  if (quality === 'high') return 8;
+  return 6;
+}
+
+function cloudflareGuidance(quality) {
+  if (quality === 'low') return 3.5;
+  if (quality === 'high') return 6.5;
+  return 4.5;
+}
+
+async function referenceUrlToBlob(url) {
+  const value = cleanText(url, 2000000);
+  const dataMatch = value.match(/^data:(image\/(?:png|jpe?g|webp|gif));base64,([a-z0-9+/=]+)$/i);
+  if (dataMatch) {
+    const bytes = Uint8Array.from(atob(dataMatch[2]), (char) => char.charCodeAt(0));
+    return new Blob([bytes], { type: dataMatch[1].toLowerCase() });
+  }
+
+  if (!/^https?:\/\//i.test(value)) return null;
+  const response = await fetch(value);
+  if (!response.ok) return null;
+  const contentType = response.headers.get('content-type') || inferImageMimeType(value);
+  if (!/^image\/(png|jpe?g|webp|gif)/i.test(contentType)) return null;
+  const buffer = await response.arrayBuffer();
+  if (buffer.byteLength > 2000000) return null;
+  return new Blob([buffer], { type: contentType });
+}
+
+function blobExtension(mimeType) {
+  if (/webp/i.test(mimeType)) return 'webp';
+  if (/gif/i.test(mimeType)) return 'gif';
+  if (/jpe?g/i.test(mimeType)) return 'jpg';
+  return 'png';
+}
+
+function extractCloudflareImageBase64(payload) {
+  if (typeof payload?.image === 'string') return payload.image;
+  if (typeof payload?.result?.image === 'string') return payload.result.image;
+  if (typeof payload?.data?.image === 'string') return payload.data.image;
+  if (Array.isArray(payload?.images) && typeof payload.images[0] === 'string') return payload.images[0];
+  return '';
+}
+
 function normalizeUrlList(value) {
   if (!Array.isArray(value)) return [];
   return value.map(normalizeReferenceUrl).filter(Boolean).slice(0, 3);
 }
 
 function normalizeReferenceUrl(value) {
-  const url = cleanText(value, 2000);
-  if (!url) return '';
-
-  if (/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(url) && url.length <= 750000) {
-    return url;
+  const raw = String(value || '').trim();
+  if (/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(raw) && raw.length <= 750000) {
+    return raw;
   }
+
+  const url = cleanText(raw, 2000);
+  if (!url) return '';
 
   try {
     const parsed = new URL(url);
@@ -1479,12 +1673,14 @@ async function aiConciergeHandler(request, env, user) {
   const systemPrompt = buildDropletConciergeSystemPrompt(input);
   const userPrompt = buildDropletConciergeUserPrompt(input);
   const providerResult = await runDropletConciergeProvider(request, env, input, systemPrompt, userPrompt);
+  const actions = await planDropletConciergeActions(env, input);
 
   if (providerResult) {
     return json({
       success: true,
       answer: providerResult.answer,
       aiModel: providerResult.aiModel,
+      actions,
       recommendations: providerResult.recommendations || dropletConciergeRecommendations(input)
     });
   }
@@ -1493,6 +1689,7 @@ async function aiConciergeHandler(request, env, user) {
     success: true,
     answer: dropletConciergeFallback(input),
     aiModel: 'droplet-concierge-fallback',
+    actions,
     recommendations: dropletConciergeRecommendations(input)
   });
 }
@@ -1671,6 +1868,133 @@ function buildDropletConciergeUserPrompt(input) {
     history ? `Recent chat:\n${history}` : '',
     `User prompt:\n${input.prompt}`
   ].filter(Boolean).join('\n\n');
+}
+
+async function planDropletConciergeActions(env, input) {
+  const fallback = dropletConciergeActionFallback(input);
+  if (!env.AI || fallback.length === 0) return fallback;
+
+  const model = cleanText(env.CONCIERGE_ACTION_MODEL, 160) || CONCIERGE_MODEL;
+  const schema = {
+    type: 'object',
+    properties: {
+      actions: {
+        type: 'array',
+        maxItems: 2,
+        items: {
+          type: 'object',
+          properties: {
+            type: {
+              type: 'string',
+              enum: ['create_asset', 'edit_asset', 'rewrite_copy', 'organize_canvas', 'answer_only']
+            },
+            label: { type: 'string' },
+            prompt: { type: 'string' },
+            pipeline: {
+              type: 'string',
+              enum: ['image', 'video', 'copy', 'canvas', 'none']
+            },
+            target: { type: 'string' }
+          },
+          required: ['type', 'label', 'prompt', 'pipeline']
+        }
+      }
+    },
+    required: ['actions']
+  };
+
+  try {
+    const payload = await env.AI.run(model, {
+      messages: [
+        {
+          role: 'system',
+          content: [
+            'You classify Droplet Concierge prompts into safe UI actions.',
+            'Return JSON only. Create asset actions only when the user asks to render, generate, remix, revise, edit, or make visual/media/copy assets.',
+            'Never invent saved state. Use answer_only when the user only asks a question.'
+          ].join('\n')
+        },
+        {
+          role: 'user',
+          content: JSON.stringify({
+            prompt: input.prompt,
+            canvasName: input.context.canvasName,
+            assetSummary: input.context.assetSummary,
+            visibleAssetTitles: input.context.assets.slice(0, 10).map((asset) => asset.title).filter(Boolean)
+          })
+        }
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: schema
+      },
+      max_tokens: 500,
+      temperature: 0.1
+    });
+    const parsed = typeof payload?.response === 'object' && payload.response
+      ? payload.response
+      : typeof payload?.result?.response === 'object' && payload.result.response
+        ? payload.result.response
+        : parseConciergeJsonObject(extractConciergeText(payload));
+    const actions = normalizeConciergeActions(parsed?.actions);
+    return actions.length > 0 ? actions : fallback;
+  } catch (error) {
+    console.warn('Concierge action planner failed', error instanceof Error ? error.message : String(error));
+    return fallback;
+  }
+}
+
+function normalizeConciergeActions(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 2).map((action) => {
+    if (!action || typeof action !== 'object') return null;
+    const type = cleanText(action.type, 40);
+    const pipeline = cleanText(action.pipeline, 24);
+    if (!['create_asset', 'edit_asset', 'rewrite_copy', 'organize_canvas', 'answer_only'].includes(type)) return null;
+    if (!['image', 'video', 'copy', 'canvas', 'none'].includes(pipeline)) return null;
+    return {
+      type,
+      label: cleanText(action.label, 80) || actionLabelForType(type),
+      prompt: cleanText(action.prompt, 900),
+      pipeline,
+      target: cleanText(action.target, 120)
+    };
+  }).filter(Boolean);
+}
+
+function actionLabelForType(type) {
+  if (type === 'edit_asset') return 'Edit selected';
+  if (type === 'create_asset') return 'Render on canvas';
+  if (type === 'rewrite_copy') return 'Rewrite copy';
+  if (type === 'organize_canvas') return 'Organize canvas';
+  return 'Answer only';
+}
+
+function dropletConciergeActionFallback(input) {
+  const prompt = cleanText(input.prompt, 900);
+  if (!/\b(render|generate|create|make|edit|remix|variant|iterate|revise|rework|asset|image|visual|poster|ad|campaign|video|shot)\b/i.test(prompt)) {
+    return [];
+  }
+  const isVideo = /\b(video|motion|clip|film|reel|storyboard)\b/i.test(prompt);
+  const isEdit = /\b(edit|remix|variant|iterate|revise|rework|change|selected|this)\b/i.test(prompt);
+  return [{
+    type: isEdit ? 'edit_asset' : 'create_asset',
+    label: isEdit ? 'Edit selected' : 'Render on canvas',
+    prompt,
+    pipeline: isVideo ? 'video' : 'image',
+    target: isEdit ? 'selected_asset' : 'canvas'
+  }];
+}
+
+function parseConciergeJsonObject(value) {
+  const text = String(value || '').replace(/```(?:json)?|```/gi, '').trim();
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[0]);
+  } catch {
+    return null;
+  }
 }
 
 async function runDropletConciergeProvider(request, env, input, systemPrompt, userPrompt) {

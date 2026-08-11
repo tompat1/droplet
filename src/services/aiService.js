@@ -181,6 +181,7 @@ export async function askConcierge({
       success: payload.success !== false,
       answer: sanitizeAssistantText(payload.answer || ''),
       aiModel: payload.aiModel || 'droplet-concierge',
+      actions: Array.isArray(payload.actions) ? payload.actions : [],
       recommendations: Array.isArray(payload.recommendations) ? payload.recommendations : []
     };
   } catch (error) {
@@ -188,6 +189,7 @@ export async function askConcierge({
       success: true,
       answer: sanitizeAssistantText(localConciergeFallback(prompt, context)),
       aiModel: 'droplet-client-fallback',
+      actions: [],
       recommendations: [],
       warning: error instanceof Error ? error.message : String(error)
     };
