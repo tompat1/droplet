@@ -1872,7 +1872,7 @@ function buildDropletConciergeUserPrompt(input) {
 
 async function planDropletConciergeActions(env, input) {
   const fallback = dropletConciergeActionFallback(input);
-  if (!env.AI || fallback.length === 0) return fallback;
+  if (!env.AI) return fallback;
 
   const model = cleanText(env.CONCIERGE_ACTION_MODEL, 160) || CONCIERGE_MODEL;
   const schema = {
@@ -1894,7 +1894,9 @@ async function planDropletConciergeActions(env, input) {
               type: 'string',
               enum: ['image', 'video', 'copy', 'canvas', 'none']
             },
-            target: { type: 'string' }
+            target: { type: 'string' },
+            contentKey: { type: 'string' },
+            value: { type: 'string' }
           },
           required: ['type', 'label', 'prompt', 'pipeline']
         }
@@ -1911,6 +1913,8 @@ async function planDropletConciergeActions(env, input) {
           content: [
             'You classify Droplet Concierge prompts into safe UI actions.',
             'Return JSON only. Create asset actions only when the user asks to render, generate, remix, revise, edit, or make visual/media/copy assets.',
+            'For rewrite_copy, choose one existing siteContent key and include contentKey plus the full replacement value.',
+            'For organize_canvas, use pipeline canvas and target canvas.',
             'Never invent saved state. Use answer_only when the user only asks a question.'
           ].join('\n')
         },
@@ -1920,7 +1924,11 @@ async function planDropletConciergeActions(env, input) {
             prompt: input.prompt,
             canvasName: input.context.canvasName,
             assetSummary: input.context.assetSummary,
-            visibleAssetTitles: input.context.assets.slice(0, 10).map((asset) => asset.title).filter(Boolean)
+            visibleAssetTitles: input.context.assets.slice(0, 10).map((asset) => asset.title).filter(Boolean),
+            siteContent: input.context.siteContent.slice(0, 16).map((block) => ({
+              key: block.key,
+              value: block.value
+            }))
           })
         }
       ],
@@ -1952,12 +1960,19 @@ function normalizeConciergeActions(value) {
     const pipeline = cleanText(action.pipeline, 24);
     if (!['create_asset', 'edit_asset', 'rewrite_copy', 'organize_canvas', 'answer_only'].includes(type)) return null;
     if (!['image', 'video', 'copy', 'canvas', 'none'].includes(pipeline)) return null;
+    const prompt = cleanText(action.prompt, 900);
+    const contentKey = cleanText(action.contentKey, 120);
+    const value = cleanText(action.value, 1800);
+    if ((type === 'create_asset' || type === 'edit_asset') && !prompt) return null;
+    if (type === 'rewrite_copy' && (!contentKey || !value)) return null;
     return {
       type,
       label: cleanText(action.label, 80) || actionLabelForType(type),
-      prompt: cleanText(action.prompt, 900),
+      prompt,
       pipeline,
-      target: cleanText(action.target, 120)
+      target: cleanText(action.target, 120),
+      contentKey,
+      value
     };
   }).filter(Boolean);
 }
@@ -1972,6 +1987,29 @@ function actionLabelForType(type) {
 
 function dropletConciergeActionFallback(input) {
   const prompt = cleanText(input.prompt, 900);
+  if (/\b(organize|arrange|tidy|layout|cluster|group|space|clean up|sort)\b/i.test(prompt) && /\b(canvas|nodes|cards|assets|board)\b/i.test(prompt)) {
+    return [{
+      type: 'organize_canvas',
+      label: 'Organize canvas',
+      prompt,
+      pipeline: 'canvas',
+      target: 'canvas'
+    }];
+  }
+  if (/\b(rewrite|tighten|edit copy|update copy|improve copy|change copy|polish copy)\b/i.test(prompt)) {
+    const block = chooseSiteContentBlock(input);
+    if (block) {
+      return [{
+        type: 'rewrite_copy',
+        label: 'Apply copy draft',
+        prompt,
+        pipeline: 'copy',
+        target: block.key,
+        contentKey: block.key,
+        value: localCopyRewrite(prompt, block.value)
+      }];
+    }
+  }
   if (!/\b(render|generate|create|make|edit|remix|variant|iterate|revise|rework|asset|image|visual|poster|ad|campaign|video|shot)\b/i.test(prompt)) {
     return [];
   }
@@ -1984,6 +2022,35 @@ function dropletConciergeActionFallback(input) {
     pipeline: isVideo ? 'video' : 'image',
     target: isEdit ? 'selected_asset' : 'canvas'
   }];
+}
+
+function chooseSiteContentBlock(input) {
+  const blocks = Array.isArray(input.context.siteContent) ? input.context.siteContent : [];
+  if (blocks.length === 0) return null;
+  const lowerPrompt = input.prompt.toLowerCase();
+  return blocks.find((block) => {
+    const key = String(block.key || '').toLowerCase();
+    return key && lowerPrompt.includes(key);
+  }) || blocks.find((block) => /\b(title|headline|hero|overhero)\b/i.test(block.key) && /\b(title|headline|hero)\b/i.test(input.prompt))
+    || blocks.find((block) => /\b(description|body|quote|copy)\b/i.test(block.key) && /\b(description|body|quote|copy)\b/i.test(input.prompt))
+    || blocks[0];
+}
+
+function localCopyRewrite(prompt, currentValue) {
+  const current = cleanText(currentValue, 1200);
+  if (!current) return cleanText(prompt.replace(/\b(rewrite|tighten|polish|improve|copy)\b/gi, '').trim(), 1200);
+  if (/\b(shorter|tighten|concise|punchy)\b/i.test(prompt)) {
+    return current
+      .replace(/\s+/g, ' ')
+      .split(/(?<=[.!?])\s+/)
+      .slice(0, 2)
+      .join(' ')
+      .slice(0, 260);
+  }
+  if (/\b(premium|elevated|polished)\b/i.test(prompt)) {
+    return `${current.replace(/[.!?]*$/, '')}. Crafted with sharper focus, elevated rhythm, and a clearer brand point of view.`;
+  }
+  return current;
 }
 
 function parseConciergeJsonObject(value) {

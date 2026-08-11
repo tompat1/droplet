@@ -83,6 +83,27 @@ The Worker returns:
   "success": true,
   "answer": "Concise Droplet-specific answer.",
   "aiModel": "@cf/meta/llama-3.1-8b-instruct",
+  "actions": [
+    {
+      "type": "create_asset",
+      "label": "Render on canvas",
+      "prompt": "Generate a campaign visual from the current brand guide.",
+      "pipeline": "image",
+      "target": "canvas"
+    }
+  ],
   "recommendations": []
 }
 ```
+
+## Action Planner
+
+The Worker uses Workers AI JSON mode when available to classify Concierge prompts into bounded UI actions. If Workers AI is unavailable, the local planner fallback still detects common render, edit, rewrite, and organize requests.
+
+Supported action types:
+
+- `create_asset`: renders a new branch on the canvas through the generation route.
+- `edit_asset`: edits/remixes the selected canvas asset into a new branch.
+- `rewrite_copy`: proposes a replacement for an existing editable site-content key, then applies it only after the user clicks the action.
+- `organize_canvas`: lays out visible canvas cards by brand guide, generated branches, and canvas groups after the user clicks the action.
+- `answer_only`: returns a chat answer with no UI mutation.

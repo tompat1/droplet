@@ -3079,12 +3079,81 @@ export default function HeroCanvas() {
     }
   }, [containerCenterCanvasPoint, loadUsageSummary, selectedCardIds, setPersistentEdges, setPersistentNodes, showCanvasActionToast, user]);
 
+  const organizeCanvasForConcierge = useCallback(async () => {
+    const sourceNodes = nodesRef.current;
+    const visibleCards = sourceNodes
+      .filter((node) => node.id !== 'padding-node' && node.hidden !== true && node.type === 'brandCard');
+    if (visibleCards.length === 0) throw new Error('There are no visible cards to organize.');
+
+    const groupOrder = ['brand-guide', 'generated-concierge'];
+    const groupKey = (node) => {
+      const data = node.data || {};
+      if (data.isBrandGuideSource === true || data.sourceOfTruth === true || data.referenceRole === 'brand-guide') return 'brand-guide';
+      return data.nodeGroup || data.referenceRole || (data.isGenerated ? 'generated-concierge' : 'canvas');
+    };
+    const groups = new Map();
+    visibleCards.forEach((node) => {
+      const key = String(groupKey(node) || 'canvas');
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(node);
+    });
+
+    const orderedGroups = [...groups.entries()].sort(([a], [b]) => {
+      const ai = groupOrder.indexOf(a);
+      const bi = groupOrder.indexOf(b);
+      if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      return a.localeCompare(b);
+    });
+    const cardWidth = 360;
+    const cardHeight = 310;
+    const columnGap = 140;
+    const rowGap = 70;
+    const origin = containerCenterCanvasPoint();
+    const startX = origin.x - ((orderedGroups.length - 1) * (cardWidth + columnGap)) / 2;
+    const positions = new Map();
+
+    orderedGroups.forEach(([, groupNodes], groupIndex) => {
+      groupNodes
+        .slice()
+        .sort((a, b) => String(a.data?.title || a.id).localeCompare(String(b.data?.title || b.id)))
+        .forEach((node, rowIndex) => {
+          positions.set(node.id, {
+            x: startX + groupIndex * (cardWidth + columnGap),
+            y: origin.y - 180 + rowIndex * (cardHeight + rowGap)
+          });
+        });
+    });
+
+    setPersistentNodes((nds) => nds.map((node) => (
+      positions.has(node.id)
+        ? { ...node, position: positions.get(node.id), selected: false }
+        : node
+    )));
+    setSelectedNodeIds([]);
+    setIsEditMode(true);
+    setCanvasStatus('Canvas organized by group.');
+    showCanvasActionToast('Concierge organized the canvas by group.');
+
+    const firstPosition = positions.values().next().value;
+    if (firstPosition) {
+      window.requestAnimationFrame(() => {
+        reactFlowInstanceRef.current?.setCenter?.(firstPosition.x + 180, firstPosition.y + 160, { zoom: 0.72, duration: 700 });
+      });
+    }
+
+    return {
+      count: visibleCards.length,
+      groups: orderedGroups.length
+    };
+  }, [containerCenterCanvasPoint, setPersistentNodes, showCanvasActionToast]);
+
   useEffect(() => {
     setCanvasActions({
-      createAssetBranch: createConciergeAssetBranch
+      createAssetBranch: createConciergeAssetBranch,
+      organizeCanvas: organizeCanvasForConcierge
     });
     return () => setCanvasActions({});
-  }, [createConciergeAssetBranch, setCanvasActions]);
+  }, [createConciergeAssetBranch, organizeCanvasForConcierge, setCanvasActions]);
 
   const createImportedImageCards = useCallback(async (files, originPoint, source = 'upload') => {
     const imageFiles = imageFilesFromList(files).slice(0, MAX_IMPORT_FILES);

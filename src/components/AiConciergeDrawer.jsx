@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bot, ImagePlus, KeyRound, Send, Settings, Sparkles, Trash2, WandSparkles, X } from 'lucide-react';
+import { Bot, FileText, Grid3X3, ImagePlus, KeyRound, Send, Settings, Sparkles, Trash2, WandSparkles, X } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { useCanvasAssets } from './CanvasAssetsState';
 import { useSiteContent } from './SiteContentContext';
@@ -74,6 +74,10 @@ const canvasActionFromPlanner = (actions = [], selectedCount = 0) => {
   return { mode, pipeline, prompt: action.prompt };
 };
 
+const executablePlannerActions = (actions = []) => actions
+  .filter((action) => ['create_asset', 'edit_asset', 'rewrite_copy', 'organize_canvas'].includes(action?.type))
+  .slice(0, 3);
+
 export default function AiConciergeDrawer() {
   const { user } = useAuth();
   if (!user) return null;
@@ -82,7 +86,7 @@ export default function AiConciergeDrawer() {
 
 function AiConciergeDrawerInner({ user }) {
   const { canvasActions, canvasNodes, canvasEdges, canvasName } = useCanvasAssets();
-  const { content } = useSiteContent();
+  const { content, updateText } = useSiteContent();
   const [isOpen, setIsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
@@ -167,6 +171,68 @@ function AiConciergeDrawerInner({ user }) {
     }
   }, [canvasActionLoading, canvasActions, providerKeys, selectedAssetCount]);
 
+  const runCopyAction = useCallback(async (action) => {
+    if (!action?.contentKey || !action?.value || canvasActionLoading) return;
+    setCanvasActionLoading(true);
+    setHistory((items) => [
+      ...items,
+      { role: 'assistant', text: `Applying copy update to ${action.contentKey}...` }
+    ]);
+    try {
+      await updateText(action.contentKey, action.value);
+      setHistory((items) => [
+        ...items,
+        { role: 'assistant', text: `Done. Updated ${action.contentKey}.` }
+      ]);
+    } catch (error) {
+      setHistory((items) => [
+        ...items,
+        { role: 'assistant', text: error instanceof Error ? error.message : 'I could not update that copy.' }
+      ]);
+    } finally {
+      setCanvasActionLoading(false);
+    }
+  }, [canvasActionLoading, updateText]);
+
+  const runOrganizeAction = useCallback(async (action) => {
+    if (canvasActionLoading) return;
+    if (!canvasActions?.organizeCanvas) {
+      setHistory((items) => [
+        ...items,
+        { role: 'assistant', text: 'The canvas is still loading. Try again once the Fluid Node Canvas is visible.' }
+      ]);
+      return;
+    }
+    setCanvasActionLoading(true);
+    setHistory((items) => [
+      ...items,
+      { role: 'assistant', text: 'Organizing the current canvas...' }
+    ]);
+    try {
+      const result = await canvasActions.organizeCanvas(action);
+      setHistory((items) => [
+        ...items,
+        { role: 'assistant', text: `Done. Organized ${result.count} canvas card${result.count === 1 ? '' : 's'} across ${result.groups} group${result.groups === 1 ? '' : 's'}.` }
+      ]);
+    } catch (error) {
+      setHistory((items) => [
+        ...items,
+        { role: 'assistant', text: error instanceof Error ? error.message : 'I could not organize the canvas.' }
+      ]);
+    } finally {
+      setCanvasActionLoading(false);
+    }
+  }, [canvasActionLoading, canvasActions]);
+
+  const runPlannerAction = useCallback((action) => {
+    if (action?.type === 'create_asset' || action?.type === 'edit_asset') {
+      return runAssetAction(action.prompt, action.pipeline === 'video' ? 'video' : 'image');
+    }
+    if (action?.type === 'rewrite_copy') return runCopyAction(action);
+    if (action?.type === 'organize_canvas') return runOrganizeAction(action);
+    return undefined;
+  }, [runAssetAction, runCopyAction, runOrganizeAction]);
+
   const submitPrompt = useCallback(async (rawPrompt) => {
     const nextPrompt = String(rawPrompt || '').trim();
     if (!nextPrompt || loading) return;
@@ -186,7 +252,8 @@ function AiConciergeDrawerInner({ user }) {
       history: recentHistory
     });
 
-    const action = canvasActionFromPlanner(result.actions, selectedAssetCount) || detectAssetAction(nextPrompt, selectedAssetCount);
+    const plannerActions = executablePlannerActions(result.actions);
+    const action = canvasActionFromPlanner(plannerActions, selectedAssetCount) || detectAssetAction(nextPrompt, selectedAssetCount);
     setHistory((items) => [
       ...items,
       {
@@ -194,7 +261,8 @@ function AiConciergeDrawerInner({ user }) {
         text: result.answer || 'No answer returned.',
         model: result.aiModel,
         warning: result.warning,
-        action
+        action,
+        plannerActions: plannerActions.filter((item) => !(item.type === 'create_asset' || item.type === 'edit_asset'))
       }
     ]);
     setLoading(false);
@@ -324,6 +392,20 @@ function AiConciergeDrawerInner({ user }) {
                       <span>{item.action.mode === 'edit' ? 'Edit Selected' : 'Render On Canvas'}</span>
                     </button>
                   )}
+                  {Array.isArray(item.plannerActions) && item.plannerActions.map((plannedAction, actionIndex) => (
+                    <button
+                      key={`${plannedAction.type}-${actionIndex}`}
+                      type="button"
+                      className="ai-message-action"
+                      onClick={() => runPlannerAction(plannedAction)}
+                      disabled={canvasActionLoading}
+                    >
+                      {plannedAction.type === 'rewrite_copy'
+                        ? <FileText size={15} aria-hidden="true" />
+                        : <Grid3X3 size={15} aria-hidden="true" />}
+                      <span>{plannedAction.label || (plannedAction.type === 'rewrite_copy' ? 'Apply Copy' : 'Organize Canvas')}</span>
+                    </button>
+                  ))}
                 </article>
               ))}
               {(loading || canvasActionLoading) && (
