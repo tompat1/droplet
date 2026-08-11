@@ -165,7 +165,7 @@ export default function AuthControls() {
               aria-pressed={isCanvasEditMode}
             >
               <img src="/assets/ui/edit-canvas-flash.svg" alt="" />
-              <span>{isCanvasEditMode ? 'Editing' : 'Edit Canvas'}</span>
+              <span className="edit-canvas-label">{isCanvasEditMode ? 'Editing' : 'Edit Canvas'}</span>
               <span className="edit-toggle-indicator" aria-hidden="true"><span /></span>
             </button>
             <button className="auth-pill" onClick={() => setActiveDrawer('account')} title="Account">

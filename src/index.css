@@ -449,7 +449,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .edit-canvas-shortcut.active {
   border-color: rgba(0, 255, 204, 0.74);
-  background: rgba(0, 255, 204, 0.12);
+  background: linear-gradient(135deg, rgba(5, 35, 32, 0.94), rgba(9, 13, 18, 0.96));
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28), 0 0 22px rgba(0, 255, 204, 0.18);
 }
 
@@ -461,7 +461,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .edit-canvas-shortcut.active:hover {
   border-color: rgba(0, 255, 204, 0.92);
-  background: rgba(0, 255, 204, 0.16);
+  background: linear-gradient(135deg, rgba(6, 46, 42, 0.96), rgba(10, 17, 21, 0.98));
 }
 
 .edit-canvas-shortcut img {
@@ -472,12 +472,14 @@ h1, h2, h3, h4, h5, h6 {
   filter: drop-shadow(0 2px 5px rgba(255, 106, 0, 0.24));
 }
 
-.edit-canvas-shortcut span {
+.edit-canvas-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.84rem;
   font-weight: 800;
+  line-height: 1;
+  min-width: 0;
 }
 
 .edit-toggle-indicator {
@@ -1339,7 +1341,7 @@ h1, h2, h3, h4, h5, h6 {
     padding: 5px;
   }
 
-  .edit-canvas-shortcut span {
+  .edit-canvas-label {
     display: none;
   }
 
