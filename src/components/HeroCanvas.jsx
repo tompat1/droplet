@@ -4377,11 +4377,12 @@ export default function HeroCanvas() {
 
   useEffect(() => {
     if (isEditMode) {
-      const viewport = document.getElementById('hero-canvas-viewport');
-      if (viewport) {
-        requestAnimationFrame(() => {
-          viewport.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
+      const canvasViewport = document.getElementById('hero-canvas-viewport');
+      if (canvasViewport) {
+        const rect = canvasViewport.getBoundingClientRect();
+        const nextArrowAllowance = window.innerWidth >= 768 ? 34 : 24;
+        const targetTop = window.scrollY + rect.top + (rect.height / 2) - (window.innerHeight / 2) + nextArrowAllowance;
+        window.scrollTo({ top: targetTop, behavior: 'smooth' });
       }
     }
   }, [isEditMode]);
@@ -4512,7 +4513,7 @@ export default function HeroCanvas() {
   return (
     <div id="hero-canvas-section" style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
       <CanvasActionToast message={canvasActionToast} />
-      {!isFullscreen && !isEditMode && (
+      {!isFullscreen && (
         <div style={{ padding: '0 5% 0 5%', marginTop: '-34px', zIndex: 10, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: '16px' }}>
           <h1 style={{ fontSize: '3.5rem', margin: 0, whiteSpace: 'nowrap' }}>
             <EditableText contentKey="canvas.title.prefix" fallback="Fluid" /> <span className="text-gradient"><EditableText contentKey="canvas.title.accent" fallback="Node Canvas" /></span>
