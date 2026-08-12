@@ -2127,7 +2127,9 @@ const CanvasPersistencePanel = ({
             <span style={{ display: 'block', fontSize: '0.62rem', color: 'rgba(255,255,255,0.48)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Canvas</span>
             <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 850, lineHeight: 1.15 }}>{user ? displayCanvasName : 'Login required'}</span>
           </span>
-          <span style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.92rem', fontWeight: 950 }}>{isCollapsed ? '>' : 'v'}</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease', color: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
         </button>
         {!isCollapsed && (
           <button type="button" onClick={createNewCanvas} disabled={!user || isBusy} title={user ? 'Create a new Fluid Node Canvas' : 'Login to create a canvas'} aria-label="Create new canvas" style={{ ...controlStyle, minWidth: '56px', cursor: user && !isBusy ? 'pointer' : 'not-allowed', opacity: user ? 1 : 0.5, fontWeight: 850 }}>
@@ -2353,7 +2355,9 @@ const GenerationSpendPanel = ({
             <span style={{ display: 'block', fontSize: '0.62rem', color: 'rgba(255,255,255,0.48)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em' }}>API Spend</span>
             <span style={{ display: 'block', fontSize: '1.04rem', lineHeight: 1.1, fontWeight: 950 }}>{formatSpend(totalUsd, usageCurrency)}</span>
           </span>
-          <span style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.92rem', fontWeight: 950 }}>{isCollapsed ? '>' : 'v'}</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease', color: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
         </button>
         {!isCollapsed && (
           <select
@@ -2861,10 +2865,12 @@ const CanvasToolbox = ({
               style={toolbarFoldButtonStyle}
               title="Expand canvas tools"
               aria-label="Expand canvas tools"
-              onMouseEnter={(event) => { event.currentTarget.style.color = 'rgba(255,255,255,0.58)'; }}
+              onMouseEnter={(event) => { event.currentTarget.style.color = 'rgba(255,255,255,0.8)'; }}
               onMouseLeave={(event) => { event.currentTarget.style.color = 'rgba(255,255,255,0.34)'; }}
             >
-              ›
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
             </button>
             <button type="button" onClick={() => zoomOut({ duration: 250 })} style={iconButtonStyle} title="Zoom out" aria-label="Zoom out">−</button>
             <div style={zoomChipStyle}>{zoomPercent}%</div>
@@ -2926,10 +2932,12 @@ const CanvasToolbox = ({
                 style={toolbarFoldButtonStyle}
                 title="Minimize canvas tools"
                 aria-label="Minimize canvas tools"
-                onMouseEnter={(event) => { event.currentTarget.style.color = 'rgba(255,255,255,0.58)'; }}
+                onMouseEnter={(event) => { event.currentTarget.style.color = 'rgba(255,255,255,0.8)'; }}
                 onMouseLeave={(event) => { event.currentTarget.style.color = 'rgba(255,255,255,0.34)'; }}
               >
-                ‹
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
               </button>
             </div>
             <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
@@ -3015,7 +3023,9 @@ const CanvasToolbox = ({
                   aria-label={collapsedToolboxSections.editTools ? 'Open edit tools section' : 'Close edit tools section'}
                 >
                   <span>Edit tools</span>
-                  <span style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.88rem' }}>{collapsedToolboxSections.editTools ? '>' : 'v'}</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: collapsedToolboxSections.editTools ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease', color: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
                 </button>
                 {!collapsedToolboxSections.editTools && (
                   <>
