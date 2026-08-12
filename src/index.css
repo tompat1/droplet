@@ -376,7 +376,8 @@ h1, h2, h3, h4, h5, h6 {
   border: none !important;
   overflow: visible !important;
   margin: 20px !important;
-  bottom: 90px !important;
+  bottom: 20px !important;
+  right: 100px !important;
   box-shadow: none !important;
 }
 

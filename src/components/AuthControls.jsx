@@ -148,8 +148,6 @@ export default function AuthControls() {
   };
 
   const handleEditCanvasShortcut = () => {
-    const canvasSection = document.getElementById('hero-canvas-section');
-    canvasSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     window.dispatchEvent(new CustomEvent('toggleHeroCanvasEditor'));
   };
 

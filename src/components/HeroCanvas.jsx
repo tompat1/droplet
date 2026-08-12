@@ -4376,6 +4376,17 @@ export default function HeroCanvas() {
   }, []);
 
   useEffect(() => {
+    if (isEditMode) {
+      const viewport = document.getElementById('hero-canvas-viewport');
+      if (viewport) {
+        requestAnimationFrame(() => {
+          viewport.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
+    }
+  }, [isEditMode]);
+
+  useEffect(() => {
     const handlePaste = (event) => {
       if (isEditableTarget(event.target)) return;
       const canvasElement = containerRef.current;
@@ -4501,7 +4512,7 @@ export default function HeroCanvas() {
   return (
     <div id="hero-canvas-section" style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
       <CanvasActionToast message={canvasActionToast} />
-      {!isFullscreen && (
+      {!isFullscreen && !isEditMode && (
         <div style={{ padding: '0 5% 0 5%', marginTop: '-34px', zIndex: 10, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: '16px' }}>
           <h1 style={{ fontSize: '3.5rem', margin: 0, whiteSpace: 'nowrap' }}>
             <EditableText contentKey="canvas.title.prefix" fallback="Fluid" /> <span className="text-gradient"><EditableText contentKey="canvas.title.accent" fallback="Node Canvas" /></span>
