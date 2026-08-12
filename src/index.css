@@ -378,6 +378,7 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 12px !important;
   overflow: hidden !important;
   margin: 20px !important;
+  bottom: 90px !important;
 }
 
 .custom-minimap svg {
@@ -1380,5 +1381,11 @@ h1, h2, h3, h4, h5, h6 {
 @media (prefers-reduced-motion: reduce) {
   .drawer-panel {
     animation: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .scroll-drag-label {
+    display: none;
   }
 }

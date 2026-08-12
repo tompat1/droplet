@@ -603,7 +603,7 @@ const NodeSearch = () => {
   };
 
   return (
-    <Panel position="top-center" style={{ marginTop: '20px', zIndex: 20 }}>
+    <Panel position="top-center" style={{ marginTop: '88px', zIndex: 20 }}>
       <div ref={wrapperRef} style={{ position: 'relative', width: '300px' }}>
         <input 
           type="text"
@@ -3194,6 +3194,8 @@ export default function HeroCanvas() {
   const [undoStack, setUndoStack] = useState([]);
   
   const containerRef = useRef(null);
+  const pageScrollHandleRef = useRef(null);
+  const [isHandleHovered, setIsHandleHovered] = useState(false);
   const canvasSnapRef = useRef({
     lastScrollY: typeof window !== 'undefined' ? window.scrollY : 0,
     lastSnapAt: 0
@@ -4309,6 +4311,71 @@ export default function HeroCanvas() {
   }, [isEditMode]);
 
   useEffect(() => {
+    const handle = pageScrollHandleRef.current;
+    if (!handle) return undefined;
+
+    let isDragging = false;
+    let startY = 0;
+    let startScrollY = 0;
+
+    const onMouseDown = (e) => {
+      isDragging = true;
+      startY = e.clientY;
+      startScrollY = window.scrollY;
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'grabbing';
+      handle.style.cursor = 'grabbing';
+    };
+
+    const onMouseMove = (e) => {
+      if (!isDragging) return;
+      const deltaY = e.clientY - startY;
+      window.scrollTo(0, startScrollY - deltaY);
+    };
+
+    const onMouseUp = () => {
+      isDragging = false;
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      if (handle) handle.style.cursor = 'grab';
+    };
+
+    const onTouchStart = (e) => {
+      isDragging = true;
+      startY = e.touches[0].clientY;
+      startScrollY = window.scrollY;
+    };
+
+    const onTouchMove = (e) => {
+      if (!isDragging) return;
+      const deltaY = e.touches[0].clientY - startY;
+      window.scrollTo(0, startScrollY - deltaY);
+    };
+
+    const onTouchEnd = () => {
+      isDragging = false;
+    };
+
+    handle.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+
+    handle.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('touchend', onTouchEnd);
+
+    return () => {
+      handle.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+
+      handle.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+    };
+  }, []);
+
+  useEffect(() => {
     const handlePaste = (event) => {
       if (isEditableTarget(event.target)) return;
       const canvasElement = containerRef.current;
@@ -4472,6 +4539,51 @@ export default function HeroCanvas() {
         style={{ display: 'none' }}
         onChange={handleCanvasUpload}
       />
+      {!isFullscreen && (
+        <div 
+          ref={pageScrollHandleRef}
+          onMouseEnter={() => setIsHandleHovered(true)}
+          onMouseLeave={() => setIsHandleHovered(false)}
+          title="Scroll mouse wheel or drag here to scroll the page"
+          style={{
+            position: 'absolute',
+            top: '20px',
+            left: '5%',
+            right: '5%',
+            height: '48px',
+            zIndex: 15,
+            background: 'rgba(20, 20, 25, 0.4)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '24px',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            cursor: 'grab',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'auto',
+            transition: 'border-color 0.2s, background 0.2s',
+            borderColor: isHandleHovered ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.08)'
+          }}
+        >
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            opacity: isHandleHovered ? 0.95 : 0.45,
+            transition: 'opacity 0.2s',
+          }}>
+            <svg width="16" height="10" viewBox="0 0 16 10" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="2" strokeLinecap="round">
+              <line x1="2" y1="2" x2="14" y2="2" />
+              <line x1="2" y1="8" x2="14" y2="8" />
+            </svg>
+            <span className="scroll-drag-label" style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.8)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>Scroll / Drag Zone</span>
+            <svg width="16" height="10" viewBox="0 0 16 10" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="2" strokeLinecap="round">
+              <line x1="2" y1="2" x2="14" y2="2" />
+              <line x1="2" y1="8" x2="14" y2="8" />
+            </svg>
+          </div>
+        </div>
+      )}
       <ReactFlow
         nodes={nodes}
         edges={edges}
