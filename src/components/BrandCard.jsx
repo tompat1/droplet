@@ -187,7 +187,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
   const [isHoveringImage, setIsHoveringImage] = useState(false);
   const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
-  const [imagePreviewPortalTarget, setImagePreviewPortalTarget] = useState(null);
+  const [imagePreviewPortalTarget, setImagePreviewPortalTarget] = useState(() => typeof document !== 'undefined' ? (document.fullscreenElement || document.body) : null);
 
   // Generative UI State
   const [genState, setGenState] = useState('idle'); // idle | pipeline | prompt | generating
@@ -430,8 +430,9 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
   };
 
   const openImagePreview = (event) => {
-    event.stopPropagation();
+    event?.stopPropagation();
     if (!data.image) return;
+    setImagePreviewPortalTarget(document.fullscreenElement || document.body);
     setIsImagePreviewOpen(true);
   };
 
@@ -801,7 +802,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
             event.stopPropagation();
             setIsImagePreviewOpen(false);
           }}
-          style={{ position: 'fixed', inset: 0, zIndex: 5000, background: 'rgba(0,0,0,0.84)', backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '28px' }}
+          style={{ position: 'fixed', inset: 0, zIndex: 999999, background: 'rgba(0,0,0,0.84)', backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '28px' }}
         >
           <div
             onClick={(event) => event.stopPropagation()}

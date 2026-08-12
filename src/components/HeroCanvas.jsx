@@ -1692,7 +1692,7 @@ const CanvasActionToast = ({ message }) => {
     >
       {message}
     </div>,
-    document.body
+    document.fullscreenElement || document.body
   );
 };
 

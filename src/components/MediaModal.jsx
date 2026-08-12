@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function MediaModal({ media, onClose, onNext, onPrev }) {
+  const [portalTarget, setPortalTarget] = useState(() => typeof document !== 'undefined' ? (document.fullscreenElement || document.body) : null);
   const [isZoomed, setIsZoomed] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -12,6 +14,15 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
     setIsZoomed(false);
     setPan({ x: 0, y: 0 });
   }, [media]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setPortalTarget(document.fullscreenElement || document.body);
+    };
+    handleFullscreenChange();
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -69,15 +80,17 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
     }
   };
 
-  return (
+  const target = portalTarget || (typeof document !== 'undefined' ? (document.fullscreenElement || document.body) : null);
+  if (!target) return null;
+
+  return createPortal(
     <div 
       style={{
         position: 'fixed',
-        top: 0,
-        left: 0,
+        inset: 0,
         width: '100vw',
         height: '100vh',
-        zIndex: 9999,
+        zIndex: 999999,
         background: 'rgba(5, 5, 5, 0.85)',
         backdropFilter: 'blur(24px)',
         display: 'flex',
@@ -276,6 +289,7 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    target
   );
 }
