@@ -191,8 +191,28 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
   // Generative UI State
   const [genState, setGenState] = useState('idle'); // idle | pipeline | prompt | generating
-  const [genPipeline, setGenPipeline] = useState(null); // 'image' | 'video'
-  const [genProvider, setGenProvider] = useState(null);
+  const [genPipeline, setGenPipeline] = useState(() => {
+    try {
+      const stored = localStorage.getItem('droplet-last-generation-renderer');
+      if (stored && GENERATION_PROVIDERS[stored]) {
+        return GENERATION_PROVIDERS[stored].pipeline;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  });
+  const [genProvider, setGenProvider] = useState(() => {
+    try {
+      const stored = localStorage.getItem('droplet-last-generation-renderer');
+      if (stored && GENERATION_PROVIDERS[stored]) {
+        return stored;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  });
   const [genPrompt, setGenPrompt] = useState('');
   const [genRefs, setGenRefs] = useState([]);
   const [genError, setGenError] = useState('');
@@ -536,6 +556,11 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
   const handleGenerateRun = async () => {
     const providerKey = genProvider || (genPipeline === 'video' ? 'google_veo' : 'cloudflare_flux_klein');
+    try {
+      localStorage.setItem('droplet-last-generation-renderer', providerKey);
+    } catch {
+      // ignore
+    }
     const provider = GENERATION_PROVIDERS[providerKey] || GENERATION_PROVIDERS.openai_image;
     const prompt = genPrompt.trim() || `Generate a ${provider.pipeline} branch from ${data.title}`;
     setGenError('');
@@ -597,8 +622,6 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       edgeUpdater(eds => [...eds, ...[newEdge, labelEdge].filter(Boolean)]);
       
       setGenState('idle');
-      setGenProvider(null);
-      setGenPipeline(null);
       setGenPrompt('');
       setGenRefs([]);
       data.onGenerationUsageUpdate?.(result?.usage || result?.branch?.usage);
@@ -934,6 +957,11 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
                   const provider = GENERATION_PROVIDERS[providerKey];
                   setGenProvider(providerKey);
                   setGenPipeline(provider.pipeline);
+                  try {
+                    localStorage.setItem('droplet-last-generation-renderer', providerKey);
+                  } catch {
+                    // ignore
+                  }
                   setGenState('prompt');
                 }}
                 style={{ minHeight: '36px', borderRadius: '7px', border: '1px solid rgba(0,255,204,0.34)', background: 'rgba(0,255,204,0.08)', color: '#fff', padding: '0 9px', fontSize: '12px', fontWeight: 850, outline: 'none', cursor: 'pointer' }}
@@ -956,6 +984,11 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
                   const provider = GENERATION_PROVIDERS[providerKey];
                   setGenProvider(providerKey);
                   setGenPipeline(provider.pipeline);
+                  try {
+                    localStorage.setItem('droplet-last-generation-renderer', providerKey);
+                  } catch {
+                    // ignore
+                  }
                   setGenState('prompt');
                 }}
                 style={{ minHeight: '36px', borderRadius: '7px', border: '1px solid rgba(255,184,77,0.34)', background: 'rgba(255,184,77,0.08)', color: '#fff', padding: '0 9px', fontSize: '12px', fontWeight: 850, outline: 'none', cursor: 'pointer' }}
@@ -971,7 +1004,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               DeepSeek is used as a text/planning agent, not an image renderer. Cloudworker options render first through the Workers AI free allocation.
             </div>
             <button 
-              onClick={(e) => { e.stopPropagation(); setGenState('idle'); setGenProvider(null); setGenPipeline(null); setGenError(''); }}
+              onClick={(e) => { e.stopPropagation(); setGenState('idle'); setGenError(''); }}
               style={{ padding: '6px', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '12px' }}
             >Cancel</button>
           </div>
@@ -1065,7 +1098,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
                 style={{ flex: 1, padding: '8px', background: 'var(--accent-neon)', border: 'none', borderRadius: '6px', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}
               >✨ Run</button>
               <button 
-                onClick={(e) => { e.stopPropagation(); setGenState('idle'); setGenProvider(null); setGenPipeline(null); setGenPrompt(''); setGenRefs([]); setGenError(''); }}
+                onClick={(e) => { e.stopPropagation(); setGenState('idle'); setGenPrompt(''); setGenRefs([]); setGenError(''); }}
                 style={{ padding: '8px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', color: 'white', cursor: 'pointer' }}
               >Cancel</button>
             </div>
