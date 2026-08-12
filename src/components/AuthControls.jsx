@@ -170,11 +170,6 @@ export default function AuthControls() {
               <Avatar user={user} initials={initials} />
               <span className="auth-pill-text">{user.displayName || user.email}</span>
             </button>
-            {isAdmin && (
-              <button className="auth-icon-button admin" onClick={() => setActiveDrawer('admin')} title="Admin">
-                <Shield size={18} />
-              </button>
-            )}
           </>
         ) : (
           <button className="auth-pill" onClick={() => setActiveDrawer('auth')} disabled={isLoading}>
@@ -275,6 +270,17 @@ export default function AuthControls() {
               <span>Role</span>
               <strong>{user.role || 'user'}</strong>
             </div>
+            {isAdmin && (
+              <button 
+                type="button" 
+                className="drawer-secondary admin-panel-button" 
+                onClick={() => setActiveDrawer('admin')} 
+                style={{ width: '100%', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              >
+                <Shield size={18} />
+                Admin Panel
+              </button>
+            )}
             <button className="drawer-secondary danger" onClick={handleLogout}>
               <LogOut size={18} />
               Logout
