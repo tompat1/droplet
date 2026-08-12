@@ -1717,6 +1717,8 @@ const CanvasPersistencePanel = ({
   isCanvasDirty,
   setIsCanvasDirty,
   isVisible,
+  isCollapsed = false,
+  onToggleCollapse,
   onNotify
 }) => {
   const { getViewport, setViewport, fitView } = useReactFlow();
@@ -2069,24 +2071,38 @@ const CanvasPersistencePanel = ({
     width: '100%',
     background: 'rgba(4,4,8,0.62)',
     border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: '14px',
-    padding: '14px',
+    borderRadius: '12px',
+    padding: '10px',
     color: '#fff',
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px',
+    gap: '8px',
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)'
   };
 
   const controlStyle = {
-    minHeight: '40px',
+    minHeight: '34px',
     borderRadius: '10px',
     border: '1px solid rgba(255,255,255,0.13)',
     background: 'rgba(255,255,255,0.07)',
     color: '#fff',
-    padding: '0 12px',
+    padding: '0 10px',
     outline: 'none',
-    fontSize: '0.88rem'
+    fontSize: '0.78rem'
+  };
+
+  const sectionToggleStyle = {
+    width: '100%',
+    border: 'none',
+    background: 'transparent',
+    color: '#fff',
+    padding: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '10px',
+    cursor: 'pointer',
+    textAlign: 'left'
   };
 
   return (
@@ -2105,17 +2121,22 @@ const CanvasPersistencePanel = ({
         style={{ display: 'none' }}
         onChange={handleCanvasImport}
       />
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
-        <div>
-          <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.48)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Canvas</div>
-          <div style={{ fontSize: '0.98rem', fontWeight: 850, lineHeight: 1.15 }}>{user ? displayCanvasName : 'Login required'}</div>
-        </div>
-        <button type="button" onClick={createNewCanvas} disabled={!user || isBusy} title={user ? 'Create a new Fluid Node Canvas' : 'Login to create a canvas'} aria-label="Create new canvas" style={{ ...controlStyle, minWidth: '70px', cursor: user && !isBusy ? 'pointer' : 'not-allowed', opacity: user ? 1 : 0.5, fontWeight: 850 }}>
-          New
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }}>
+        <button type="button" onClick={onToggleCollapse} style={sectionToggleStyle} aria-expanded={!isCollapsed} aria-label={isCollapsed ? 'Open canvas section' : 'Close canvas section'}>
+          <span>
+            <span style={{ display: 'block', fontSize: '0.62rem', color: 'rgba(255,255,255,0.48)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Canvas</span>
+            <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 850, lineHeight: 1.15 }}>{user ? displayCanvasName : 'Login required'}</span>
+          </span>
+          <span style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.92rem', fontWeight: 950 }}>{isCollapsed ? '>' : 'v'}</span>
         </button>
+        {!isCollapsed && (
+          <button type="button" onClick={createNewCanvas} disabled={!user || isBusy} title={user ? 'Create a new Fluid Node Canvas' : 'Login to create a canvas'} aria-label="Create new canvas" style={{ ...controlStyle, minWidth: '56px', cursor: user && !isBusy ? 'pointer' : 'not-allowed', opacity: user ? 1 : 0.5, fontWeight: 850 }}>
+            New
+          </button>
+        )}
       </div>
 
-      {user && (
+      {!isCollapsed && user && (
         <>
           <select
             value={activeCanvasId || ''}
@@ -2159,7 +2180,7 @@ const CanvasPersistencePanel = ({
             {isBusy ? 'Working...' : !canSave ? 'Saved' : activeCanvasId ? 'Save Canvas' : 'Create & Save'}
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '7px' }}>
             <button
               type="button"
               onClick={openCanvasImportPicker}
@@ -2172,7 +2193,7 @@ const CanvasPersistencePanel = ({
                 background: 'rgba(75,94,250,0.12)',
                 cursor: isBusy ? 'not-allowed' : 'pointer',
                 fontWeight: 850,
-                padding: '0 8px'
+                padding: '0 7px'
               }}
             >
               Import
@@ -2189,7 +2210,7 @@ const CanvasPersistencePanel = ({
                 background: 'rgba(0,255,204,0.08)',
                 cursor: isBusy ? 'not-allowed' : 'pointer',
                 fontWeight: 850,
-                padding: '0 8px'
+                padding: '0 7px'
               }}
             >
               Export
@@ -2207,7 +2228,7 @@ const CanvasPersistencePanel = ({
                 color: activeCanvasId ? '#ffd6d6' : 'rgba(255,255,255,0.38)',
                 cursor: activeCanvasId && !isBusy ? 'pointer' : 'not-allowed',
                 fontWeight: 850,
-                padding: '0 8px'
+                padding: '0 7px'
               }}
             >
               Delete
@@ -2232,8 +2253,8 @@ const CanvasPersistencePanel = ({
         </>
       )}
 
-      {status && (
-        <div style={{ fontSize: '0.78rem', color: status.includes('failed') || status.includes('required') || status.includes('Login') ? '#ffb4b4' : 'rgba(255,255,255,0.68)' }}>
+      {!isCollapsed && status && (
+        <div style={{ fontSize: '0.72rem', color: status.includes('failed') || status.includes('required') || status.includes('Login') ? '#ffb4b4' : 'rgba(255,255,255,0.68)' }}>
           {status}
         </div>
       )}
@@ -2247,7 +2268,9 @@ const GenerationSpendPanel = ({
   usageCurrency,
   onUsageCurrencyChange,
   isLoading,
-  onRefresh
+  onRefresh,
+  isCollapsed = false,
+  onToggleCollapse
 }) => {
   const summary = usageSummary?.summary || {};
   const providers = usageSummary?.byProvider || [];
@@ -2287,64 +2310,85 @@ const GenerationSpendPanel = ({
     width: '100%',
     background: 'rgba(4,4,8,0.62)',
     border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: '14px',
-    padding: '12px',
+    borderRadius: '12px',
+    padding: '10px',
     color: '#fff',
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px',
+    gap: '8px',
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)'
   };
 
   const smallButtonStyle = {
-    minHeight: '32px',
+    minHeight: '30px',
     borderRadius: '9px',
     border: '1px solid rgba(255,255,255,0.12)',
     background: 'rgba(255,255,255,0.07)',
     color: '#fff',
     padding: '0 9px',
-    fontSize: '0.74rem',
+    fontSize: '0.7rem',
     fontWeight: 850,
     cursor: user ? 'pointer' : 'not-allowed'
+  };
+
+  const sectionToggleStyle = {
+    flex: 1,
+    border: 'none',
+    background: 'transparent',
+    color: '#fff',
+    padding: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '10px',
+    cursor: 'pointer',
+    textAlign: 'left'
   };
 
   return (
     <div style={panelStyle}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-        <div>
-          <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.48)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em' }}>API Spend</div>
-          <div style={{ fontSize: '1.25rem', lineHeight: 1.1, fontWeight: 950 }}>{formatSpend(totalUsd, usageCurrency)}</div>
-        </div>
-        <select
-          value={usageCurrency}
-          onChange={(event) => onUsageCurrencyChange(event.target.value)}
-          aria-label="Usage display currency"
-          style={{
-            minHeight: '32px',
-            borderRadius: '9px',
-            border: '1px solid rgba(255,255,255,0.13)',
-            background: 'rgba(255,255,255,0.08)',
-            color: '#fff',
-            outline: 'none',
-            fontSize: '0.74rem',
-            fontWeight: 850
-          }}
-        >
-          {Object.keys(DISPLAY_CURRENCIES).map((currency) => (
-            <option key={currency} value={currency}>{currency}</option>
-          ))}
-        </select>
+        <button type="button" onClick={onToggleCollapse} style={sectionToggleStyle} aria-expanded={!isCollapsed} aria-label={isCollapsed ? 'Open API spend section' : 'Close API spend section'}>
+          <span>
+            <span style={{ display: 'block', fontSize: '0.62rem', color: 'rgba(255,255,255,0.48)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em' }}>API Spend</span>
+            <span style={{ display: 'block', fontSize: '1.04rem', lineHeight: 1.1, fontWeight: 950 }}>{formatSpend(totalUsd, usageCurrency)}</span>
+          </span>
+          <span style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.92rem', fontWeight: 950 }}>{isCollapsed ? '>' : 'v'}</span>
+        </button>
+        {!isCollapsed && (
+          <select
+            value={usageCurrency}
+            onChange={(event) => onUsageCurrencyChange(event.target.value)}
+            aria-label="Usage display currency"
+            style={{
+              minHeight: '30px',
+              borderRadius: '9px',
+              border: '1px solid rgba(255,255,255,0.13)',
+              background: 'rgba(255,255,255,0.08)',
+              color: '#fff',
+              outline: 'none',
+              fontSize: '0.7rem',
+              fontWeight: 850
+            }}
+          >
+            {Object.keys(DISPLAY_CURRENCIES).map((currency) => (
+              <option key={currency} value={currency}>{currency}</option>
+            ))}
+          </select>
+        )}
       </div>
 
+      {!isCollapsed && (
+        <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
         {[
           ['Runs', summary.requestCount || 0],
           ['Images', summary.imageCount || 0],
           ['Videos', summary.videoCount || 0]
         ].map(([label, value]) => (
-          <div key={label} style={{ minHeight: '42px', borderRadius: '10px', background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.08)', padding: '7px' }}>
-            <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.42)', fontWeight: 900, textTransform: 'uppercase' }}>{label}</div>
-            <div style={{ fontSize: '0.9rem', fontWeight: 900 }}>{value}</div>
+          <div key={label} style={{ minHeight: '36px', borderRadius: '9px', background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.08)', padding: '6px' }}>
+            <div style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.42)', fontWeight: 900, textTransform: 'uppercase' }}>{label}</div>
+            <div style={{ fontSize: '0.82rem', fontWeight: 900 }}>{value}</div>
           </div>
         ))}
       </div>
@@ -2379,15 +2423,15 @@ const GenerationSpendPanel = ({
           const percentLabel = data.mode === 'tracked' ? 'free allocation' : `${percent}% used`;
 
           return (
-            <div key={key} style={{ borderRadius: '10px', border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.045)', padding: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', fontSize: '0.7rem' }}>
+            <div key={key} style={{ borderRadius: '10px', border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.045)', padding: '7px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', fontSize: '0.68rem' }}>
                 <span style={{ color: '#fff', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.label || label}</span>
                 <strong style={{ color: 'rgba(255,255,255,0.84)', whiteSpace: 'nowrap' }}>{primary}</strong>
               </div>
-              <div style={{ marginTop: '7px', height: '6px', borderRadius: '999px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }} aria-label={`${label} usage ${percent}%`}>
+              <div style={{ marginTop: '6px', height: '5px', borderRadius: '999px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }} aria-label={`${label} usage ${percent}%`}>
                 <div style={{ width: `${percent}%`, height: '100%', borderRadius: '999px', background: accent, boxShadow: `0 0 14px ${accent}66` }} />
               </div>
-              <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', color: 'rgba(255,255,255,0.46)', fontSize: '0.64rem', fontWeight: 800 }}>
+              <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', color: 'rgba(255,255,255,0.46)', fontSize: '0.6rem', fontWeight: 800 }}>
                 <span>{secondary}</span>
                 <span>{percentLabel}</span>
               </div>
@@ -2397,13 +2441,15 @@ const GenerationSpendPanel = ({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-        <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.42)', lineHeight: 1.35 }}>
+        <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.42)', lineHeight: 1.35 }}>
           Estimated from provider pricing; USD is billing basis.
         </span>
         <button type="button" onClick={onRefresh} disabled={!user || isLoading} style={{ ...smallButtonStyle, opacity: user ? 1 : 0.5 }} title="Refresh API spend" aria-label="Refresh API spend">
           {isLoading ? '...' : 'Refresh'}
         </button>
       </div>
+        </>
+      )}
     </div>
   );
 };
@@ -2451,6 +2497,15 @@ const CanvasToolbox = ({
   onNotify
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
+  const [collapsedToolboxSections, setCollapsedToolboxSections] = useState(() => {
+    try {
+      const stored = localStorage.getItem('hero-canvas-toolbox-collapsed-sections');
+      if (stored) return JSON.parse(stored);
+    } catch {
+      return {};
+    }
+    return {};
+  });
   const [toolboxPosition, setToolboxPosition] = useState(() => {
     try {
       const stored = localStorage.getItem('hero-canvas-toolbox-position');
@@ -2470,7 +2525,7 @@ const CanvasToolbox = ({
   const notify = useCallback((message) => onNotify?.(message), [onNotify]);
 
   const clampToolboxPosition = useCallback((position) => {
-    const width = isMinimized ? 58 : Math.min(360, window.innerWidth - 40);
+    const width = isMinimized ? 58 : 332;
     const height = isMinimized ? 390 : 560;
     const maxX = Math.max(8, window.innerWidth - width - 8);
     const maxY = Math.max(8, window.innerHeight - height - 8);
@@ -2483,6 +2538,19 @@ const CanvasToolbox = ({
   useEffect(() => {
     localStorage.setItem('hero-canvas-toolbox-position', JSON.stringify(toolboxPosition));
   }, [toolboxPosition]);
+
+  useEffect(() => {
+    localStorage.setItem('hero-canvas-toolbox-collapsed-sections', JSON.stringify(collapsedToolboxSections));
+  }, [collapsedToolboxSections]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setToolboxPosition((position) => clampToolboxPosition(position));
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [clampToolboxPosition]);
 
   const startToolboxDrag = (event) => {
     event.preventDefault();
@@ -2516,6 +2584,13 @@ const CanvasToolbox = ({
   const toggleMinimized = (nextValue) => {
     setIsMinimized(nextValue);
     notify(nextValue ? 'Canvas tools minimized.' : 'Canvas tools expanded.');
+  };
+
+  const toggleToolboxSection = (sectionKey) => {
+    setCollapsedToolboxSections((sections) => ({
+      ...sections,
+      [sectionKey]: !sections[sectionKey]
+    }));
   };
 
   const handleFitView = () => {
@@ -2579,24 +2654,24 @@ const CanvasToolbox = ({
   };
 
   const toolboxStyle = {
-    width: isMinimized ? '58px' : 'min(360px, calc(100vw - 40px))',
+    width: isMinimized ? '58px' : 'min(332px, calc(100vw - 32px))',
     background: 'linear-gradient(145deg, rgba(30,30,38,0.86), rgba(9,9,14,0.9))',
     backdropFilter: 'blur(18px)',
     WebkitBackdropFilter: 'blur(18px)',
     border: '1px solid rgba(255,255,255,0.14)',
     borderRadius: isMinimized ? '18px' : '18px',
-    padding: isMinimized ? '8px' : '14px',
+    padding: isMinimized ? '8px' : '11px',
     color: '#fff',
     display: 'flex',
     flexDirection: 'column',
-    gap: isMinimized ? '7px' : '12px',
+    gap: isMinimized ? '7px' : '9px',
     boxShadow: '0 22px 70px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.08)'
   };
 
   const iconButtonStyle = {
-    width: isMinimized ? '40px' : '42px',
-    height: '40px',
-    borderRadius: '12px',
+    width: isMinimized ? '40px' : '32px',
+    height: isMinimized ? '40px' : '32px',
+    borderRadius: '10px',
     border: '1px solid rgba(255,255,255,0.14)',
     background: 'rgba(255,255,255,0.075)',
     color: '#fff',
@@ -2604,22 +2679,22 @@ const CanvasToolbox = ({
     placeItems: 'center',
     cursor: 'pointer',
     fontWeight: 900,
-    fontSize: '1.2rem',
+    fontSize: isMinimized ? '1.2rem' : '1rem',
     lineHeight: 1,
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)'
   };
 
   const zoomChipStyle = {
-    minWidth: isMinimized ? '40px' : '58px',
-    height: '40px',
-    borderRadius: '12px',
+    minWidth: isMinimized ? '40px' : '48px',
+    height: isMinimized ? '40px' : '32px',
+    borderRadius: '10px',
     border: '1px solid rgba(75, 94, 250, 0.28)',
     background: 'rgba(75, 94, 250, 0.16)',
     color: '#fff',
     display: 'grid',
     placeItems: 'center',
     fontFamily: 'monospace',
-    fontSize: isMinimized ? '0.72rem' : '0.86rem',
+    fontSize: isMinimized ? '0.72rem' : '0.76rem',
     fontWeight: 900,
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
     pointerEvents: 'none'
@@ -2645,6 +2720,23 @@ const CanvasToolbox = ({
     transition: 'color 0.2s ease'
   };
 
+  const toolbarFoldButtonStyle = {
+    width: isMinimized ? '40px' : '34px',
+    height: isMinimized ? '34px' : '32px',
+    border: 'none',
+    borderBottom: '1px solid rgba(255,255,255,0.12)',
+    borderRadius: 0,
+    background: 'transparent',
+    color: 'rgba(255,255,255,0.34)',
+    display: 'grid',
+    placeItems: 'center',
+    cursor: 'pointer',
+    fontWeight: 950,
+    fontSize: isMinimized ? '1.45rem' : '1.15rem',
+    lineHeight: 1,
+    padding: 0
+  };
+
   const dragDots = (
     <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <circle cx="9" cy="5" r="2" />
@@ -2668,7 +2760,7 @@ const CanvasToolbox = ({
   );
 
   const modeButton = (active, accent) => ({
-    minHeight: '58px',
+    minHeight: '46px',
     flex: 1,
     borderRadius: '14px',
     border: active ? `1px solid ${accent}` : '1px solid rgba(255,255,255,0.1)',
@@ -2677,18 +2769,18 @@ const CanvasToolbox = ({
       : 'rgba(5,5,10,0.55)',
     color: active ? '#fff' : 'rgba(255,255,255,0.56)',
     cursor: 'pointer',
-    padding: '9px 10px',
+    padding: '7px 8px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-start',
     justifyContent: 'center',
-    gap: '4px',
+    gap: '2px',
     boxShadow: active ? `0 0 18px ${accent}22` : 'none'
   });
 
   const toggleStyle = (active, accent) => ({
-    width: '34px',
-    height: '18px',
+    width: '30px',
+    height: '16px',
     borderRadius: '999px',
     background: active ? accent : 'rgba(255,255,255,0.18)',
     position: 'relative',
@@ -2696,30 +2788,57 @@ const CanvasToolbox = ({
   });
 
   const toggleKnobStyle = (active) => ({
-    width: '14px',
-    height: '14px',
+    width: '12px',
+    height: '12px',
     borderRadius: '999px',
     background: '#fff',
     position: 'absolute',
     top: '2px',
-    left: active ? '18px' : '2px',
+    left: active ? '16px' : '2px',
     transition: 'left 0.2s ease',
     boxShadow: '0 2px 8px rgba(0,0,0,0.28)'
   });
 
   const selectionActionStyle = (disabled = false) => ({
-    minHeight: '36px',
+    minHeight: '32px',
     flex: 1,
     borderRadius: '10px',
     border: disabled ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,255,204,0.32)',
     background: disabled ? 'rgba(255,255,255,0.045)' : 'rgba(0,255,204,0.11)',
     color: disabled ? 'rgba(255,255,255,0.34)' : '#fff',
     cursor: disabled ? 'not-allowed' : 'pointer',
-    fontSize: '0.72rem',
+    fontSize: '0.66rem',
     fontWeight: 900,
     textTransform: 'uppercase',
     letterSpacing: '0.04em'
   });
+
+  const toolboxSectionStyle = {
+    borderRadius: '12px',
+    border: '1px solid rgba(255,255,255,0.09)',
+    background: 'rgba(5,5,10,0.32)',
+    padding: '8px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
+  };
+
+  const toolboxSectionHeaderStyle = {
+    width: '100%',
+    border: 'none',
+    background: 'transparent',
+    color: '#fff',
+    padding: 0,
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '10px',
+    cursor: 'pointer',
+    fontSize: '0.64rem',
+    fontWeight: 900,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase'
+  };
 
   return (
     <Panel position="top-left" style={{ margin: 0, zIndex: 15, transform: `translate(${toolboxPosition.x}px, ${toolboxPosition.y}px)` }}>
@@ -2736,7 +2855,17 @@ const CanvasToolbox = ({
             >
               {horizontalDragDots}
             </div>
-            <button type="button" onClick={() => toggleMinimized(false)} style={iconButtonStyle} title="Expand canvas tools" aria-label="Expand canvas tools">›</button>
+            <button
+              type="button"
+              onClick={() => toggleMinimized(false)}
+              style={toolbarFoldButtonStyle}
+              title="Expand canvas tools"
+              aria-label="Expand canvas tools"
+              onMouseEnter={(event) => { event.currentTarget.style.color = 'rgba(255,255,255,0.58)'; }}
+              onMouseLeave={(event) => { event.currentTarget.style.color = 'rgba(255,255,255,0.34)'; }}
+            >
+              ›
+            </button>
             <button type="button" onClick={() => zoomOut({ duration: 250 })} style={iconButtonStyle} title="Zoom out" aria-label="Zoom out">−</button>
             <div style={zoomChipStyle}>{zoomPercent}%</div>
             <button type="button" onClick={() => zoomIn({ duration: 250 })} style={iconButtonStyle} title="Zoom in" aria-label="Zoom in">+</button>
@@ -2791,14 +2920,24 @@ const CanvasToolbox = ({
                   Canvas Tools
                 </span>
               </div>
-              <button type="button" onClick={() => toggleMinimized(true)} style={{ ...iconButtonStyle, width: '40px', height: '36px' }} title="Minimize canvas tools" aria-label="Minimize canvas tools">‹</button>
+              <button
+                type="button"
+                onClick={() => toggleMinimized(true)}
+                style={toolbarFoldButtonStyle}
+                title="Minimize canvas tools"
+                aria-label="Minimize canvas tools"
+                onMouseEnter={(event) => { event.currentTarget.style.color = 'rgba(255,255,255,0.58)'; }}
+                onMouseLeave={(event) => { event.currentTarget.style.color = 'rgba(255,255,255,0.34)'; }}
+              >
+                ‹
+              </button>
             </div>
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
               <button type="button" onClick={() => zoomOut({ duration: 250 })} style={iconButtonStyle} title="Zoom out" aria-label="Zoom out">−</button>
               <div style={zoomChipStyle}>{zoomPercent}%</div>
               <button type="button" onClick={() => zoomIn({ duration: 250 })} style={iconButtonStyle} title="Zoom in" aria-label="Zoom in">+</button>
               <button type="button" onClick={handleFitView} style={fitViewButtonStyle} title="Fit view" aria-label="Fit view">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M4 9V4h5" />
                   <path d="M20 9V4h-5" />
                   <path d="M4 15v5h5" />
@@ -2813,13 +2952,13 @@ const CanvasToolbox = ({
                   <SparklesIcon />
                 </button>
               )}
-              <button type="button" onClick={handleZoomToActualSize} style={{ ...iconButtonStyle, fontSize: '0.78rem', fontFamily: 'monospace' }} title="Zoom 1:1" aria-label="Zoom 1:1">1:1</button>
+              <button type="button" onClick={handleZoomToActualSize} style={{ ...iconButtonStyle, fontSize: '0.7rem', fontFamily: 'monospace' }} title="Zoom 1:1" aria-label="Zoom 1:1">1:1</button>
               <button type="button" onClick={handleToggleFullscreen} style={iconButtonStyle} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
                 {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
               </button>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '6px' }}>
               <button
                 type="button"
                 onClick={handleToggleEditMode}
@@ -2829,10 +2968,10 @@ const CanvasToolbox = ({
                 aria-label={user ? 'Toggle edit mode' : 'Login required to edit canvas'}
               >
                 <span style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Edit</span>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Edit</span>
                   <span style={toggleStyle(isEditMode, '#4B5EFA')}><span style={toggleKnobStyle(isEditMode)} /></span>
                 </span>
-                <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.48)' }}>{user ? (isEditMode ? 'Cards unlocked' : 'View only') : 'Login required'}</span>
+                <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.48)' }}>{user ? (isEditMode ? 'Cards unlocked' : 'View only') : 'Login required'}</span>
               </button>
 
               <button
@@ -2843,10 +2982,10 @@ const CanvasToolbox = ({
                 aria-label="Toggle pan and selection mode"
               >
                 <span style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{interactionMode === 'pan' ? 'Pan' : 'Select'}</span>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{interactionMode === 'pan' ? 'Pan' : 'Select'}</span>
                   <span style={toggleStyle(interactionMode === 'pan', '#00ffcc')}><span style={toggleKnobStyle(interactionMode === 'pan')} /></span>
                 </span>
-                <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.48)' }}>{interactionMode === 'pan' ? 'Drag moves view' : 'Drag selects'}</span>
+                <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.48)' }}>{interactionMode === 'pan' ? 'Drag moves view' : 'Drag selects'}</span>
               </button>
 
               {user && (
@@ -2858,28 +2997,40 @@ const CanvasToolbox = ({
                   aria-label="Open canvas concierge"
                 >
                   <span style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Concierge</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Concierge</span>
                     <SparklesIcon />
                   </span>
-                  <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.48)' }}>Canvas assistant</span>
+                  <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.48)' }}>Canvas assistant</span>
                 </button>
               )}
             </div>
 
             {isEditMode && (
-              <>
+              <div style={toolboxSectionStyle}>
+                <button
+                  type="button"
+                  onClick={() => toggleToolboxSection('editTools')}
+                  style={toolboxSectionHeaderStyle}
+                  aria-expanded={!collapsedToolboxSections.editTools}
+                  aria-label={collapsedToolboxSections.editTools ? 'Open edit tools section' : 'Close edit tools section'}
+                >
+                  <span>Edit tools</span>
+                  <span style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.88rem' }}>{collapsedToolboxSections.editTools ? '>' : 'v'}</span>
+                </button>
+                {!collapsedToolboxSections.editTools && (
+                  <>
                 <button
                   type="button"
                   onClick={handleStartLabelPlacement}
                   style={{
-                    minHeight: '42px',
+                    minHeight: '36px',
                     width: '100%',
-                    borderRadius: '12px',
+                    borderRadius: '10px',
                     border: isPlacingLabel ? '1px solid rgba(0,255,204,0.62)' : '1px solid rgba(0,255,204,0.24)',
                     background: isPlacingLabel ? 'rgba(0,255,204,0.17)' : 'rgba(0,255,204,0.075)',
                     color: '#fff',
                     cursor: 'pointer',
-                    fontSize: '0.78rem',
+                    fontSize: '0.7rem',
                     fontWeight: 900,
                     textTransform: 'uppercase',
                     letterSpacing: '0.06em'
@@ -2893,14 +3044,14 @@ const CanvasToolbox = ({
                   type="button"
                   onClick={handleStartNotePlacement}
                   style={{
-                    minHeight: '42px',
+                    minHeight: '36px',
                     width: '100%',
-                    borderRadius: '12px',
+                    borderRadius: '10px',
                     border: isPlacingNote ? '1px solid rgba(255,224,102,0.84)' : '1px solid rgba(255,224,102,0.28)',
                     background: isPlacingNote ? 'rgba(255,224,102,0.24)' : 'rgba(255,224,102,0.09)',
                     color: '#fff',
                     cursor: 'pointer',
-                    fontSize: '0.78rem',
+                    fontSize: '0.7rem',
                     fontWeight: 900,
                     textTransform: 'uppercase',
                     letterSpacing: '0.06em'
@@ -2915,7 +3066,7 @@ const CanvasToolbox = ({
                   <div
                     style={{
                       padding: '10px',
-                      borderRadius: '12px',
+                      borderRadius: '10px',
                       border: '1px solid rgba(0,255,204,0.18)',
                       background: 'rgba(0,255,204,0.055)',
                       display: 'flex',
@@ -2931,7 +3082,7 @@ const CanvasToolbox = ({
                         {selectedCardCount} card{selectedCardCount === 1 ? '' : 's'}
                       </span>
                     </div>
-                    <div style={{ display: 'flex', gap: '6px' }}>
+                    <div style={{ display: 'flex', gap: '5px' }}>
                       <button type="button" onClick={onAlignSelectedRow} disabled={selectedCardCount < 2} style={selectionActionStyle(selectedCardCount < 2)} title="Align selected cards into a row" aria-label="Align selected cards into a row">
                         Row
                       </button>
@@ -2952,14 +3103,14 @@ const CanvasToolbox = ({
                   title={undoStack[0]?.label || 'Nothing to restore'}
                   aria-label={undoStack[0]?.label || 'Nothing to restore'}
                   style={{
-                    minHeight: '42px',
+                    minHeight: '36px',
                     width: '100%',
-                    borderRadius: '12px',
+                    borderRadius: '10px',
                     border: undoStack.length > 0 ? '1px solid rgba(255, 106, 0, 0.48)' : '1px solid rgba(255,255,255,0.1)',
                     background: undoStack.length > 0 ? 'rgba(255, 106, 0, 0.16)' : 'rgba(255,255,255,0.055)',
                     color: undoStack.length > 0 ? '#fff' : 'rgba(255,255,255,0.38)',
                     cursor: undoStack.length > 0 ? 'pointer' : 'not-allowed',
-                    fontSize: '0.78rem',
+                    fontSize: '0.7rem',
                     fontWeight: 900,
                     textTransform: 'uppercase',
                     letterSpacing: '0.06em'
@@ -2967,7 +3118,9 @@ const CanvasToolbox = ({
                 >
                   ↶ {undoStack[0]?.label || 'Undo Delete'}
                 </button>
-              </>
+                  </>
+                )}
+              </div>
             )}
 
             <CanvasPersistencePanel
@@ -2991,6 +3144,8 @@ const CanvasToolbox = ({
               isCanvasDirty={isCanvasDirty}
               setIsCanvasDirty={setIsCanvasDirty}
               isVisible={isEditMode}
+              isCollapsed={Boolean(collapsedToolboxSections.canvas)}
+              onToggleCollapse={() => toggleToolboxSection('canvas')}
               onNotify={onNotify}
             />
             {isEditMode && (
@@ -3001,6 +3156,8 @@ const CanvasToolbox = ({
                 onUsageCurrencyChange={onUsageCurrencyChange}
                 isLoading={isUsageLoading}
                 onRefresh={onRefreshUsage}
+                isCollapsed={Boolean(collapsedToolboxSections.spend)}
+                onToggleCollapse={() => toggleToolboxSection('spend')}
               />
             )}
           </>
