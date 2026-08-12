@@ -11,7 +11,7 @@ export default function Overhero() {
       flexDirection: 'column', 
       alignItems: 'center', 
       justifyContent: 'center', 
-      overflow: 'hidden' 
+      overflow: 'visible' 
     }}>
       <video
         autoPlay
@@ -23,7 +23,7 @@ export default function Overhero() {
           top: 0,
           left: 0,
           width: '100%',
-          height: '100%',
+          height: 'calc(100% + 150px)',
           objectFit: 'cover',
           zIndex: -1,
           opacity: 0.8
@@ -38,8 +38,8 @@ export default function Overhero() {
         top: 0, 
         left: 0, 
         width: '100%', 
-        height: '100%', 
-        background: 'linear-gradient(to bottom, rgba(5,5,5,0.3) 0%, rgba(5,5,5,0.85) 100%)', 
+        height: 'calc(100% + 150px)', 
+        background: 'linear-gradient(to bottom, rgba(5,5,5,0.3) 0%, rgba(5,5,5,0.85) calc(100% - 150px), rgba(5,5,5,0.85) 100%)', 
         zIndex: -1 
       }}></div>
 

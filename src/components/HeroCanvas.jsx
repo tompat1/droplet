@@ -4435,11 +4435,11 @@ export default function HeroCanvas() {
     <div id="hero-canvas-section" style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
       <CanvasActionToast message={canvasActionToast} />
       {!isFullscreen && (
-        <div style={{ padding: '0 5% 0 5%', marginTop: '-34px', zIndex: 10, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: '40px' }}>
+        <div style={{ padding: '0 5% 0 5%', marginTop: '-34px', zIndex: 10, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: '16px' }}>
           <h1 style={{ fontSize: '3.5rem', margin: 0, whiteSpace: 'nowrap' }}>
             <EditableText contentKey="canvas.title.prefix" fallback="Fluid" /> <span className="text-gradient"><EditableText contentKey="canvas.title.accent" fallback="Node Canvas" /></span>
           </h1>
-          <p style={{ margin: 0, fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', lineHeight: '1.48', maxWidth: '1080px', flex: '1 1 860px', textAlign: 'left' }}>
+          <p style={{ margin: 0, fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', lineHeight: '1.48', maxWidth: '1080px', textAlign: 'left' }}>
             <EditableText
               contentKey="canvas.description.main"
               fallback="Navigate the Droplet ecosystem through our interactive, physics-based graph. Pan, zoom, and explore"
