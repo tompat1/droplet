@@ -92,7 +92,7 @@ const OPENAI_IMAGE_PRICE_ESTIMATES_USD = {
   }
 };
 const DEFAULT_IMAGE_SIZE = '1024x1024';
-const DEFAULT_IMAGE_QUALITY = 'medium';
+const DEFAULT_IMAGE_QUALITY = 'high';
 const DEFAULT_VEO_SECONDS = 8;
 const CLOUDFLARE_AI_USAGE_PROVIDERS = new Set([
   'cloudflare_flux_klein',
@@ -1193,7 +1193,9 @@ async function generateCloudflareFluxSchnell(env, input) {
   const model = cleanText(env.CLOUDFLARE_FLUX_SCHNELL_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_flux_schnell.defaultModel;
   const payload = await env.AI.run(model, {
     prompt: buildCloudflareImagePrompt(input),
-    steps: cloudflareFluxSteps(input.quality),
+    num_steps: Math.max(cloudflareFluxSteps(input.quality), 8),
+    width: cloudflareImageDimension(input.size, 'width'),
+    height: cloudflareImageDimension(input.size, 'height'),
     seed: Math.floor(Math.random() * 1000000000)
   });
   const imageBase64 = extractCloudflareImageBase64(payload);
@@ -1897,15 +1899,15 @@ function cloudflareTileCount(size) {
 }
 
 function cloudflareFluxSteps(quality) {
-  if (quality === 'low') return 4;
-  if (quality === 'high') return 8;
-  return 6;
+  if (quality === 'low') return 6;
+  if (quality === 'medium') return 10;
+  return 12;
 }
 
 function cloudflareGuidance(quality) {
-  if (quality === 'low') return 3.5;
-  if (quality === 'high') return 6.5;
-  return 4.5;
+  if (quality === 'low') return 4.0;
+  if (quality === 'medium') return 5.5;
+  return 7.0;
 }
 
 async function referenceUrlToBlob(url) {

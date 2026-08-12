@@ -780,6 +780,36 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           style={{ width: '100%', height: '180px', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px', position: 'relative', cursor: isEditMode ? 'zoom-in' : 'default' }}
         >
           <img src={data.image} alt={data.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          {(data.generationProviderLabel || data.generationProvider || GENERATION_PROVIDERS[data.generationProvider]) && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '8px',
+                left: '8px',
+                zIndex: 3,
+                padding: '3px 9px',
+                borderRadius: '7px',
+                border: '1px solid rgba(255,255,255,0.24)',
+                background: 'rgba(9, 9, 16, 0.78)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                color: '#fff',
+                fontSize: '0.62rem',
+                fontWeight: 900,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                pointerEvents: 'none',
+                boxShadow: '0 4px 14px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)'
+              }}
+              title={`Rendered with ${data.generationProviderLabel || GENERATION_PROVIDERS[data.generationProvider]?.label || 'AI Renderer'}`}
+            >
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: GENERATION_PROVIDERS[data.generationProvider]?.accent || '#00ffcc', boxShadow: `0 0 6px ${GENERATION_PROVIDERS[data.generationProvider]?.accent || '#00ffcc'}` }} />
+              {data.generationProviderLabel || GENERATION_PROVIDERS[data.generationProvider]?.shortLabel || GENERATION_PROVIDERS[data.generationProvider]?.label || 'AI Render'}
+            </div>
+          )}
           <button
             type="button"
             onClick={openImagePreview}
