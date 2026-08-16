@@ -3304,6 +3304,12 @@ export default function HeroCanvas() {
       type: node.data.image ? 'image' : (node.data.video ? 'video' : 'palette'),
       src: node.data.image || node.data.video || 'palette-' + node.id,
       title: node.data.title,
+      subtitle: node.data.subtitle,
+      description: node.data.description,
+      prompt: node.data.generationPrompt || node.data.description,
+      generationProvider: node.data.generationProvider,
+      generationProviderLabel: node.data.generationProviderLabel,
+      isGenerated: node.data.isGenerated,
       colors: node.data.colors,
       nodeGroup: node.data.nodeGroup || 'canvas'
     })), [nodes]);

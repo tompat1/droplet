@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
 import { generationApi } from '../lib/apiClient';
 import { downloadMediaSource, mediaFilename, readImageFileAsDataUrl } from '../lib/mediaFiles';
 import DropletLoader from './DropletLoader';
+import MediaModal from './MediaModal';
 
 const GENERATION_PROVIDERS = {
   cloudflare_flux_klein: {
@@ -187,7 +187,6 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
   const [isHoveringImage, setIsHoveringImage] = useState(false);
   const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
-  const [imagePreviewPortalTarget, setImagePreviewPortalTarget] = useState(() => typeof document !== 'undefined' ? (document.fullscreenElement || document.body) : null);
 
   // Generative UI State
   const [genState, setGenState] = useState('idle'); // idle | pipeline | prompt | generating
@@ -217,6 +216,31 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
   const [genRefs, setGenRefs] = useState([]);
   const [genError, setGenError] = useState('');
   const [isPromptHelpOpen, setIsPromptHelpOpen] = useState(false);
+  const [copiedCardPrompt, setCopiedCardPrompt] = useState(false);
+
+  const handleCopyCardPrompt = async (e) => {
+    e?.stopPropagation();
+    const text = data.generationPrompt || data.description || '';
+    if (!text) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      setCopiedCardPrompt(true);
+      setTimeout(() => setCopiedCardPrompt(false), 2200);
+    } catch (err) {
+      console.error('Failed to copy card prompt:', err);
+    }
+  };
 
   // 3D Parallax Tilt State
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
@@ -451,27 +475,9 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
   const openImagePreview = (event) => {
     event?.stopPropagation();
-    if (!data.image) return;
-    setImagePreviewPortalTarget(document.fullscreenElement || document.body);
+    if (!data.image && !data.video) return;
     setIsImagePreviewOpen(true);
   };
-
-  useEffect(() => {
-    if (!isImagePreviewOpen) return undefined;
-    setImagePreviewPortalTarget(document.fullscreenElement || document.body);
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') setIsImagePreviewOpen(false);
-    };
-    const handleFullscreenChange = () => {
-      setImagePreviewPortalTarget(document.fullscreenElement || document.body);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    };
-  }, [isImagePreviewOpen]);
 
   const handleReferenceUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -810,11 +816,42 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               {data.generationProviderLabel || GENERATION_PROVIDERS[data.generationProvider]?.shortLabel || GENERATION_PROVIDERS[data.generationProvider]?.label || 'AI Render'}
             </div>
           )}
+          {(data.generationPrompt || data.description) && (
+            <button
+              type="button"
+              onClick={handleCopyCardPrompt}
+              title={copiedCardPrompt ? "Copied prompt to clipboard!" : "Copy prompt"}
+              aria-label="Copy prompt"
+              style={{
+                position: 'absolute',
+                top: '8px',
+                right: '88px',
+                zIndex: 3,
+                padding: '0 10px',
+                height: '32px',
+                borderRadius: '8px',
+                border: '1px solid rgba(255,255,255,0.22)',
+                background: copiedCardPrompt ? 'rgba(0,255,204,0.3)' : 'rgba(0,0,0,0.52)',
+                color: copiedCardPrompt ? '#00ffcc' : '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '11px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                opacity: isHoveringImage || data.isGenerated ? 1 : 0,
+                transition: 'all 0.2s',
+                backdropFilter: 'blur(6px)'
+              }}
+            >
+              {copiedCardPrompt ? '✓ Copied' : '📋 Copy'}
+            </button>
+          )}
           <button
             type="button"
             onClick={openImagePreview}
-            title="View full image"
-            aria-label="View full image"
+            title="Open Lightbox"
+            aria-label="Open Lightbox"
             style={{ position: 'absolute', top: '8px', right: '48px', zIndex: 3, width: '32px', height: '32px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.22)', background: 'rgba(0,0,0,0.52)', color: '#fff', display: 'grid', placeItems: 'center', cursor: 'zoom-in', opacity: isHoveringImage || data.isGenerated ? 1 : 0, transition: 'opacity 0.2s', backdropFilter: 'blur(6px)' }}
           >
             ⛶
@@ -846,36 +883,21 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         </div>
       )}
 
-      {isImagePreviewOpen && imagePreviewPortalTarget && createPortal(
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Full image preview for ${data.title || 'asset'}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            setIsImagePreviewOpen(false);
+      {isImagePreviewOpen && (
+        <MediaModal
+          media={{
+            type: data.video ? 'video' : 'image',
+            src: data.image || data.video,
+            title: data.title || 'Canvas Asset',
+            subtitle: data.subtitle || (data.generationProviderLabel ? `Generated with ${data.generationProviderLabel}` : ''),
+            description: data.description || '',
+            prompt: data.generationPrompt || data.description || '',
+            generationProvider: data.generationProvider,
+            generationProviderLabel: data.generationProviderLabel || GENERATION_PROVIDERS[data.generationProvider]?.label || '',
+            isGenerated: data.isGenerated
           }}
-          style={{ position: 'fixed', inset: 0, zIndex: 999999, background: 'rgba(0,0,0,0.84)', backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '28px' }}
-        >
-          <div
-            onClick={(event) => event.stopPropagation()}
-            style={{ width: 'min(96vw, 1400px)', height: 'min(88vh, 980px)', display: 'flex', flexDirection: 'column', gap: '12px' }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', color: '#fff' }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.52)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Full Image</div>
-                <div style={{ fontSize: '1rem', fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.title || 'Canvas Asset'}</div>
-              </div>
-              <button type="button" onClick={() => setIsImagePreviewOpen(false)} style={{ width: '42px', height: '42px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: '1.4rem', lineHeight: 1 }} aria-label="Close full image preview">
-                ×
-              </button>
-            </div>
-            <div style={{ flex: 1, minHeight: 0, borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(10,10,15,0.82)', display: 'grid', placeItems: 'center' }}>
-              <img src={data.image} alt={data.title || 'Canvas asset'} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-            </div>
-          </div>
-        </div>,
-        document.body
+          onClose={() => setIsImagePreviewOpen(false)}
+        />
       )}
 
       {data.video && (
@@ -917,24 +939,54 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         </div>
       )}
 
-      {isEditingDesc ? (
-        <textarea 
-          autoFocus value={tempDesc} onChange={e => setTempDesc(e.target.value)} onBlur={handleSaveText}
-          style={{ fontSize: '14px', lineHeight: '1.5', background: 'rgba(0,0,0,0.5)', color: 'white', border: '1px solid var(--accent-neon)', borderRadius: '4px', width: '100%', minHeight: '60px', outline: 'none', resize: 'vertical' }}
-        />
-      ) : (
-        <p 
-          onClick={(e) => { 
-            if (isEditMode) {
-              e.stopPropagation(); 
-              setIsEditingDesc(true); 
-            }
-          }}
-          style={{ fontSize: '14px', lineHeight: '1.5', color: 'rgba(255,255,255,0.8)', cursor: isEditMode ? 'text' : 'default', minHeight: '20px' }}
-        >
-          {data.description || 'Add description...'}
-        </p>
-      )}
+      <div style={{ marginTop: '12px', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+          <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            {data.isGenerated || data.generationPrompt ? 'Prompt' : 'Description'}
+          </span>
+          {(data.generationPrompt || data.description) && (
+            <button
+              type="button"
+              onClick={handleCopyCardPrompt}
+              style={{
+                padding: '2px 8px',
+                borderRadius: '6px',
+                border: '1px solid rgba(255,255,255,0.15)',
+                background: copiedCardPrompt ? 'rgba(0,255,204,0.2)' : 'rgba(255,255,255,0.06)',
+                color: copiedCardPrompt ? '#00ffcc' : 'rgba(255,255,255,0.7)',
+                fontSize: '10px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'all 0.2s'
+              }}
+              title="Copy prompt to clipboard"
+            >
+              {copiedCardPrompt ? '✓ Copied' : '📋 Copy Prompt'}
+            </button>
+          )}
+        </div>
+        {isEditingDesc ? (
+          <textarea 
+            autoFocus value={tempDesc} onChange={e => setTempDesc(e.target.value)} onBlur={handleSaveText}
+            style={{ fontSize: '14px', lineHeight: '1.5', background: 'rgba(0,0,0,0.5)', color: 'white', border: '1px solid var(--accent-neon)', borderRadius: '4px', width: '100%', minHeight: '60px', outline: 'none', resize: 'vertical' }}
+          />
+        ) : (
+          <p 
+            onClick={(e) => { 
+              if (isEditMode) {
+                e.stopPropagation(); 
+                setIsEditingDesc(true); 
+              }
+            }}
+            style={{ fontSize: '14px', lineHeight: '1.5', color: 'rgba(255,255,255,0.85)', cursor: isEditMode ? 'text' : 'default', minHeight: '20px', margin: 0 }}
+          >
+            {data.description || 'Add description...'}
+          </p>
+        )}
+      </div>
 
       {isEditMode && (
       <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>

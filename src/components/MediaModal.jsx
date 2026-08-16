@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Copy, Check, Download } from 'lucide-react';
+import { downloadMediaSource, mediaFilename } from '../lib/mediaFiles';
 
 export default function MediaModal({ media, onClose, onNext, onPrev }) {
   const [portalTarget, setPortalTarget] = useState(() => typeof document !== 'undefined' ? (document.fullscreenElement || document.body) : null);
@@ -9,10 +10,12 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
 
   useEffect(() => {
     setIsZoomed(false);
     setPan({ x: 0, y: 0 });
+    setCopiedPrompt(false);
   }, [media]);
 
   useEffect(() => {
@@ -36,6 +39,39 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
   }, [onClose, onNext, onPrev, isZoomed, media]);
 
   if (!media) return null;
+
+  const promptText = media.prompt || media.description || media.generationPrompt || '';
+
+  const handleCopyPrompt = async (e) => {
+    e?.stopPropagation();
+    if (!promptText) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(promptText);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = promptText;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      setCopiedPrompt(true);
+      setTimeout(() => setCopiedPrompt(false), 2200);
+    } catch (err) {
+      console.error('Failed to copy prompt:', err);
+    }
+  };
+
+  const handleDownload = (e) => {
+    e?.stopPropagation();
+    if (!media.src) return;
+    const type = media.type || 'image';
+    const ext = type === 'video' ? 'mp4' : (media.src?.startsWith('data:image/png') ? 'png' : 'webp');
+    downloadMediaSource(media.src, mediaFilename(media.title || 'rendered-asset', ext));
+  };
 
   const handlePointerDown = (e) => {
     if (media.type !== 'image') return;
@@ -91,49 +127,160 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
         width: '100vw',
         height: '100vh',
         zIndex: 999999,
-        background: 'rgba(5, 5, 5, 0.85)',
+        background: 'rgba(4, 4, 8, 0.88)',
         backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
         display: 'flex',
+        flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: '40px'
+        padding: '20px'
       }}
       onClick={onClose}
     >
-      <button 
-        onClick={onClose}
+      {/* Top Header Bar */}
+      <div 
+        onClick={(e) => e.stopPropagation()}
         style={{
           position: 'absolute',
-          top: '30px',
-          right: '30px',
-          background: 'rgba(255, 255, 255, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          borderRadius: '50%',
-          width: '50px',
-          height: '50px',
+          top: '20px',
+          left: '24px',
+          right: '24px',
           display: 'flex',
-          justifyContent: 'center',
           alignItems: 'center',
-          color: '#fff',
-          cursor: 'pointer',
-          zIndex: 10000,
-          transition: 'all 0.2s ease',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-        }}
-        onMouseOver={e => {
-          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-          e.currentTarget.style.transform = 'scale(1.05)';
-        }}
-        onMouseOut={e => {
-          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-          e.currentTarget.style.transform = 'scale(1)';
+          justifyContent: 'space-between',
+          zIndex: 10005,
+          pointerEvents: 'auto'
         }}
       >
-        <X size={24} />
-      </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {media.title || 'Rendered Asset'}
+              </h2>
+              {media.generationProviderLabel && (
+                <span style={{
+                  padding: '3px 10px',
+                  borderRadius: '20px',
+                  background: 'rgba(0, 255, 204, 0.14)',
+                  border: '1px solid rgba(0, 255, 204, 0.35)',
+                  color: '#00ffcc',
+                  fontSize: '0.7rem',
+                  fontWeight: 900,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  whiteSpace: 'nowrap'
+                }}>
+                  ● {media.generationProviderLabel}
+                </span>
+              )}
+            </div>
+            {media.subtitle && (
+              <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {media.subtitle}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {promptText && (
+            <button
+              type="button"
+              onClick={handleCopyPrompt}
+              title={copiedPrompt ? "Copied!" : "Copy Prompt"}
+              aria-label="Copy Prompt"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '7px',
+                padding: '10px 18px',
+                borderRadius: '30px',
+                background: copiedPrompt ? 'rgba(0, 255, 204, 0.25)' : 'rgba(255, 255, 255, 0.1)',
+                border: copiedPrompt ? '1px solid rgba(0, 255, 204, 0.6)' : '1px solid rgba(255, 255, 255, 0.2)',
+                color: copiedPrompt ? '#00ffcc' : '#fff',
+                fontSize: '0.85rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+              }}
+            >
+              {copiedPrompt ? <Check size={16} /> : <Copy size={16} />}
+              <span>{copiedPrompt ? 'Copied!' : 'Copy Prompt'}</span>
+            </button>
+          )}
+
+          {media.src && (
+            <button
+              type="button"
+              onClick={handleDownload}
+              title="Download asset"
+              aria-label="Download asset"
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                color: '#fff',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+              }}
+              onMouseOver={e => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <Download size={20} />
+            </button>
+          )}
+
+          <button 
+            type="button"
+            onClick={onClose}
+            title="Close Lightbox"
+            aria-label="Close Lightbox"
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              color: '#fff',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+            }}
+            onMouseOver={e => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseOut={e => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            <X size={22} />
+          </button>
+        </div>
+      </div>
 
       {!isZoomed && onPrev && (
         <button 
+          type="button"
           onClick={(e) => { e.stopPropagation(); onPrev(); }}
           style={{
             position: 'absolute',
@@ -143,8 +290,8 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
             background: 'rgba(255, 255, 255, 0.1)',
             border: '1px solid rgba(255, 255, 255, 0.2)',
             borderRadius: '50%',
-            width: '60px',
-            height: '60px',
+            width: '56px',
+            height: '56px',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
@@ -152,7 +299,7 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
             cursor: 'pointer',
             zIndex: 10000,
             transition: 'all 0.2s ease',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+            boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
           }}
           onMouseOver={e => {
             e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
@@ -163,12 +310,13 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
             e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
           }}
         >
-          <ChevronLeft size={32} />
+          <ChevronLeft size={30} />
         </button>
       )}
 
       {!isZoomed && onNext && (
         <button 
+          type="button"
           onClick={(e) => { e.stopPropagation(); onNext(); }}
           style={{
             position: 'absolute',
@@ -178,8 +326,8 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
             background: 'rgba(255, 255, 255, 0.1)',
             border: '1px solid rgba(255, 255, 255, 0.2)',
             borderRadius: '50%',
-            width: '60px',
-            height: '60px',
+            width: '56px',
+            height: '56px',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
@@ -187,7 +335,7 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
             cursor: 'pointer',
             zIndex: 10000,
             transition: 'all 0.2s ease',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+            boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
           }}
           onMouseOver={e => {
             e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
@@ -198,32 +346,34 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
             e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
           }}
         >
-          <ChevronRight size={32} />
+          <ChevronRight size={30} />
         </button>
       )}
 
+      {/* Media Viewport */}
       <div 
         onClick={e => e.stopPropagation()} 
         style={{
           position: 'relative',
           width: media.type === 'video' ? '100vw' : 'auto',
           height: media.type === 'video' ? '100vh' : 'auto',
-          maxWidth: media.type === 'video' ? '100vw' : '90%',
-          maxHeight: media.type === 'video' ? '100vh' : '90%',
+          maxWidth: media.type === 'video' ? '100vw' : '88%',
+          maxHeight: media.type === 'video' ? '100vh' : (promptText && !isZoomed ? '72vh' : '84vh'),
           borderRadius: media.type === 'video' ? '0' : '16px',
           overflow: isZoomed ? 'visible' : 'hidden',
           boxShadow: media.type === 'video' ? 'none' : '0 20px 60px rgba(0,0,0,0.6)',
-          border: (isZoomed || media.type === 'video') ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+          border: (isZoomed || media.type === 'video') ? 'none' : '1px solid rgba(255, 255, 255, 0.12)',
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          background: 'transparent'
+          background: 'transparent',
+          transition: 'max-height 0.3s ease'
         }}
       >
         {media.type === 'image' ? (
           <img 
             src={media.src} 
-            alt={media.title} 
+            alt={media.title || 'Rendered asset'} 
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -232,7 +382,7 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
             style={{ 
               width: '100%', 
               height: '100%', 
-              maxHeight: '90vh',
+              maxHeight: promptText && !isZoomed ? '72vh' : '84vh',
               objectFit: 'contain',
               cursor: isZoomed ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in',
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${isZoomed ? 2.5 : 1})`,
@@ -265,27 +415,89 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
         ) : null}
       </div>
 
-      {media.type === 'image' && !isZoomed && (
+      {/* Bottom Prompt Bar Overlay */}
+      {promptText && !isZoomed && (
+        <div 
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            bottom: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 'min(90vw, 840px)',
+            background: 'rgba(12, 12, 20, 0.85)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.16)',
+            borderRadius: '18px',
+            padding: '14px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(75, 94, 250, 0.15)',
+            zIndex: 10004
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.68rem', color: 'rgba(0, 255, 204, 0.85)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Generation Prompt
+            </span>
+            <button
+              type="button"
+              onClick={handleCopyPrompt}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 12px',
+                borderRadius: '12px',
+                background: copiedPrompt ? 'rgba(0, 255, 204, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                border: copiedPrompt ? '1px solid rgba(0, 255, 204, 0.5)' : '1px solid rgba(255, 255, 255, 0.14)',
+                color: copiedPrompt ? '#00ffcc' : 'rgba(255, 255, 255, 0.85)',
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {copiedPrompt ? <Check size={13} /> : <Copy size={13} />}
+              <span>{copiedPrompt ? 'Copied Prompt' : 'Copy Prompt'}</span>
+            </button>
+          </div>
+          <div style={{
+            fontSize: '0.9rem',
+            lineHeight: 1.45,
+            color: 'rgba(255, 255, 255, 0.92)',
+            maxHeight: '80px',
+            overflowY: 'auto',
+            wordBreak: 'break-word'
+          }}>
+            {promptText}
+          </div>
+        </div>
+      )}
+
+      {/* Click to zoom hint overlay */}
+      {media.type === 'image' && !isZoomed && !promptText && (
         <div style={{
           position: 'absolute',
-          top: '50%',
+          bottom: '30px',
           left: '50%',
-          transform: 'translate(-50%, -50%)',
+          transform: 'translateX(-50%)',
           pointerEvents: 'none',
           zIndex: 10002,
         }}>
           <div style={{
-            padding: '12px 24px',
-            background: 'rgba(5, 5, 5, 0.6)',
+            padding: '10px 20px',
+            background: 'rgba(5, 5, 5, 0.65)',
             backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
             borderRadius: '30px',
             color: 'rgba(255, 255, 255, 0.8)',
-            fontSize: '0.9rem',
-            boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
-            animation: 'fadeIn 0.5s ease-out'
+            fontSize: '0.85rem',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.4)'
           }}>
-            Click to zoom, drag to pan
+            Click image to zoom, drag to pan
           </div>
         </div>
       )}
@@ -293,3 +505,4 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
     target
   );
 }
+
