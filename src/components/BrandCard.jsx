@@ -762,15 +762,17 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               {data.isCollapsed ? '+' : '−'}
             </button>
           )}
-          {isEditMode && (
+          {(isEditMode || data.isGenerated) && (
             <button 
+              type="button"
               onClick={handleDeleteInitiate}
               style={{ 
-                background: 'rgba(255,50,50,0.15)', border: '1px solid rgba(255,80,80,0.25)', color: '#ff8888', borderRadius: '6px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '18px', transition: 'all 0.2s ease'
+                background: 'rgba(255,50,50,0.18)', border: '1px solid rgba(255,80,80,0.3)', color: '#ff8888', borderRadius: '6px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '18px', transition: 'all 0.2s ease'
               }}
-              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255,50,50,0.35)'; e.currentTarget.style.color = '#fff'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255,50,50,0.15)'; e.currentTarget.style.color = '#ff8888'; }}
-              title="Delete Node"
+              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255,50,50,0.4)'; e.currentTarget.style.color = '#fff'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255,50,50,0.18)'; e.currentTarget.style.color = '#ff8888'; }}
+              title="Delete Card"
+              aria-label="Delete Card"
             >
               ×
             </button>
@@ -825,7 +827,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               style={{
                 position: 'absolute',
                 top: '8px',
-                right: '88px',
+                right: '128px',
                 zIndex: 3,
                 padding: '0 10px',
                 height: '32px',
@@ -845,6 +847,34 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               }}
             >
               {copiedCardPrompt ? '✓ Copied' : '📋 Copy'}
+            </button>
+          )}
+          {(isEditMode || data.isGenerated) && (
+            <button
+              type="button"
+              onClick={handleDeleteInitiate}
+              title="Delete card"
+              aria-label="Delete card"
+              style={{
+                position: 'absolute',
+                top: '8px',
+                right: '88px',
+                zIndex: 3,
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                border: '1px solid rgba(255,80,80,0.35)',
+                background: 'rgba(255,40,40,0.4)',
+                color: '#fff',
+                display: 'grid',
+                placeItems: 'center',
+                cursor: 'pointer',
+                opacity: isHoveringImage || data.isGenerated ? 1 : 0,
+                transition: 'opacity 0.2s',
+                backdropFilter: 'blur(6px)'
+              }}
+            >
+              🗑️
             </button>
           )}
           <button

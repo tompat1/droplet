@@ -3,8 +3,20 @@ import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, Copy, Check, Download } from 'lucide-react';
 import { downloadMediaSource, mediaFilename } from '../lib/mediaFiles';
 
+const getActivePortalTarget = () => {
+  if (typeof document === 'undefined') return null;
+  return (
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.mozFullScreenElement ||
+    document.msFullscreenElement ||
+    document.querySelector('#hero-canvas-viewport') ||
+    document.body
+  );
+};
+
 export default function MediaModal({ media, onClose, onNext, onPrev }) {
-  const [portalTarget, setPortalTarget] = useState(() => typeof document !== 'undefined' ? (document.fullscreenElement || document.body) : null);
+  const [portalTarget, setPortalTarget] = useState(getActivePortalTarget);
   const [isZoomed, setIsZoomed] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -20,11 +32,19 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setPortalTarget(document.fullscreenElement || document.body);
+      setPortalTarget(getActivePortalTarget());
     };
     handleFullscreenChange();
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -116,7 +136,7 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
     }
   };
 
-  const target = portalTarget || (typeof document !== 'undefined' ? (document.fullscreenElement || document.body) : null);
+  const target = getActivePortalTarget() || portalTarget || (typeof document !== 'undefined' ? document.body : null);
   if (!target) return null;
 
   return createPortal(
