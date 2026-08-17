@@ -205,6 +205,36 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {media.onTweak && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+                media.onTweak();
+              }}
+              title="Tweak this asset using the same pipeline"
+              aria-label="Tweak this asset"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '7px',
+                padding: '10px 18px',
+                borderRadius: '30px',
+                background: 'rgba(0, 255, 204, 0.22)',
+                border: '1px solid rgba(0, 255, 204, 0.5)',
+                color: '#00ffcc',
+                fontSize: '0.85rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+              }}
+            >
+              <span>✨</span> Tweak Asset
+            </button>
+          )}
+
           {promptText && (
             <button
               type="button"
@@ -462,27 +492,56 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
             <span style={{ fontSize: '0.68rem', color: 'rgba(0, 255, 204, 0.85)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
               Generation Prompt
             </span>
-            <button
-              type="button"
-              onClick={handleCopyPrompt}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '4px 12px',
-                borderRadius: '12px',
-                background: copiedPrompt ? 'rgba(0, 255, 204, 0.25)' : 'rgba(255, 255, 255, 0.08)',
-                border: copiedPrompt ? '1px solid rgba(0, 255, 204, 0.5)' : '1px solid rgba(255, 255, 255, 0.14)',
-                color: copiedPrompt ? '#00ffcc' : 'rgba(255, 255, 255, 0.85)',
-                fontSize: '0.75rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {copiedPrompt ? <Check size={13} /> : <Copy size={13} />}
-              <span>{copiedPrompt ? 'Copied Prompt' : 'Copy Prompt'}</span>
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {media.onTweak && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClose();
+                    media.onTweak();
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 12px',
+                    borderRadius: '12px',
+                    background: 'rgba(0, 255, 204, 0.22)',
+                    border: '1px solid rgba(0, 255, 204, 0.5)',
+                    color: '#00ffcc',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  title="Tweak this asset using the same pipeline"
+                >
+                  <span>✨</span> Tweak Asset
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleCopyPrompt}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '4px 12px',
+                  borderRadius: '12px',
+                  background: copiedPrompt ? 'rgba(0, 255, 204, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                  border: copiedPrompt ? '1px solid rgba(0, 255, 204, 0.5)' : '1px solid rgba(255, 255, 255, 0.14)',
+                  color: copiedPrompt ? '#00ffcc' : 'rgba(255, 255, 255, 0.85)',
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {copiedPrompt ? <Check size={13} /> : <Copy size={13} />}
+                <span>{copiedPrompt ? 'Copied Prompt' : 'Copy Prompt'}</span>
+              </button>
+            </div>
           </div>
           <div style={{
             fontSize: '0.9rem',

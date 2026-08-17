@@ -242,6 +242,22 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
     }
   };
 
+  const handleInitiateTweak = (e) => {
+    e?.stopPropagation();
+    const sameProviderKey = data.generationProvider || (data.generationPipeline === 'video' ? 'google_veo' : 'cloudflare_flux_klein');
+    const providerObj = GENERATION_PROVIDERS[sameProviderKey] || GENERATION_PROVIDERS.cloudflare_flux_klein;
+
+    setGenProvider(sameProviderKey);
+    setGenPipeline(providerObj.pipeline);
+    setGenError('');
+
+    if (data.image) {
+      setGenRefs((prevRefs) => (prevRefs.includes(data.image) ? prevRefs : [data.image, ...prevRefs]));
+    }
+
+    setGenState('prompt');
+  };
+
   // 3D Parallax Tilt State
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [isHoveringHandle, setIsHoveringHandle] = useState(false);
@@ -818,6 +834,37 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               {data.generationProviderLabel || GENERATION_PROVIDERS[data.generationProvider]?.shortLabel || GENERATION_PROVIDERS[data.generationProvider]?.label || 'AI Render'}
             </div>
           )}
+          {(data.image || data.video) && (
+            <button
+              type="button"
+              onClick={handleInitiateTweak}
+              title={`Add prompt to tweak asset using ${GENERATION_PROVIDERS[data.generationProvider]?.label || GENERATION_PROVIDERS[data.generationProvider]?.shortLabel || 'same pipeline'}`}
+              aria-label="Tweak asset"
+              style={{
+                position: 'absolute',
+                top: '8px',
+                right: '168px',
+                zIndex: 3,
+                padding: '0 10px',
+                height: '32px',
+                borderRadius: '8px',
+                border: '1px solid rgba(0, 255, 204, 0.35)',
+                background: 'rgba(0, 255, 204, 0.24)',
+                color: '#00ffcc',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '11px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                opacity: isHoveringImage || data.isGenerated ? 1 : 0,
+                transition: 'all 0.2s',
+                backdropFilter: 'blur(6px)'
+              }}
+            >
+              ✨ Tweak
+            </button>
+          )}
           {(data.generationPrompt || data.description) && (
             <button
               type="button"
@@ -924,7 +971,8 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
             prompt: data.generationPrompt || data.description || '',
             generationProvider: data.generationProvider,
             generationProviderLabel: data.generationProviderLabel || GENERATION_PROVIDERS[data.generationProvider]?.label || '',
-            isGenerated: data.isGenerated
+            isGenerated: data.isGenerated,
+            onTweak: handleInitiateTweak
           }}
           onClose={() => setIsImagePreviewOpen(false)}
         />
@@ -1018,41 +1066,64 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         )}
       </div>
 
-      {isEditMode && (
-      <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {genState === 'idle' && (
-          <button
-            style={{
-              width: '100%',
-              padding: '10px',
-              background: 'rgba(75, 94, 250, 0.15)',
-              border: '1px dashed rgba(75, 94, 250, 0.4)',
-              borderRadius: '8px',
-              color: 'var(--accent-neon)',
-              fontSize: '13px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              transition: 'all 0.2s ease',
-              backdropFilter: 'blur(4px)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(75, 94, 250, 0.3)';
-              e.currentTarget.style.border = '1px solid rgba(75, 94, 250, 0.8)';
-              e.currentTarget.style.boxShadow = '0 0 10px rgba(75, 94, 250, 0.4)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(75, 94, 250, 0.15)';
-              e.currentTarget.style.border = '1px dashed rgba(75, 94, 250, 0.4)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-            onClick={(e) => { e.stopPropagation(); setGenState('pipeline'); }}
-          >
-            <span>✨</span> Generate Branch
-          </button>
+          <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+            <button
+              type="button"
+              style={{
+                flex: 1,
+                padding: '10px 14px',
+                background: 'rgba(0, 255, 204, 0.16)',
+                border: '1px solid rgba(0, 255, 204, 0.45)',
+                borderRadius: '8px',
+                color: '#00ffcc',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease',
+                backdropFilter: 'blur(4px)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(0, 255, 204, 0.28)';
+                e.currentTarget.style.boxShadow = '0 0 12px rgba(0, 255, 204, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(0, 255, 204, 0.16)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+              onClick={handleInitiateTweak}
+              title={`Add prompt to tweak this asset using ${GENERATION_PROVIDERS[data.generationProvider]?.label || GENERATION_PROVIDERS[data.generationProvider]?.shortLabel || 'same pipeline'}`}
+            >
+              <span>✨</span> Tweak / Add Prompt
+            </button>
+            <button
+              type="button"
+              style={{
+                padding: '10px 12px',
+                background: 'rgba(75, 94, 250, 0.12)',
+                border: '1px dashed rgba(75, 94, 250, 0.35)',
+                borderRadius: '8px',
+                color: 'var(--accent-neon)',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.2s ease'
+              }}
+              onClick={(e) => { e.stopPropagation(); setGenState('pipeline'); }}
+              title="Pick a different AI pipeline to generate a branch"
+            >
+              Other Pipeline
+            </button>
+          </div>
         )}
 
         {genState === 'pipeline' && (
@@ -1123,18 +1194,35 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         )}
 
         {genState === 'prompt' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.35)', borderRadius: '8px', border: '1px solid rgba(0,255,204,0.28)' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-              <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 'bold' }}>{genPipeline === 'image' ? '🖼️' : '🎥'} {GENERATION_PROVIDERS[genProvider]?.label || 'AI'} Prompt:</span>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setIsPromptHelpOpen((open) => !open); }}
-                style={{ padding: '5px 8px', background: isPromptHelpOpen ? 'rgba(0,255,204,0.18)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '999px', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 900, letterSpacing: '0.04em', textTransform: 'uppercase' }}
-                title="Open prompt helper"
-                aria-label="Open prompt helper"
-              >
-                Guide
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <span style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  {genPipeline === 'image' ? '🖼️' : '🎥'} Tweak Asset
+                </span>
+                <span style={{ fontSize: '10px', color: 'rgba(0,255,204,0.85)', fontWeight: 800 }}>
+                  ● Pipeline: {GENERATION_PROVIDERS[genProvider]?.shortLabel || GENERATION_PROVIDERS[genProvider]?.label || genProvider}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setGenState('pipeline'); }}
+                  style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '10px' }}
+                  title="Change AI pipeline"
+                >
+                  Change
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setIsPromptHelpOpen((open) => !open); }}
+                  style={{ padding: '4px 8px', background: isPromptHelpOpen ? 'rgba(0,255,204,0.18)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '6px', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase' }}
+                  title="Open prompt helper"
+                  aria-label="Open prompt helper"
+                >
+                  Guide
+                </button>
+              </div>
             </div>
             {isPromptHelpOpen && (
               <div style={{ padding: '9px', border: '1px solid rgba(0,255,204,0.22)', borderRadius: '8px', background: 'rgba(0,255,204,0.06)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1223,7 +1311,6 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           </div>
         )}
       </div>
-      )}
 
       <Handle type="source" position={Position.Right} isConnectable={isConnectable} style={{ background: 'var(--bg-color)', border: '2px solid var(--accent-neon)' }} />
 
