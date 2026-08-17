@@ -9,6 +9,7 @@ import { SiteContentProvider } from './components/SiteContentProvider';
 import { CanvasAssetsProvider } from './components/CanvasAssetsProvider';
 import DropletLoader from './components/DropletLoader';
 import AiConciergeDrawer from './components/AiConciergeDrawer';
+import CookieConsentBanner from './components/CookieConsentBanner';
 
 import Overhero from './components/Overhero';
 import CoreValues from './components/CoreValues';
@@ -22,6 +23,7 @@ function App() {
       <SiteContentProvider>
         <Preloader />
         <AuthControls />
+        <CookieConsentBanner />
         <div className="app-background" style={{ zIndex: -4 }}></div>
         {/* Background Video */}
         <video
