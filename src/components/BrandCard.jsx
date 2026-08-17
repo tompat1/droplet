@@ -778,7 +778,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               {data.isCollapsed ? '+' : '−'}
             </button>
           )}
-          {(isEditMode || data.isGenerated) && (
+          {isEditMode && (
             <button 
               type="button"
               onClick={handleDeleteInitiate}
@@ -976,251 +976,253 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         )}
       </div>
 
-      <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {genState === 'idle' && (
-          <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-            <button
-              type="button"
-              style={{
-                flex: 1,
-                padding: '10px 14px',
-                background: 'rgba(0, 255, 204, 0.16)',
-                border: '1px solid rgba(0, 255, 204, 0.45)',
-                borderRadius: '8px',
-                color: '#00ffcc',
-                fontSize: '13px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                transition: 'all 0.2s ease',
-                backdropFilter: 'blur(4px)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(0, 255, 204, 0.28)';
-                e.currentTarget.style.boxShadow = '0 0 12px rgba(0, 255, 204, 0.4)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(0, 255, 204, 0.16)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-              onClick={handleInitiateTweak}
-              title={`Add prompt to tweak this asset using ${GENERATION_PROVIDERS[data.generationProvider]?.label || GENERATION_PROVIDERS[data.generationProvider]?.shortLabel || 'same pipeline'}`}
-            >
-              <span>✨</span> Tweak / Add Prompt
-            </button>
-            <button
-              type="button"
-              style={{
-                padding: '10px 12px',
-                background: 'rgba(75, 94, 250, 0.12)',
-                border: '1px dashed rgba(75, 94, 250, 0.35)',
-                borderRadius: '8px',
-                color: 'var(--accent-neon)',
-                fontSize: '12px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.2s ease'
-              }}
-              onClick={(e) => { e.stopPropagation(); setGenState('pipeline'); }}
-              title="Pick a different AI pipeline to generate a branch"
-            >
-              Other Pipeline
-            </button>
-          </div>
-        )}
-
-        {genState === 'pipeline' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
-            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 'bold' }}>Select AI Pipeline:</span>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <span style={{ fontSize: '10px', color: 'rgba(0,255,204,0.75)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cloudworker free allocation</span>
-              <select
-                value={FREE_IMAGE_PROVIDER_KEYS.includes(genProvider) ? genProvider : ''}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  const providerKey = e.target.value;
-                  if (!providerKey) return;
-                  const provider = GENERATION_PROVIDERS[providerKey];
-                  setGenProvider(providerKey);
-                  setGenPipeline(provider.pipeline);
-                  try {
-                    localStorage.setItem('droplet-last-generation-renderer', providerKey);
-                  } catch {
-                    // ignore
-                  }
-                  setGenState('prompt');
+      {isEditMode && (
+        <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {genState === 'idle' && (
+            <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  background: 'rgba(0, 255, 204, 0.16)',
+                  border: '1px solid rgba(0, 255, 204, 0.45)',
+                  borderRadius: '8px',
+                  color: '#00ffcc',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s ease',
+                  backdropFilter: 'blur(4px)'
                 }}
-                style={{ minHeight: '36px', borderRadius: '7px', border: '1px solid rgba(0,255,204,0.34)', background: 'rgba(0,255,204,0.08)', color: '#fff', padding: '0 9px', fontSize: '12px', fontWeight: 850, outline: 'none', cursor: 'pointer' }}
-                aria-label="Select Cloudworker free allocation image pipeline"
-              >
-                <option value="">Choose a Cloudworker renderer...</option>
-                {FREE_IMAGE_PROVIDER_KEYS.map((providerKey) => (
-                  <option key={providerKey} value={providerKey}>{GENERATION_PROVIDERS[providerKey].label}</option>
-                ))}
-              </select>
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <span style={{ fontSize: '10px', color: 'rgba(255,184,77,0.78)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>API-key renderers</span>
-              <select
-                value={API_KEY_PROVIDER_KEYS.includes(genProvider) ? genProvider : ''}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  const providerKey = e.target.value;
-                  if (!providerKey) return;
-                  const provider = GENERATION_PROVIDERS[providerKey];
-                  setGenProvider(providerKey);
-                  setGenPipeline(provider.pipeline);
-                  try {
-                    localStorage.setItem('droplet-last-generation-renderer', providerKey);
-                  } catch {
-                    // ignore
-                  }
-                  setGenState('prompt');
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(0, 255, 204, 0.28)';
+                  e.currentTarget.style.boxShadow = '0 0 12px rgba(0, 255, 204, 0.4)';
                 }}
-                style={{ minHeight: '36px', borderRadius: '7px', border: '1px solid rgba(255,184,77,0.34)', background: 'rgba(255,184,77,0.08)', color: '#fff', padding: '0 9px', fontSize: '12px', fontWeight: 850, outline: 'none', cursor: 'pointer' }}
-                aria-label="Select API key renderer"
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(0, 255, 204, 0.16)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+                onClick={handleInitiateTweak}
+                title={`Add prompt to tweak this asset using ${GENERATION_PROVIDERS[data.generationProvider]?.label || GENERATION_PROVIDERS[data.generationProvider]?.shortLabel || 'same pipeline'}`}
               >
-                <option value="">Choose a key-backed renderer...</option>
-                {API_KEY_PROVIDER_KEYS.map((providerKey) => (
-                  <option key={providerKey} value={providerKey}>{GENERATION_PROVIDERS[providerKey].label}</option>
-                ))}
-              </select>
-            </label>
-            <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.48)', lineHeight: 1.35 }}>
-              DeepSeek is used as a text/planning agent, not an image renderer. Cloudworker options render first through the Workers AI free allocation.
+                <span>✨</span> Tweak / Add Prompt
+              </button>
+              <button
+                type="button"
+                style={{
+                  padding: '10px 12px',
+                  background: 'rgba(75, 94, 250, 0.12)',
+                  border: '1px dashed rgba(75, 94, 250, 0.35)',
+                  borderRadius: '8px',
+                  color: 'var(--accent-neon)',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={(e) => { e.stopPropagation(); setGenState('pipeline'); }}
+                title="Pick a different AI pipeline to generate a branch"
+              >
+                Other Pipeline
+              </button>
             </div>
-            <button 
-              onClick={(e) => { e.stopPropagation(); setGenState('idle'); setGenError(''); }}
-              style={{ padding: '6px', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '12px' }}
-            >Cancel</button>
-          </div>
-        )}
+          )}
 
-        {genState === 'prompt' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.35)', borderRadius: '8px', border: '1px solid rgba(0,255,204,0.28)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                <span style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  {genPipeline === 'image' ? '🖼️' : '🎥'} Tweak Asset
-                </span>
-                <span style={{ fontSize: '10px', color: 'rgba(0,255,204,0.85)', fontWeight: 800 }}>
-                  ● Pipeline: {GENERATION_PROVIDERS[genProvider]?.shortLabel || GENERATION_PROVIDERS[genProvider]?.label || genProvider}
-                </span>
-              </div>
-              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); setGenState('pipeline'); }}
-                  style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '10px' }}
-                  title="Change AI pipeline"
+          {genState === 'pipeline' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
+              <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 'bold' }}>Select AI Pipeline:</span>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <span style={{ fontSize: '10px', color: 'rgba(0,255,204,0.75)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cloudworker free allocation</span>
+                <select
+                  value={FREE_IMAGE_PROVIDER_KEYS.includes(genProvider) ? genProvider : ''}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    const providerKey = e.target.value;
+                    if (!providerKey) return;
+                    const provider = GENERATION_PROVIDERS[providerKey];
+                    setGenProvider(providerKey);
+                    setGenPipeline(provider.pipeline);
+                    try {
+                      localStorage.setItem('droplet-last-generation-renderer', providerKey);
+                    } catch {
+                      // ignore
+                    }
+                    setGenState('prompt');
+                  }}
+                  style={{ minHeight: '36px', borderRadius: '7px', border: '1px solid rgba(0,255,204,0.34)', background: 'rgba(0,255,204,0.08)', color: '#fff', padding: '0 9px', fontSize: '12px', fontWeight: 850, outline: 'none', cursor: 'pointer' }}
+                  aria-label="Select Cloudworker free allocation image pipeline"
                 >
-                  Change
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); setIsPromptHelpOpen((open) => !open); }}
-                  style={{ padding: '4px 8px', background: isPromptHelpOpen ? 'rgba(0,255,204,0.18)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '6px', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase' }}
-                  title="Open prompt helper"
-                  aria-label="Open prompt helper"
+                  <option value="">Choose a Cloudworker renderer...</option>
+                  {FREE_IMAGE_PROVIDER_KEYS.map((providerKey) => (
+                    <option key={providerKey} value={providerKey}>{GENERATION_PROVIDERS[providerKey].label}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <span style={{ fontSize: '10px', color: 'rgba(255,184,77,0.78)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>API-key renderers</span>
+                <select
+                  value={API_KEY_PROVIDER_KEYS.includes(genProvider) ? genProvider : ''}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    const providerKey = e.target.value;
+                    if (!providerKey) return;
+                    const provider = GENERATION_PROVIDERS[providerKey];
+                    setGenProvider(providerKey);
+                    setGenPipeline(provider.pipeline);
+                    try {
+                      localStorage.setItem('droplet-last-generation-renderer', providerKey);
+                    } catch {
+                      // ignore
+                    }
+                    setGenState('prompt');
+                  }}
+                  style={{ minHeight: '36px', borderRadius: '7px', border: '1px solid rgba(255,184,77,0.34)', background: 'rgba(255,184,77,0.08)', color: '#fff', padding: '0 9px', fontSize: '12px', fontWeight: 850, outline: 'none', cursor: 'pointer' }}
+                  aria-label="Select API key renderer"
                 >
-                  Guide
-                </button>
+                  <option value="">Choose a key-backed renderer...</option>
+                  {API_KEY_PROVIDER_KEYS.map((providerKey) => (
+                    <option key={providerKey} value={providerKey}>{GENERATION_PROVIDERS[providerKey].label}</option>
+                  ))}
+                </select>
+              </label>
+              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.48)', lineHeight: 1.35 }}>
+                DeepSeek is used as a text/planning agent, not an image renderer. Cloudworker options render first through the Workers AI free allocation.
               </div>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setGenState('idle'); setGenError(''); }}
+                style={{ padding: '6px', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '12px' }}
+              >Cancel</button>
             </div>
-            {isPromptHelpOpen && (
-              <div style={{ padding: '9px', border: '1px solid rgba(0,255,204,0.22)', borderRadius: '8px', background: 'rgba(0,255,204,0.06)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.78)', lineHeight: 1.35 }}>
-                  Write it like a compact creative brief: subject, composition, lighting, style, exact copy, and what must stay unchanged from references.
+          )}
+
+          {genState === 'prompt' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.35)', borderRadius: '8px', border: '1px solid rgba(0,255,204,0.28)' }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <span style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    {genPipeline === 'image' ? '🖼️' : '🎥'} Tweak Asset
+                  </span>
+                  <span style={{ fontSize: '10px', color: 'rgba(0,255,204,0.85)', fontWeight: 800 }}>
+                    ● Pipeline: {GENERATION_PROVIDERS[genProvider]?.shortLabel || GENERATION_PROVIDERS[genProvider]?.label || genProvider}
+                  </span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '5px' }}>
-                  {PROMPT_HELP_SECTIONS.map((section) => (
-                    <div key={section.title} style={{ display: 'grid', gridTemplateColumns: '86px 1fr', gap: '7px', fontSize: '10px', lineHeight: 1.3 }}>
-                      <strong style={{ color: 'rgba(0,255,204,0.82)' }}>{section.title}</strong>
-                      <span style={{ color: 'rgba(255,255,255,0.6)' }}>{section.text}</span>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setGenState('pipeline'); }}
+                    style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '10px' }}
+                    title="Change AI pipeline"
+                  >
+                    Change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setIsPromptHelpOpen((open) => !open); }}
+                    style={{ padding: '4px 8px', background: isPromptHelpOpen ? 'rgba(0,255,204,0.18)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '6px', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase' }}
+                    title="Open prompt helper"
+                    aria-label="Open prompt helper"
+                  >
+                    Guide
+                  </button>
+                </div>
+              </div>
+              {isPromptHelpOpen && (
+                <div style={{ padding: '9px', border: '1px solid rgba(0,255,204,0.22)', borderRadius: '8px', background: 'rgba(0,255,204,0.06)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.78)', lineHeight: 1.35 }}>
+                    Write it like a compact creative brief: subject, composition, lighting, style, exact copy, and what must stay unchanged from references.
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '5px' }}>
+                    {PROMPT_HELP_SECTIONS.map((section) => (
+                      <div key={section.title} style={{ display: 'grid', gridTemplateColumns: '86px 1fr', gap: '7px', fontSize: '10px', lineHeight: 1.3 }}>
+                        <strong style={{ color: 'rgba(0,255,204,0.82)' }}>{section.title}</strong>
+                        <span style={{ color: 'rgba(255,255,255,0.6)' }}>{section.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                    {PROMPT_STARTERS.map((starter) => (
+                      <button
+                        type="button"
+                        key={starter}
+                        onClick={(e) => { e.stopPropagation(); applyPromptStarter(starter); }}
+                        style={{ padding: '5px 7px', borderRadius: '999px', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.055)', color: 'rgba(255,255,255,0.72)', cursor: 'pointer', fontSize: '10px', textAlign: 'left' }}
+                      >
+                        {starter}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.48)', lineHeight: 1.35 }}>
+                    Color words are brand-locked at generation time: if you write "orange", Droplet asks the provider to use the closest brand-guide color and exact hex when available.
+                  </div>
+                </div>
+              )}
+              <textarea 
+                autoFocus
+                placeholder="Describe what you want to generate..."
+                value={genPrompt}
+                onChange={(e) => { setGenPrompt(e.target.value); setGenError(''); }}
+                style={{ width: '100%', minHeight: '60px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', color: 'white', padding: '8px', fontSize: '12px', resize: 'vertical', outline: 'none' }}
+              />
+              {genError && (
+                <div style={{ padding: '7px 8px', border: '1px solid rgba(255, 99, 99, 0.35)', background: 'rgba(255, 70, 70, 0.12)', borderRadius: '6px', color: '#ff9c9c', fontSize: '11px', lineHeight: 1.35 }}>
+                  {genError}
+                </div>
+              )}
+              
+              {genRefs.length > 0 && (
+                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                  {genRefs.map((refUrl, idx) => (
+                    <div key={idx} style={{ width: '30px', height: '30px', borderRadius: '4px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.3)' }}>
+                      <img src={refUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
                   ))}
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                  {PROMPT_STARTERS.map((starter) => (
-                    <button
-                      type="button"
-                      key={starter}
-                      onClick={(e) => { e.stopPropagation(); applyPromptStarter(starter); }}
-                      style={{ padding: '5px 7px', borderRadius: '999px', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.055)', color: 'rgba(255,255,255,0.72)', cursor: 'pointer', fontSize: '10px', textAlign: 'left' }}
-                    >
-                      {starter}
-                    </button>
-                  ))}
-                </div>
-                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.48)', lineHeight: 1.35 }}>
-                  Color words are brand-locked at generation time: if you write "orange", Droplet asks the provider to use the closest brand-guide color and exact hex when available.
-                </div>
+              )}
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); referenceInputRef.current?.click(); }}
+                  style={{ padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: '4px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '11px', textAlign: 'left' }}
+                >+ Upload Ref</button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const url = window.prompt("Enter reference image URL:");
+                    if (url) setGenRefs([...genRefs, url]);
+                  }}
+                  style={{ padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: '4px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '11px', textAlign: 'left' }}
+                >+ Ref URL</button>
               </div>
-            )}
-            <textarea 
-              autoFocus
-              placeholder="Describe what you want to generate..."
-              value={genPrompt}
-              onChange={(e) => { setGenPrompt(e.target.value); setGenError(''); }}
-              style={{ width: '100%', minHeight: '60px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', color: 'white', padding: '8px', fontSize: '12px', resize: 'vertical', outline: 'none' }}
-            />
-            {genError && (
-              <div style={{ padding: '7px 8px', border: '1px solid rgba(255, 99, 99, 0.35)', background: 'rgba(255, 70, 70, 0.12)', borderRadius: '6px', color: '#ff9c9c', fontSize: '11px', lineHeight: 1.35 }}>
-                {genError}
-              </div>
-            )}
-            
-            {genRefs.length > 0 && (
-              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                {genRefs.map((refUrl, idx) => (
-                  <div key={idx} style={{ width: '30px', height: '30px', borderRadius: '4px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.3)' }}>
-                    <img src={refUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-              <button
-                onClick={(e) => { e.stopPropagation(); referenceInputRef.current?.click(); }}
-                style={{ padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: '4px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '11px', textAlign: 'left' }}
-              >+ Upload Ref</button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const url = window.prompt("Enter reference image URL:");
-                  if (url) setGenRefs([...genRefs, url]);
-                }}
-                style={{ padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: '4px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '11px', textAlign: 'left' }}
-              >+ Ref URL</button>
-            </div>
 
-            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-              <button 
-                onClick={(e) => { e.stopPropagation(); handleGenerateRun(); }}
-                style={{ flex: 1, padding: '8px', background: 'var(--accent-neon)', border: 'none', borderRadius: '6px', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}
-              >✨ Run</button>
-              <button 
-                onClick={(e) => { e.stopPropagation(); setGenState('idle'); setGenPrompt(''); setGenRefs([]); setGenError(''); }}
-                style={{ padding: '8px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', color: 'white', cursor: 'pointer' }}
-              >Cancel</button>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleGenerateRun(); }}
+                  style={{ flex: 1, padding: '8px', background: 'var(--accent-neon)', border: 'none', borderRadius: '6px', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}
+                >✨ Run</button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setGenState('idle'); setGenPrompt(''); setGenRefs([]); setGenError(''); }}
+                  style={{ padding: '8px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', color: 'white', cursor: 'pointer' }}
+                >Cancel</button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {genState === 'generating' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
-            <DropletLoader label={`Generating with ${GENERATION_PROVIDERS[genProvider]?.shortLabel || 'AI'}`} size={118} compact />
-          </div>
-        )}
-      </div>
+          {genState === 'generating' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+              <DropletLoader label={`Generating with ${GENERATION_PROVIDERS[genProvider]?.shortLabel || 'AI'}`} size={118} compact />
+            </div>
+          )}
+        </div>
+      )}
 
       <Handle type="source" position={Position.Right} isConnectable={isConnectable} style={{ background: 'var(--bg-color)', border: '2px solid var(--accent-neon)' }} />
 

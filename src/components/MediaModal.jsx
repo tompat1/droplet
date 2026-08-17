@@ -295,36 +295,57 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
             </button>
           )}
 
-          <button 
-            type="button"
-            onClick={onClose}
-            title="Close Lightbox"
-            aria-label="Close Lightbox"
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.1)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              color: '#fff',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
-            }}
-            onMouseOver={e => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-              e.currentTarget.style.transform = 'scale(1.05)';
-            }}
-            onMouseOut={e => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-          >
-            <X size={22} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span
+              style={{
+                fontSize: '0.72rem',
+                color: 'rgba(255, 255, 255, 0.65)',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.16)',
+                borderRadius: '8px',
+                padding: '6px 12px',
+                fontWeight: 700,
+                letterSpacing: '0.04em',
+                whiteSpace: 'nowrap',
+                userSelect: 'none',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
+              }}
+            >
+              ESC to exit
+            </span>
+            <button 
+              type="button"
+              onClick={onClose}
+              title="Close Lightbox (ESC to exit)"
+              aria-label="Close Lightbox (ESC to exit)"
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                color: '#fff',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+              }}
+              onMouseOver={e => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <X size={22} />
+            </button>
+          </div>
         </div>
       </div>
 
