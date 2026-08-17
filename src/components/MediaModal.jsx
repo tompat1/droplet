@@ -60,7 +60,8 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
 
   if (!media) return null;
 
-  const promptText = media.prompt || media.description || media.generationPrompt || '';
+  const descText = media.description || '';
+  const promptText = media.prompt || media.generationPrompt || '';
 
   const handleCopyPrompt = async (e) => {
     e?.stopPropagation();
@@ -82,6 +83,29 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
       setTimeout(() => setCopiedPrompt(false), 2200);
     } catch (err) {
       console.error('Failed to copy prompt:', err);
+    }
+  };
+
+  const handleCopyDesc = async (e) => {
+    e?.stopPropagation();
+    if (!descText) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(descText);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = descText;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      setCopiedDesc(true);
+      setTimeout(() => setCopiedDesc(false), 2200);
+    } catch (err) {
+      console.error('Failed to copy description:', err);
     }
   };
 
@@ -486,8 +510,8 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
         ) : null}
       </div>
 
-      {/* Bottom Prompt Bar Overlay */}
-      {promptText && !isZoomed && (
+      {/* Bottom Prompt & Description Bar Overlay */}
+      {(promptText || descText) && !isZoomed && (
         <div 
           onClick={e => e.stopPropagation()}
           style={{
@@ -496,7 +520,7 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
             left: '50%',
             transform: 'translateX(-50%)',
             width: 'min(90vw, 840px)',
-            background: 'rgba(12, 12, 20, 0.85)',
+            background: 'rgba(12, 12, 20, 0.88)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
             border: '1px solid rgba(255, 255, 255, 0.16)',
@@ -504,16 +528,16 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
             padding: '14px 20px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '10px',
             boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(75, 94, 250, 0.15)',
             zIndex: 10004
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
             <span style={{ fontSize: '0.68rem', color: 'rgba(0, 255, 204, 0.85)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Generation Prompt
+              {promptText && descText ? 'Generation Prompt & Storyboard Description' : promptText ? 'Generation Prompt' : 'Asset Description'}
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               {media.onTweak && (
                 <button
                   type="button"
@@ -541,38 +565,80 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
                   <span>✨</span> Tweak Asset
                 </button>
               )}
-              <button
-                type="button"
-                onClick={handleCopyPrompt}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '4px 12px',
-                  borderRadius: '12px',
-                  background: copiedPrompt ? 'rgba(0, 255, 204, 0.25)' : 'rgba(255, 255, 255, 0.08)',
-                  border: copiedPrompt ? '1px solid rgba(0, 255, 204, 0.5)' : '1px solid rgba(255, 255, 255, 0.14)',
-                  color: copiedPrompt ? '#00ffcc' : 'rgba(255, 255, 255, 0.85)',
-                  fontSize: '0.75rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                {copiedPrompt ? <Check size={13} /> : <Copy size={13} />}
-                <span>{copiedPrompt ? 'Copied Prompt' : 'Copy Prompt'}</span>
-              </button>
+
+              {promptText && (
+                <button
+                  type="button"
+                  onClick={handleCopyPrompt}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '4px 12px',
+                    borderRadius: '12px',
+                    background: copiedPrompt ? 'rgba(0, 255, 204, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                    border: copiedPrompt ? '1px solid rgba(0, 255, 204, 0.5)' : '1px solid rgba(255, 255, 255, 0.14)',
+                    color: copiedPrompt ? '#00ffcc' : 'rgba(255, 255, 255, 0.85)',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  title="Copy prompt"
+                >
+                  {copiedPrompt ? <Check size={13} /> : <Copy size={13} />}
+                  <span>{copiedPrompt ? 'Copied Prompt' : 'Copy Prompt'}</span>
+                </button>
+              )}
+
+              {descText && (
+                <button
+                  type="button"
+                  onClick={handleCopyDesc}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '4px 12px',
+                    borderRadius: '12px',
+                    background: copiedDesc ? 'rgba(0, 255, 204, 0.25)' : 'rgba(0, 255, 204, 0.12)',
+                    border: copiedDesc ? '1px solid rgba(0, 255, 204, 0.5)' : '1px solid rgba(0, 255, 204, 0.3)',
+                    color: copiedDesc ? '#00ffcc' : '#00ffcc',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  title="Copy storyboard description"
+                >
+                  {copiedDesc ? <Check size={13} /> : <Copy size={13} />}
+                  <span>{copiedDesc ? 'Copied Description' : 'Copy Description'}</span>
+                </button>
+              )}
             </div>
           </div>
-          <div style={{
-            fontSize: '0.9rem',
-            lineHeight: 1.45,
-            color: 'rgba(255, 255, 255, 0.92)',
-            maxHeight: '80px',
-            overflowY: 'auto',
-            wordBreak: 'break-word'
-          }}>
-            {promptText}
+
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              maxHeight: '120px',
+              overflowY: 'auto',
+              userSelect: 'text',
+              WebkitUserSelect: 'text'
+            }}
+          >
+            {promptText && (
+              <div style={{ fontSize: '0.85rem', lineHeight: 1.45, color: 'rgba(255, 255, 255, 0.95)', fontWeight: 600 }}>
+                {promptText}
+              </div>
+            )}
+            {descText && descText !== promptText && (
+              <div style={{ fontSize: '0.82rem', lineHeight: 1.5, color: 'rgba(255, 255, 255, 0.75)', whiteSpace: 'pre-wrap' }}>
+                {descText}
+              </div>
+            )}
           </div>
         </div>
       )}

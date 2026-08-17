@@ -224,6 +224,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
   const [genError, setGenError] = useState('');
   const [isPromptHelpOpen, setIsPromptHelpOpen] = useState(false);
   const [copiedCardPrompt, setCopiedCardPrompt] = useState(false);
+  const [copiedCardDesc, setCopiedCardDesc] = useState(false);
 
   const handleCopyCardPrompt = async (e) => {
     e?.stopPropagation();
@@ -246,6 +247,30 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       setTimeout(() => setCopiedCardPrompt(false), 2200);
     } catch (err) {
       console.error('Failed to copy card prompt:', err);
+    }
+  };
+
+  const handleCopyCardDesc = async (e) => {
+    e?.stopPropagation();
+    const text = data.description || data.generationPrompt || '';
+    if (!text) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      setCopiedCardDesc(true);
+      setTimeout(() => setCopiedCardDesc(false), 2200);
+    } catch (err) {
+      console.error('Failed to copy card description:', err);
     }
   };
 
@@ -818,6 +843,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
                 top: '8px',
                 left: '8px',
                 zIndex: 3,
+                maxWidth: 'calc(100% - 92px)',
                 padding: '3px 9px',
                 borderRadius: '7px',
                 border: '1px solid rgba(255,255,255,0.24)',
@@ -837,8 +863,10 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               }}
               title={`Rendered with ${data.generationProviderLabel || GENERATION_PROVIDERS[data.generationProvider]?.label || 'AI Renderer'}`}
             >
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: GENERATION_PROVIDERS[data.generationProvider]?.accent || '#00ffcc', boxShadow: `0 0 6px ${GENERATION_PROVIDERS[data.generationProvider]?.accent || '#00ffcc'}` }} />
-              {data.generationProviderLabel || GENERATION_PROVIDERS[data.generationProvider]?.shortLabel || GENERATION_PROVIDERS[data.generationProvider]?.label || 'AI Render'}
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: GENERATION_PROVIDERS[data.generationProvider]?.accent || '#00ffcc', boxShadow: `0 0 6px ${GENERATION_PROVIDERS[data.generationProvider]?.accent || '#00ffcc'}`, flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {GENERATION_PROVIDERS[data.generationProvider]?.shortLabel || data.generationProviderLabel || GENERATION_PROVIDERS[data.generationProvider]?.label || 'AI Render'}
+              </span>
             </div>
           )}
           <button
@@ -935,33 +963,58 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       )}
 
       <div style={{ marginTop: '12px', marginBottom: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', flexWrap: 'wrap', gap: '4px' }}>
           <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {data.isGenerated || data.generationPrompt ? 'Prompt' : 'Description'}
+            {data.isGenerated || data.generationPrompt ? 'Prompt & Storyboard' : 'Description'}
           </span>
-          {(data.generationPrompt || data.description) && (
-            <button
-              type="button"
-              onClick={handleCopyCardPrompt}
-              style={{
-                padding: '2px 8px',
-                borderRadius: '6px',
-                border: '1px solid rgba(255,255,255,0.15)',
-                background: copiedCardPrompt ? 'rgba(0,255,204,0.2)' : 'rgba(255,255,255,0.06)',
-                color: copiedCardPrompt ? '#00ffcc' : 'rgba(255,255,255,0.7)',
-                fontSize: '10px',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                transition: 'all 0.2s'
-              }}
-              title="Copy prompt to clipboard"
-            >
-              {copiedCardPrompt ? '✓ Copied' : '📋 Copy Prompt'}
-            </button>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {data.generationPrompt && (
+              <button
+                type="button"
+                onClick={handleCopyCardPrompt}
+                style={{
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  background: copiedCardPrompt ? 'rgba(0,255,204,0.2)' : 'rgba(255,255,255,0.06)',
+                  color: copiedCardPrompt ? '#00ffcc' : 'rgba(255,255,255,0.7)',
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  transition: 'all 0.2s'
+                }}
+                title="Copy prompt to clipboard"
+              >
+                {copiedCardPrompt ? '✓ Prompt' : '📋 Copy Prompt'}
+              </button>
+            )}
+            {data.description && (
+              <button
+                type="button"
+                onClick={handleCopyCardDesc}
+                style={{
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(0,255,204,0.3)',
+                  background: copiedCardDesc ? 'rgba(0,255,204,0.25)' : 'rgba(0,255,204,0.08)',
+                  color: copiedCardDesc ? '#00ffcc' : 'rgba(0,255,204,0.9)',
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  transition: 'all 0.2s'
+                }}
+                title="Copy description / storyboard breakdown to clipboard"
+              >
+                {copiedCardDesc ? '✓ Description' : '📋 Copy Description'}
+              </button>
+            )}
+          </div>
         </div>
         {isEditingDesc ? (
           <textarea 
@@ -970,13 +1023,24 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           />
         ) : (
           <p 
+            className="nodrag"
             onClick={(e) => { 
               if (isEditMode) {
                 e.stopPropagation(); 
                 setIsEditingDesc(true); 
               }
             }}
-            style={{ fontSize: '14px', lineHeight: '1.5', color: 'rgba(255,255,255,0.85)', cursor: isEditMode ? 'text' : 'default', minHeight: '20px', margin: 0 }}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              fontSize: '14px',
+              lineHeight: '1.5',
+              color: 'rgba(255,255,255,0.85)',
+              cursor: isEditMode ? 'text' : 'default',
+              minHeight: '20px',
+              margin: 0,
+              userSelect: 'text',
+              WebkitUserSelect: 'text'
+            }}
           >
             {data.description || 'Add description...'}
           </p>
