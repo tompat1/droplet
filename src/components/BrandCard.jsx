@@ -42,6 +42,12 @@ const GENERATION_PROVIDERS = {
     pipeline: 'image',
     accent: '#92ffb8'
   },
+  cloudflare_video_storyboard: {
+    label: 'Cloudflare Workers Video Concept',
+    shortLabel: 'Workers Video',
+    pipeline: 'video',
+    accent: '#00ffcc'
+  },
   openai_image: {
     label: 'ChatGPT Images',
     shortLabel: 'ChatGPT',
@@ -68,13 +74,14 @@ const GENERATION_PROVIDERS = {
   }
 };
 
-const FREE_IMAGE_PROVIDER_KEYS = [
+const FREE_PROVIDER_KEYS = [
   'cloudflare_flux_klein',
   'cloudflare_flux_klein_9b',
   'cloudflare_flux_schnell',
   'cloudflare_sdxl',
   'cloudflare_sdxl_lightning',
-  'cloudflare_sd_img2img'
+  'cloudflare_sd_img2img',
+  'cloudflare_video_storyboard'
 ];
 
 const API_KEY_PROVIDER_KEYS = [
@@ -1043,7 +1050,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               <label style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                 <span style={{ fontSize: '10px', color: 'rgba(0,255,204,0.75)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cloudworker free allocation</span>
                 <select
-                  value={FREE_IMAGE_PROVIDER_KEYS.includes(genProvider) ? genProvider : ''}
+                  value={FREE_PROVIDER_KEYS.includes(genProvider) ? genProvider : ''}
                   onChange={(e) => {
                     e.stopPropagation();
                     const providerKey = e.target.value;
@@ -1059,10 +1066,10 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
                     setGenState('prompt');
                   }}
                   style={{ minHeight: '36px', borderRadius: '7px', border: '1px solid rgba(0,255,204,0.34)', background: 'rgba(0,255,204,0.08)', color: '#fff', padding: '0 9px', fontSize: '12px', fontWeight: 850, outline: 'none', cursor: 'pointer' }}
-                  aria-label="Select Cloudworker free allocation image pipeline"
+                  aria-label="Select Cloudworker free allocation image and video pipeline"
                 >
                   <option value="">Choose a Cloudworker renderer...</option>
-                  {FREE_IMAGE_PROVIDER_KEYS.map((providerKey) => (
+                  {FREE_PROVIDER_KEYS.map((providerKey) => (
                     <option key={providerKey} value={providerKey}>{GENERATION_PROVIDERS[providerKey].label}</option>
                   ))}
                 </select>

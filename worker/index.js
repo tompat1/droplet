@@ -38,6 +38,11 @@ const GENERATION_PROVIDERS = {
     pipeline: 'image',
     defaultModel: '@cf/runwayml/stable-diffusion-v1-5-img2img'
   },
+  cloudflare_video_storyboard: {
+    label: 'Cloudflare Workers AI Video Concept',
+    pipeline: 'video',
+    defaultModel: 'workers-ai-free'
+  },
   concierge_free_image: {
     label: 'Concierge Free Render',
     pipeline: 'image',
@@ -590,7 +595,7 @@ async function createGenerationBranch(request, env, userId) {
       branch = await generateCloudflareSdxlLightning(env, input);
     } else if (input.provider === 'cloudflare_sd_img2img') {
       branch = await generateCloudflareSdImg2Img(env, input);
-    } else if (input.provider === 'concierge_free_image' || input.provider === 'concierge_free_video') {
+    } else if (input.provider === 'cloudflare_video_storyboard' || input.provider === 'concierge_free_image' || input.provider === 'concierge_free_video') {
       branch = await generateConciergeFreeBranch(request, env, input);
     } else if (input.provider === 'openai_image') {
       branch = await generateOpenAiImage(env, input);
