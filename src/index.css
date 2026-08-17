@@ -1279,23 +1279,68 @@ h1, h2, h3, h4, h5, h6 {
 
 .ai-chip-row {
   display: flex;
-  gap: 7px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
   overflow-x: auto;
+  padding: 8px clamp(16px, 3vw, 28px);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  flex-shrink: 0;
 }
 
-.ai-chip-row button {
+.ai-chip-row::-webkit-scrollbar {
+  height: 4px;
+}
+
+.ai-chip-row::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.ai-chip-btn {
   flex: 0 0 auto;
-  max-width: 220px;
-  min-height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.82);
-  padding: 0 10px;
-  font-size: 0.78rem;
-  font-weight: 750;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  border: 1px solid var(--chip-border, rgba(255, 255, 255, 0.15));
+  border-radius: 20px;
+  background: rgba(18, 18, 28, 0.65);
+  color: rgba(255, 255, 255, 0.88);
+  padding: 0 12px 0 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
   cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.ai-chip-btn:hover:not(:disabled) {
+  background: var(--chip-bg, rgba(255, 255, 255, 0.12));
+  border-color: var(--chip-color, #00ffcc);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 0 10px var(--chip-bg, rgba(0, 255, 204, 0.2));
+}
+
+.ai-chip-icon-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--chip-border, rgba(255, 255, 255, 0.2));
+  flex-shrink: 0;
+}
+
+.ai-chip-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

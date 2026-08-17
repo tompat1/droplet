@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bot, FileText, Grid3X3, ImagePlus, KeyRound, Send, Settings, Trash2, WandSparkles, X } from 'lucide-react';
+import { Bot, Compass, FileText, Grid3X3, ImagePlus, KeyRound, PenTool, Send, Settings, Sparkles, Trash2, Wand2, WandSparkles, X, Zap } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { useCanvasAssets } from './CanvasAssetsState';
 import { useSiteContent } from './SiteContentContext';
@@ -10,11 +10,51 @@ const PROVIDER_STORAGE_KEY = 'droplet_ai_concierge_provider_v1';
 const KEYS_STORAGE_KEY = 'droplet_ai_provider_keys_v1';
 
 const PROMPT_CHIPS = [
-  'Render a campaign image from this canvas.',
-  'Edit the selected asset into a premium ad variant.',
-  'Turn the strongest nodes into a campaign direction.',
-  'Find gaps in the brand system.',
-  'Tighten the editable site copy.'
+  {
+    id: 'campaign-image',
+    prompt: 'Render a campaign image from this canvas.',
+    label: 'Render Campaign Image',
+    icon: Sparkles,
+    color: '#00ffcc',
+    bg: 'rgba(0, 255, 204, 0.14)',
+    border: 'rgba(0, 255, 204, 0.35)'
+  },
+  {
+    id: 'ad-variant',
+    prompt: 'Edit the selected asset into a premium ad variant.',
+    label: 'Edit Premium Ad Variant',
+    icon: Wand2,
+    color: '#ffb84d',
+    bg: 'rgba(255, 184, 77, 0.14)',
+    border: 'rgba(255, 184, 77, 0.35)'
+  },
+  {
+    id: 'campaign-direction',
+    prompt: 'Turn the strongest nodes into a campaign direction.',
+    label: 'Turn Nodes to Campaign',
+    icon: Zap,
+    color: '#ff4d8d',
+    bg: 'rgba(255, 77, 141, 0.14)',
+    border: 'rgba(255, 77, 141, 0.35)'
+  },
+  {
+    id: 'brand-gaps',
+    prompt: 'Find gaps in the brand system.',
+    label: 'Find Brand System Gaps',
+    icon: Compass,
+    color: '#a855f7',
+    bg: 'rgba(168, 85, 247, 0.14)',
+    border: 'rgba(168, 85, 247, 0.35)'
+  },
+  {
+    id: 'site-copy',
+    prompt: 'Tighten the editable site copy.',
+    label: 'Tighten Editable Site Copy',
+    icon: PenTool,
+    color: '#3b82f6',
+    bg: 'rgba(59, 130, 246, 0.14)',
+    border: 'rgba(59, 130, 246, 0.35)'
+  }
 ];
 
 const PROVIDERS = [
@@ -427,11 +467,29 @@ function AiConciergeDrawerInner({ user }) {
           </div>
 
           <div className="ai-chip-row">
-            {PROMPT_CHIPS.map((chip) => (
-              <button key={chip} type="button" onClick={() => submitPrompt(chip)} disabled={loading}>
-                {chip}
-              </button>
-            ))}
+            {PROMPT_CHIPS.map((chip) => {
+              const IconComponent = chip.icon;
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className="ai-chip-btn"
+                  onClick={() => submitPrompt(chip.prompt)}
+                  disabled={loading}
+                  title={chip.prompt}
+                  style={{
+                    '--chip-color': chip.color,
+                    '--chip-bg': chip.bg,
+                    '--chip-border': chip.border
+                  }}
+                >
+                  <span className="ai-chip-icon-badge" style={{ color: chip.color, background: chip.bg, borderColor: chip.border }}>
+                    <IconComponent size={13} strokeWidth={2.4} />
+                  </span>
+                  <span className="ai-chip-label">{chip.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           <form className="ai-concierge-form" onSubmit={handleSubmit}>
