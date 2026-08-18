@@ -23,11 +23,13 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
   const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [copiedDesc, setCopiedDesc] = useState(false);
 
   useEffect(() => {
     setIsZoomed(false);
     setPan({ x: 0, y: 0 });
     setCopiedPrompt(false);
+    setCopiedDesc(false);
   }, [media]);
 
   useEffect(() => {
