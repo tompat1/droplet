@@ -653,6 +653,12 @@ async function createGenerationBranch(request, env, userId) {
         console.warn('Free generation fallback failed', fallbackError instanceof Error ? fallbackError.message : String(fallbackError));
       }
     }
+    if (isGenerationPolicyRefusal(message)) {
+      return json({
+        error: `The image provider rejected this prompt or reference image for safety reasons. Try a less literal prompt or remove the reference image and run again. (${message})`,
+        code: 'GENERATION_POLICY_REFUSAL'
+      }, 422);
+    }
     const status = /required|unsupported/i.test(message) ? 400 : 502;
     return json({ error: `Generation failed: ${message}` }, status);
   }
@@ -1135,6 +1141,10 @@ function escapeSvg(value) {
 function shouldUseFreeGenerationFallback(message, input) {
   if (!input || input.provider === 'concierge_free_image' || input.provider === 'concierge_free_video') return false;
   return /credit|quota|billing|insufficient_quota|rate limit|429|payment|required|exhausted|balance|not configured|binding/i.test(String(message || ''));
+}
+
+function isGenerationPolicyRefusal(message) {
+  return /\b3030\b|flagged|moderation|content policy|safety filter|safety system|blocked by policy/i.test(String(message || ''));
 }
 
 async function generateCloudflareFluxKlein(env, input) {
