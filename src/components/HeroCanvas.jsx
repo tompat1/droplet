@@ -2489,6 +2489,9 @@ const CanvasToolbox = ({
   onAlignSelectedRow,
   onAlignSelectedColumn,
   onCreateLabelGroup,
+  onDeleteSelectedCards,
+  pendingCardDeletion,
+  onCancelDeleteSelectedCards,
   isPlacingLabel,
   onStartLabelPlacement,
   isPlacingNote,
@@ -3106,6 +3109,15 @@ const CanvasToolbox = ({
                       <button type="button" onClick={onCreateLabelGroup} style={selectionActionStyle(false)} title="Create a label group from selected cards" aria-label="Create a label group from selected cards">
                         Label
                       </button>
+                      {selectedCardCount > 1 && (pendingCardDeletion ? (
+                        <button type="button" onClick={onCancelDeleteSelectedCards} style={selectionActionStyle(false)} title="Cancel deleting selected cards" aria-label="Cancel deleting selected cards">
+                          Cancel ({pendingCardDeletion.countdown})
+                        </button>
+                      ) : (
+                        <button type="button" onClick={onDeleteSelectedCards} style={{ ...selectionActionStyle(false), borderColor: 'rgba(255,80,100,0.55)', background: 'rgba(255,80,100,0.12)' }} title="Delete selected cards" aria-label="Delete selected cards">
+                          Delete
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -3206,6 +3218,7 @@ export default function HeroCanvas() {
   });
   const [isCanvasDirty, setIsCanvasDirty] = useState(false);
   const [undoStack, setUndoStack] = useState([]);
+  const [pendingCardDeletion, setPendingCardDeletion] = useState(null);
   
   const containerRef = useRef(null);
   const pageScrollHandleRef = useRef(null);
@@ -3301,6 +3314,48 @@ export default function HeroCanvas() {
       .filter((node) => (selectedSet.has(node.id) || node.selected === true) && node.type === 'brandCard' && node.id !== 'padding-node')
       .map((node) => node.id);
   }, [nodes, selectedNodeIds]);
+
+  const requestDeleteSelectedCards = useCallback(() => {
+    if (!user || !isEditMode || selectedCardIds.length === 0) return;
+    setPendingCardDeletion({ ids: selectedCardIds, countdown: 3 });
+  }, [isEditMode, selectedCardIds, user]);
+
+  const cancelDeleteSelectedCards = useCallback(() => {
+    setPendingCardDeletion(null);
+  }, []);
+
+  useEffect(() => {
+    if (!pendingCardDeletion) return undefined;
+    if (!user || !isEditMode) {
+      setPendingCardDeletion(null);
+      return undefined;
+    }
+    if (pendingCardDeletion.countdown > 0) {
+      const timer = window.setTimeout(() => {
+        setPendingCardDeletion((pending) => pending ? { ...pending, countdown: pending.countdown - 1 } : null);
+      }, 1000);
+      return () => window.clearTimeout(timer);
+    }
+
+    const ids = new Set(pendingCardDeletion.ids);
+    const deletedNodes = nodesRef.current.filter((node) => ids.has(node.id));
+    const deletedEdges = edgesRef.current.filter((edge) => ids.has(edge.source) || ids.has(edge.target));
+    if (deletedNodes.length > 0) {
+      pushUndoAction({
+        type: 'delete-nodes',
+        label: `Restore ${deletedNodes.length} cards`,
+        nodes: deletedNodes,
+        edges: deletedEdges
+      });
+      setPersistentNodes((currentNodes) => currentNodes.filter((node) => !ids.has(node.id)));
+      setPersistentEdges((currentEdges) => currentEdges.filter((edge) => !ids.has(edge.source) && !ids.has(edge.target)));
+      setSelectedNodeIds((currentIds) => currentIds.filter((id) => !ids.has(id)));
+      setCanvasStatus(`Deleted ${deletedNodes.length} cards.`);
+      showCanvasActionToast(`Deleted ${deletedNodes.length} cards.`);
+    }
+    setPendingCardDeletion(null);
+    return undefined;
+  }, [isEditMode, pendingCardDeletion, pushUndoAction, setPersistentEdges, setPersistentNodes, showCanvasActionToast, user]);
 
   const canvasMedias = useMemo(() => nodes
     .filter(node => node.data && (node.data.image || node.data.video || node.data.colors))
@@ -4198,6 +4253,22 @@ export default function HeroCanvas() {
         showCanvasActionToast(`Restored ${action.node?.data?.title || 'deleted node'}.`);
       }
 
+      if (action.type === 'delete-nodes') {
+        setNodes((nds) => {
+          const restoredIds = new Set(action.nodes.map((node) => node.id));
+          const withoutDuplicates = nds.filter((node) => !restoredIds.has(node.id));
+          return [...withoutDuplicates, ...action.nodes];
+        });
+        setEdges((eds) => {
+          const restoredEdgeIds = new Set(action.edges.map((edge) => edge.id));
+          const withoutDuplicates = eds.filter((edge) => !restoredEdgeIds.has(edge.id));
+          return [...withoutDuplicates, ...action.edges];
+        });
+        setIsCanvasDirty(true);
+        setCanvasStatus(`Restored ${action.nodes.length} cards.`);
+        showCanvasActionToast(`Restored ${action.nodes.length} cards.`);
+      }
+
       return rest;
     });
   }, [setEdges, setNodes, showCanvasActionToast]);
@@ -4673,6 +4744,9 @@ export default function HeroCanvas() {
           onAlignSelectedRow={() => alignSelectedCards('row')}
           onAlignSelectedColumn={() => alignSelectedCards('column')}
           onCreateLabelGroup={createLabelGroup}
+          onDeleteSelectedCards={requestDeleteSelectedCards}
+          pendingCardDeletion={pendingCardDeletion}
+          onCancelDeleteSelectedCards={cancelDeleteSelectedCards}
           isPlacingLabel={isPlacingLabel}
           onStartLabelPlacement={startLabelPlacement}
           isPlacingNote={isPlacingNote}
