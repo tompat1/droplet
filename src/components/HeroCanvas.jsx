@@ -880,16 +880,13 @@ const LabelNode = ({ id, data, selected, isConnectable }) => {
 
   const deleteLabel = (event) => {
     event.stopPropagation();
+    const memberIds = new Set(Array.isArray(data.memberIds) ? data.memberIds : []);
     data.setGlobalNodes?.((nds) => nds
-      .filter((node) => node.id !== id)
-      .map((node) => node.data?.labelGroupId === id ? {
-        ...node,
-        data: {
-          ...node.data,
-          labelGroupId: undefined,
-          labelTitle: undefined
-        }
-      } : node));
+      .filter((node) => node.id !== id && !(
+        node.type === 'brandCard' && (
+          memberIds.has(node.id) || node.data?.labelGroupId === id
+        )
+      )));
     data.setGlobalEdges?.((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
   };
 
