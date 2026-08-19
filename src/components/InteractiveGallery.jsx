@@ -303,6 +303,7 @@ export default function InteractiveGallery() {
   }, []);
 
   useEffect(() => {
+    if (!galleryRef.current?.querySelector('.gallery-item')) return undefined;
     const ctx = gsap.context(() => {
       gsap.from('.gallery-item', {
         y: 60,

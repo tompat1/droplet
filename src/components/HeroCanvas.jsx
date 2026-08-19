@@ -1991,20 +1991,20 @@ const CanvasPersistencePanel = ({
       return;
     }
 
-    const brandNameInput = window.prompt('Brand name for this new canvas:', 'New Brand');
-    if (brandNameInput === null) return;
-    const brandName = brandNameInput.trim();
-    if (!brandName) {
-      setStatus('Brand name is required to create a canvas.');
-      return;
-    }
-
     setStatus('Choose a branding guide image from your device...');
     let guideUrl = '';
     try {
       guideUrl = await chooseBrandGuideImage();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Branding guide upload failed.');
+      return;
+    }
+
+    const brandNameInput = window.prompt('Brand name for this new canvas:', 'New Brand');
+    if (brandNameInput === null) return;
+    const brandName = brandNameInput.trim();
+    if (!brandName) {
+      setStatus('Brand name is required to create a canvas.');
       return;
     }
 
