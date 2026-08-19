@@ -860,6 +860,7 @@ const LabelNode = ({ id, data, selected, isConnectable }) => {
   const memberCount = Array.isArray(data.memberIds) ? data.memberIds.length : 0;
   const sourceTruthCount = Array.isArray(data.sourceOfTruthNodeIds) ? data.sourceOfTruthNodeIds.length : 0;
   const isDropTarget = data.isDropTarget === true;
+  const isCollapsed = data.isCollapsed === true;
   const { zoom } = useViewport();
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
   const labelTitle = data.title || 'Canvas Label';
@@ -888,6 +889,11 @@ const LabelNode = ({ id, data, selected, isConnectable }) => {
         )
       )));
     data.setGlobalEdges?.((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
+  };
+
+  const toggleLabel = (event) => {
+    event.stopPropagation();
+    data.onToggleCollapse?.(id);
   };
 
   return (
@@ -959,30 +965,52 @@ const LabelNode = ({ id, data, selected, isConnectable }) => {
           </div>
         </div>
         {data.isEditMode && (
-          <button
-            type="button"
-            onClick={deleteLabel}
-            title="Delete label"
-            aria-label="Delete label"
-            style={{
-              width: '26px',
-              height: '26px',
-              borderRadius: '8px',
-              border: '1px solid rgba(255,80,80,0.28)',
-              background: 'rgba(255,50,50,0.12)',
-              color: '#ff9a9a',
-              cursor: 'pointer',
-              fontWeight: 900
-            }}
-          >
-            ×
-          </button>
+          <div style={{ display: 'flex', gap: '5px', flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={toggleLabel}
+              title={isCollapsed ? 'Show group cards' : 'Hide group cards'}
+              aria-label={isCollapsed ? 'Show group cards' : 'Hide group cards'}
+              style={{
+                width: '26px',
+                height: '26px',
+                borderRadius: '8px',
+                border: '1px solid rgba(0,255,204,0.28)',
+                background: 'rgba(0,255,204,0.1)',
+                color: '#fff',
+                cursor: 'pointer',
+                fontWeight: 900,
+                fontSize: '1.05rem',
+                lineHeight: 1
+              }}
+            >
+              {isCollapsed ? '+' : '-'}
+            </button>
+            <button
+              type="button"
+              onClick={deleteLabel}
+              title="Delete label group"
+              aria-label="Delete label group"
+              style={{
+                width: '26px',
+                height: '26px',
+                borderRadius: '8px',
+                border: '1px solid rgba(255,80,80,0.42)',
+                background: 'rgba(255,50,50,0.16)',
+                color: '#ff9a9a',
+                cursor: 'pointer',
+                fontWeight: 900
+              }}
+            >
+              ×
+            </button>
+          </div>
         )}
       </div>
       <div style={{ marginTop: '10px', fontSize: '0.76rem', color: 'rgba(255,255,255,0.58)' }}>
         {isDropTarget
           ? 'Drop to connect and arrange'
-          : `${sourceTruthCount > 0 ? `${sourceTruthCount} guide${sourceTruthCount === 1 ? '' : 's'} / ` : ''}${memberCount === 1 ? '1 card connected' : `${memberCount} cards connected`}`}
+          : `${sourceTruthCount > 0 ? `${sourceTruthCount} guide${sourceTruthCount === 1 ? '' : 's'} / ` : ''}${memberCount === 1 ? '1 card connected' : `${memberCount} cards connected`}${isCollapsed ? ' / hidden' : ''}`}
       </div>
       <Handle type="source" position={Position.Right} isConnectable={isConnectable} style={{ background: '#050505', border: '2px solid rgba(0,255,204,0.75)' }} />
     </div>
@@ -1589,9 +1617,28 @@ const createBrandGuideCanvasSnapshot = ({ brandName, guideUrl, guideNotes }) => 
           referenceRole: 'brand-guide',
           nodeGroup: 'brand-guide'
         }
+      },
+      {
+        id: 'brand-guide-group',
+        type: 'labelNode',
+        position: { x: -230, y: 120 },
+        data: {
+          title: `${brandName} Brand System`,
+          memberIds: [],
+          sourceOfTruthNodeIds: ['brand-guide-source'],
+          nodeGroup: 'labels'
+        }
       }
     ].map(sanitizeNodeForSave),
-    edges: [],
+    edges: [{
+      id: 'e-brand-guide-source-brand-guide-group',
+      source: 'brand-guide-source',
+      target: 'brand-guide-group',
+      type: 'smoothstep',
+      animated: true,
+      data: { isLabelLink: true, labelId: 'brand-guide-group' },
+      style: { stroke: 'rgba(0,255,204,0.72)', strokeWidth: 3 }
+    }],
     viewport: { x: 180, y: 90, zoom: 0.9 },
     settings: {
       interactionMode: 'pan',
@@ -1601,7 +1648,6 @@ const createBrandGuideCanvasSnapshot = ({ brandName, guideUrl, guideNotes }) => 
     collapsedBranches: {}
   };
 };
-
 const sanitizeNodeForSave = (node) => {
   const data = { ...(node.data || {}) };
   delete data.setGlobalNodes;
@@ -3662,6 +3708,13 @@ export default function HeroCanvas() {
 
     const labelTitle = String(title || 'Imported Folder').trim() || 'Imported Folder';
     const labelId = `label-${Date.now()}-${folderIndex}-${Math.random().toString(36).slice(2, 8)}`;
+    const sourceOfTruthNodeIds = nodes
+      .filter((node) => node.type === 'brandCard' && (
+        node.data?.isBrandGuideSource === true ||
+        node.data?.sourceOfTruth === true ||
+        node.data?.referenceRole === 'brand-guide'
+      ))
+      .map((node) => node.id);
     const labelPosition = {
       x: originPoint.x + folderIndex * (CARD_GRID_X * 3 + LABEL_WIDTH + LABEL_CARD_GAP),
       y: originPoint.y
@@ -3674,6 +3727,7 @@ export default function HeroCanvas() {
       data: {
         title: labelTitle,
         memberIds: uniqueCardIds,
+        sourceOfTruthNodeIds,
         nodeGroup: 'labels',
         sourceFolderName: labelTitle
       }
@@ -3715,7 +3769,16 @@ export default function HeroCanvas() {
           style: { stroke: 'rgba(0,255,204,0.72)', strokeWidth: 3 }
         }))
         .filter((edge) => !existingIds.has(edge.id));
-      return [...eds, ...labelEdges];
+      const sourceEdges = sourceOfTruthNodeIds.map((sourceId) => ({
+        id: `source-${sourceId}-${labelId}`,
+        source: sourceId,
+        target: labelId,
+        type: 'smoothstep',
+        animated: true,
+        data: { isLabelLink: true, labelId, isSourceOfTruthLink: true },
+        style: { stroke: 'rgba(245,215,110,0.82)', strokeWidth: 3 }
+      })).filter((edge) => !existingIds.has(edge.id));
+      return [...eds, ...labelEdges, ...sourceEdges];
     });
 
     setSelectedNodeIds([labelId, ...uniqueCardIds]);
@@ -3729,11 +3792,14 @@ export default function HeroCanvas() {
     canvasUploadInputRef.current?.click();
   }, []);
 
-  const handleCanvasUpload = useCallback((event) => {
-    const files = event.target.files;
-    event.target.value = '';
-    createImportedImageCards(files, containerCenterCanvasPoint(), 'upload');
-  }, [containerCenterCanvasPoint, createImportedImageCards]);
+  const handleCanvasUpload = useCallback(async (event) => {
+    const { target } = event;
+    const files = target.files;
+    target.value = '';
+    const originPoint = containerCenterCanvasPoint();
+    const result = await createImportedImageCards(files, originPoint, 'upload');
+    if (result.count > 1) createLabelForImportedCards('Imported Assets', result.nodeIds, originPoint);
+  }, [containerCenterCanvasPoint, createImportedImageCards, createLabelForImportedCards]);
 
   const hasFileDrag = (event) => Array.from(event.dataTransfer?.types || []).includes('Files');
 
@@ -3800,7 +3866,8 @@ export default function HeroCanvas() {
       return;
     }
 
-    createImportedImageCards(event.dataTransfer.files, dropPoint, 'drop');
+    const result = await createImportedImageCards(event.dataTransfer.files, dropPoint, 'drop');
+    if (result.count > 1) createLabelForImportedCards('Imported Assets', result.nodeIds, dropPoint);
   }, [clientPointToCanvasPoint, createImportedImageCards, createLabelForImportedCards, showCanvasActionToast]);
 
   const handleCanvasPointerMove = useCallback((event) => {
@@ -4278,6 +4345,16 @@ export default function HeroCanvas() {
 
     setNodes((nds) => {
       const parentPositions = {};
+      const collapsedLabelIds = new Set(
+        nds
+          .filter((node) => node.type === 'labelNode' && collapsedBranches[node.id])
+          .map((node) => node.id)
+      );
+      const collapsedMemberIds = new Set(
+        nds
+          .filter((node) => node.type === 'labelNode' && collapsedLabelIds.has(node.id))
+          .flatMap((node) => labelMemberIdsFromNodes(node, nds))
+      );
       nds.forEach(n => {
         if (['3', '6', '7', '9'].includes(n.id)) {
           parentPositions[n.id] = n.position;
@@ -4314,7 +4391,7 @@ export default function HeroCanvas() {
         return { 
           ...node, 
           dragHandle: node.type === 'noteNode' ? '.note-drag-handle' : node.dragHandle,
-          hidden: false,
+          hidden: node.type === 'brandCard' && collapsedMemberIds.has(node.id),
           data: {
             ...node.data,
             canCollapse,
@@ -4343,12 +4420,14 @@ export default function HeroCanvas() {
       if (edge.target.startsWith('wild-') && collapsedBranches['7']) isParentCollapsed = true;
       if (edge.target.startsWith('shot-') && collapsedBranches['9']) isParentCollapsed = true;
       if (edge.target.startsWith('video-') && collapsedBranches['3']) isParentCollapsed = true;
+      const labelCollapsed = Boolean(collapsedBranches[edge.source]) && edge.data?.isLabelLink === true;
+      const memberGroupCollapsed = Boolean(collapsedBranches[edge.source]) && edge.data?.labelId === edge.source;
       return { 
         ...edge, 
-        hidden: false,
+        hidden: labelCollapsed || memberGroupCollapsed,
         style: {
           ...edge.style,
-          opacity: isParentCollapsed ? 0 : 1,
+          opacity: isParentCollapsed || labelCollapsed || memberGroupCollapsed ? 0 : 1,
           transition: 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
           pointerEvents: isParentCollapsed ? 'none' : 'auto'
         }
@@ -4476,7 +4555,7 @@ export default function HeroCanvas() {
   }, [isEditMode]);
 
   useEffect(() => {
-    const handlePaste = (event) => {
+    const handlePaste = async (event) => {
       if (isEditableTarget(event.target)) return;
       const canvasElement = containerRef.current;
       if (!canvasElement) return;
@@ -4497,12 +4576,13 @@ export default function HeroCanvas() {
       const originPoint = lastPointer.x || lastPointer.y
         ? clientPointToCanvasPoint(lastPointer.x, lastPointer.y)
         : containerCenterCanvasPoint();
-      createImportedImageCards(files, originPoint, 'paste');
+      const result = await createImportedImageCards(files, originPoint, 'paste');
+      if (result.count > 1) createLabelForImportedCards('Pasted Assets', result.nodeIds, originPoint);
     };
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [clientPointToCanvasPoint, containerCenterCanvasPoint, createImportedImageCards, isFullscreen]);
+  }, [clientPointToCanvasPoint, containerCenterCanvasPoint, createImportedImageCards, createLabelForImportedCards, isFullscreen]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
