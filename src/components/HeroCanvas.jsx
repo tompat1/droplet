@@ -2883,9 +2883,11 @@ const CanvasToolbox = ({
                 <path d="M20 15v5h-5" />
               </svg>
             </button>
-            <button type="button" onClick={handleUploadImagesClick} style={iconButtonStyle} title="Upload images to canvas" aria-label="Upload images to canvas">
-              <UploadIcon />
-            </button>
+            {(user || isEditMode) && (
+              <button type="button" onClick={handleUploadImagesClick} style={iconButtonStyle} title="Upload images to canvas" aria-label="Upload images to canvas">
+                <UploadIcon />
+              </button>
+            )}
             {user && (
               <button type="button" onClick={handleOpenConcierge} style={{ ...iconButtonStyle, borderColor: 'rgba(0,255,204,0.52)', background: 'rgba(0,255,204,0.13)', color: '#00ffcc' }} title="Open canvas concierge" aria-label="Open canvas concierge">
                 <SparklesIcon />
@@ -2952,9 +2954,11 @@ const CanvasToolbox = ({
                   <path d="M20 15v5h-5" />
                 </svg>
               </button>
-              <button type="button" onClick={handleUploadImagesClick} style={iconButtonStyle} title="Upload images to canvas" aria-label="Upload images to canvas">
-                <UploadIcon />
-              </button>
+              {(user || isEditMode) && (
+                <button type="button" onClick={handleUploadImagesClick} style={iconButtonStyle} title="Upload images to canvas" aria-label="Upload images to canvas">
+                  <UploadIcon />
+                </button>
+              )}
               {user && (
                 <button type="button" onClick={handleOpenConcierge} style={{ ...iconButtonStyle, borderColor: 'rgba(0,255,204,0.52)', background: 'rgba(0,255,204,0.13)', color: '#00ffcc' }} title="Open canvas concierge" aria-label="Open canvas concierge">
                   <SparklesIcon />
