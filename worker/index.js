@@ -1199,6 +1199,7 @@ async function generateCloudflareFluxMultipart(env, input, model, titles) {
     description: input.prompt,
     imageDataUrl: `data:image/jpeg;base64,${imageBase64}`,
     model,
+    referenceCount,
     status: 'ready'
   };
 }
@@ -1877,8 +1878,12 @@ function withReferenceContext(input) {
 }
 
 function buildCloudflareImagePrompt(input) {
+  const referenceInstruction = input.parent?.image || input.refs.length > 0
+    ? 'Use the supplied reference images as active visual inputs, not inspiration only. Image 0 is the selected source asset and must remain the same subject, product, pose, composition, and overall identity unless the request explicitly changes them. Apply only the requested edit. Image 1 and later images are brand-guide or additional reference images; use them to preserve the correct logo, colors, typography, and brand details.'
+    : 'This request has no reference image; create a new image from the written brief.';
   return cleanText([
     withReferenceContext(input),
+    referenceInstruction,
     'Output a polished, production-ready brand/campaign image. Preserve the source brand identity, keep typography intentional, and avoid distorted logos or unreadable text.'
   ].join('\n\n'), 2048);
 }
@@ -1998,7 +2003,7 @@ function normalizeUrlList(value) {
 
 function normalizeReferenceUrl(value) {
   const raw = String(value || '').trim();
-  if (/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(raw) && raw.length <= 750000) {
+  if (/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(raw) && raw.length <= 2000000) {
     return raw;
   }
 
