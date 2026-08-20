@@ -2042,7 +2042,7 @@ const CanvasPersistencePanel = ({
     const savingMessage = activeCanvasId ? `Saving canvas: ${name}...` : `Creating canvas: ${name}...`;
     setIsBusy(true);
     setStatus(silent ? 'Autosaving canvas...' : savingMessage);
-    onNotify?.(silent ? `Autosaving canvas: ${name}...` : savingMessage);
+    if (!silent) onNotify?.(savingMessage);
     try {
       const result = activeCanvasId
         ? await canvasApi.update(activeCanvasId, payload)
@@ -2054,11 +2054,11 @@ const CanvasPersistencePanel = ({
       await refreshCanvases();
       setIsCanvasDirty(false);
       setStatus(silent ? 'Autosaved.' : 'Canvas saved.');
-      onNotify?.(silent ? `Autosaved: ${saved.name}.` : `Canvas saved: ${saved.name}.`);
+      if (!silent) onNotify?.(`Canvas saved: ${saved.name}.`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Canvas save failed.';
       setStatus(message);
-      onNotify?.(message);
+      if (!silent) onNotify?.(message);
     } finally {
       setIsBusy(false);
     }
