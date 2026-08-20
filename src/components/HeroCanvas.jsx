@@ -63,6 +63,7 @@ const CARD_FALLBACK_HEIGHT = 430;
 const NOTE_WIDTH = 240;
 const NOTE_HEIGHT = 190;
 const NOTE_SIBLING_GAP = 28;
+const DEFAULT_CANVAS_NAME = 'Droplet merch';
 const LABEL_WIDTH = 230;
 const LABEL_HEIGHT = 86;
 const LABEL_CARD_GAP = 150;
@@ -1804,17 +1805,17 @@ const CanvasPersistencePanel = ({
 }) => {
   const { getViewport, setViewport, fitView } = useReactFlow();
   const [isBusy, setIsBusy] = useState(false);
-  const [draftName, setDraftName] = useState(activeCanvasName || 'Fluid Node Canvas');
+  const [draftName, setDraftName] = useState(activeCanvasName || DEFAULT_CANVAS_NAME);
   const hasAutoLoadedCanvas = useRef(false);
   const brandGuideInputRef = useRef(null);
   const brandGuideResolverRef = useRef(null);
   const importCanvasInputRef = useRef(null);
   const activeCanvasFromList = canvases.find((canvas) => canvas.id === activeCanvasId);
-  const displayCanvasName = activeCanvasName || activeCanvasFromList?.name || 'Unsaved Canvas';
-  const isNameDirty = draftName.trim() !== (activeCanvasName || 'Fluid Node Canvas');
+  const displayCanvasName = activeCanvasName || activeCanvasFromList?.name || DEFAULT_CANVAS_NAME;
+  const isNameDirty = draftName.trim() !== (activeCanvasName || DEFAULT_CANVAS_NAME);
   const canSave = user && !isBusy && (!activeCanvasId || isCanvasDirty || isNameDirty);
   const currentCanvasPayload = useMemo(() => buildCanvasPayload({
-    name: draftName.trim() || activeCanvasName || 'Fluid Node Canvas',
+    name: draftName.trim() || activeCanvasName || DEFAULT_CANVAS_NAME,
     nodes,
     edges,
     viewport: getViewport(),
@@ -1826,7 +1827,7 @@ const CanvasPersistencePanel = ({
   const showStorageWarning = currentPayloadBytes > CANVAS_STORAGE_WARNING_BYTES || currentMediaBytes > CANVAS_MEDIA_WARNING_BYTES;
 
   useEffect(() => {
-    setDraftName(activeCanvasName || 'Fluid Node Canvas');
+    setDraftName(activeCanvasName || DEFAULT_CANVAS_NAME);
   }, [activeCanvasName]);
 
   const refreshCanvases = useCallback(async () => {
@@ -1859,8 +1860,8 @@ const CanvasPersistencePanel = ({
     setCollapsedBranches(nextCollapsedBranches);
     setInteractionMode(nextInteractionMode);
     setActiveCanvasId(canvas.id);
-    setActiveCanvasName(canvas.name || 'Fluid Node Canvas');
-    setDraftName(canvas.name || 'Fluid Node Canvas');
+    setActiveCanvasName(canvas.name || DEFAULT_CANVAS_NAME);
+    setDraftName(canvas.name || DEFAULT_CANVAS_NAME);
     setIsCanvasDirty(false);
 
     if (snapshot.viewport && Number.isFinite(snapshot.viewport.zoom)) {
@@ -1902,7 +1903,7 @@ const CanvasPersistencePanel = ({
       const payload = await canvasApi.get(canvasId);
       applyCanvasSnapshot(payload.canvas);
       setStatus('Canvas loaded.');
-      onNotify?.(`Canvas loaded: ${payload.canvas?.name || 'Fluid Node Canvas'}.`);
+      onNotify?.(`Canvas loaded: ${payload.canvas?.name || DEFAULT_CANVAS_NAME}.`);
     } catch (err) {
       setStatus(err.message);
     } finally {
@@ -1998,7 +1999,7 @@ const CanvasPersistencePanel = ({
         setInteractionMode('pan');
         setActiveCanvasId(null);
         setActiveCanvasName('');
-        setDraftName('Fluid Node Canvas');
+        setDraftName(DEFAULT_CANVAS_NAME);
         setIsCanvasDirty(false);
         window.requestAnimationFrame(() => fitView({ duration: 350, nodes: [{ id: '1' }, { id: '2' }], maxZoom: 0.5 }));
         setStatus('Canvas deleted. You are back on an unsaved starter canvas.');
@@ -2017,7 +2018,7 @@ const CanvasPersistencePanel = ({
       return;
     }
 
-    const name = draftName.trim() || activeCanvasName || 'Fluid Node Canvas';
+    const name = draftName.trim() || activeCanvasName || DEFAULT_CANVAS_NAME;
     setStatus('Preparing canvas for save...');
     const optimized = await optimizeNodesForCanvasSave(nodes);
     if (optimized.changed) {
@@ -2210,7 +2211,7 @@ const CanvasPersistencePanel = ({
         <button type="button" onClick={onToggleCollapse} style={sectionToggleStyle} aria-expanded={!isCollapsed} aria-label={isCollapsed ? 'Open canvas section' : 'Close canvas section'}>
           <span>
             <span style={{ display: 'block', fontSize: '0.62rem', color: 'rgba(255,255,255,0.48)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Canvas</span>
-            <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 850, lineHeight: 1.15 }}>{user ? displayCanvasName : 'Login required'}</span>
+            <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 850, lineHeight: 1.15 }}>{displayCanvasName}</span>
           </span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease', color: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>
             <polyline points="6 9 12 15 18 9" />
