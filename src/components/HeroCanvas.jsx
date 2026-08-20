@@ -127,6 +127,23 @@ const formatBytes = (bytes) => {
   return `${(bytes / 1000000).toFixed(bytes > 10000000 ? 0 : 1)} MB`;
 };
 
+const noteDateFromNode = (id, data = {}) => {
+  const explicitDate = data.createdAt || data.createdDate || data.dateStamp;
+  const parsedExplicitDate = explicitDate ? new Date(explicitDate) : null;
+  if (parsedExplicitDate && !Number.isNaN(parsedExplicitDate.getTime())) return parsedExplicitDate;
+
+  const idTimestamp = String(id || '').match(/^note-(\d{10,})-/)?.[1];
+  const parsedIdDate = idTimestamp ? new Date(Number(idTimestamp)) : null;
+  if (parsedIdDate && !Number.isNaN(parsedIdDate.getTime())) return parsedIdDate;
+
+  return null;
+};
+
+const formatNoteDateStamp = (id, data = {}) => {
+  const date = noteDateFromNode(id, data);
+  return date ? date.toISOString().slice(0, 10) : '';
+};
+
 const safeFileName = (value, fallback = 'fluid-node-canvas') => {
   const cleaned = String(value || fallback)
     .trim()
@@ -1021,6 +1038,7 @@ const StickyNoteNode = ({ id, data, selected, width, height }) => {
   const [draftText, setDraftText] = useState(data.text || '');
   const { zoom } = useViewport();
   const canEditNote = data.isEditMode !== false;
+  const dateStamp = formatNoteDateStamp(id, data);
   const deleteTimeoutRef = useRef(null);
   const deleteIntervalRef = useRef(null);
   const [deleteCountdown, setDeleteCountdown] = useState(null);
@@ -1203,6 +1221,26 @@ const StickyNoteNode = ({ id, data, selected, width, height }) => {
           <circle cx="15" cy="12" r="2" />
           <circle cx="24" cy="12" r="2" />
         </svg>
+        {dateStamp && (
+          <time
+            dateTime={dateStamp}
+            title={`Created ${dateStamp}`}
+            style={{
+              flex: 1,
+              textAlign: 'center',
+              fontFamily: 'Inter, sans-serif',
+              fontSize: '0.62rem',
+              lineHeight: 1,
+              fontWeight: 900,
+              letterSpacing: '0.08em',
+              color: 'rgba(51,37,0,0.54)',
+              whiteSpace: 'nowrap',
+              userSelect: 'none'
+            }}
+          >
+            {dateStamp}
+          </time>
+        )}
         {canEditNote && (
           <div
             className="nodrag nopan"
@@ -4072,6 +4110,7 @@ export default function HeroCanvas() {
       position,
       data: {
         text,
+        createdAt: new Date().toISOString(),
         noteWidth: NOTE_WIDTH,
         noteHeight: NOTE_HEIGHT,
         nodeGroup: 'notes'
