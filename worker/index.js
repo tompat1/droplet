@@ -7,6 +7,7 @@ const CANVAS_ASSET_REF_FLAG = '__dropletCanvasAsset';
 const CONCIERGE_MODEL = '@cf/meta/llama-3.1-8b-instruct';
 const MAX_CONCIERGE_ASSETS = 36;
 const MAX_CONCIERGE_HISTORY = 8;
+const MAX_GENERATION_REFERENCE_CHARS = 8000000;
 const GENERATION_PROVIDERS = {
   cloudflare_flux_klein: {
     label: 'Cloudflare FLUX.2 Klein',
@@ -1931,7 +1932,8 @@ function cloudflareGuidance(quality) {
 }
 
 async function referenceUrlToBlob(url) {
-  const value = cleanText(url, 2000000);
+  const value = String(url || '').trim();
+  if (value.length > MAX_GENERATION_REFERENCE_CHARS) return null;
   const dataMatch = value.match(/^data:(image\/(?:png|jpe?g|webp|gif));base64,([a-z0-9+/=]+)$/i);
   if (dataMatch) {
     const bytes = Uint8Array.from(atob(dataMatch[2]), (char) => char.charCodeAt(0));
@@ -2003,7 +2005,7 @@ function normalizeUrlList(value) {
 
 function normalizeReferenceUrl(value) {
   const raw = String(value || '').trim();
-  if (/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(raw) && raw.length <= 2000000) {
+  if (/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(raw) && raw.length <= MAX_GENERATION_REFERENCE_CHARS) {
     return raw;
   }
 
