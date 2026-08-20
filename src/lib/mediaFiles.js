@@ -26,11 +26,17 @@ export function readImageFileAsDataUrl(file, options = {}) {
   const maxDimension = options.maxDimension || 1400;
   const maxBytes = options.maxBytes || DEFAULT_MAX_IMAGE_BYTES;
 
-  if (!file?.type?.startsWith('image/')) {
+  const isSvg = file?.type === 'image/svg+xml' || /\.svg$/i.test(file?.name || '');
+
+  if (!file?.type?.startsWith('image/') && !isSvg) {
     return Promise.reject(new Error('Choose an image file.'));
   }
 
-  if (file.type === 'image/svg+xml' || file.type === 'image/gif') {
+  if (isSvg) {
+    return readSvgImageFileAsWebp(file, { maxDimension, maxBytes });
+  }
+
+  if (file.type === 'image/gif') {
     return readRawImageFile(file, maxBytes);
   }
 
@@ -119,6 +125,91 @@ export function compressImageDataUrl(dataUrl, options = {}) {
     };
     image.src = source;
   });
+}
+
+function readSvgImageFileAsWebp(file, options = {}) {
+  const maxDimension = options.maxDimension || 1400;
+  const maxBytes = options.maxBytes || DEFAULT_MAX_IMAGE_BYTES;
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read that SVG.'));
+    reader.onload = () => {
+      const svgText = String(reader.result || '');
+      const svgBlob = new Blob([svgText], { type: 'image/svg+xml' });
+      const objectUrl = URL.createObjectURL(svgBlob);
+      const image = new Image();
+
+      image.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('Could not convert that SVG to WebP.'));
+      };
+      image.onload = () => {
+        try {
+          const dimensions = svgDimensions(svgText);
+          const sourceWidth = image.naturalWidth || image.width || dimensions.width || maxDimension;
+          const sourceHeight = image.naturalHeight || image.height || dimensions.height || maxDimension;
+          let scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
+          let best = '';
+
+          for (let attempt = 0; attempt < 8; attempt += 1) {
+            const width = Math.max(96, Math.round(sourceWidth * scale));
+            const height = Math.max(96, Math.round(sourceHeight * scale));
+            const quality = Math.max(0.5, 0.9 - attempt * 0.06);
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = width;
+            canvas.height = height;
+            context.clearRect(0, 0, width, height);
+            context.drawImage(image, 0, 0, width, height);
+            best = canvas.toDataURL('image/webp', quality);
+            if (estimatedDataUrlBytes(best) <= maxBytes) {
+              URL.revokeObjectURL(objectUrl);
+              resolve(best);
+              return;
+            }
+            scale *= 0.82;
+          }
+
+          URL.revokeObjectURL(objectUrl);
+          if (estimatedDataUrlBytes(best) <= maxBytes * 1.25) {
+            resolve(best);
+            return;
+          }
+          reject(new Error('That SVG is too large after WebP conversion. Try a simpler export.'));
+        } catch {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error('Could not convert that SVG to WebP.'));
+        }
+      };
+
+      image.src = objectUrl;
+    };
+    reader.readAsText(file);
+  });
+}
+
+function svgDimensions(svgText) {
+  try {
+    const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+    const svg = doc.querySelector('svg');
+    const width = parseSvgLength(svg?.getAttribute('width'));
+    const height = parseSvgLength(svg?.getAttribute('height'));
+    if (width && height) return { width, height };
+    const viewBox = String(svg?.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
+    if (viewBox.length === 4 && Number.isFinite(viewBox[2]) && Number.isFinite(viewBox[3])) {
+      return { width: viewBox[2], height: viewBox[3] };
+    }
+  } catch {
+    // Fall through to default dimensions.
+  }
+  return { width: 1024, height: 1024 };
+}
+
+function parseSvgLength(value) {
+  const match = String(value || '').trim().match(/^([0-9.]+)/);
+  const number = match ? Number(match[1]) : 0;
+  return Number.isFinite(number) && number > 0 ? number : 0;
 }
 
 function readRawImageFile(file, maxBytes) {

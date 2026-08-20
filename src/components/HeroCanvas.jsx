@@ -17,6 +17,7 @@ import '@xyflow/react/dist/style.css';
 
 import BrandCard from './BrandCard';
 import MediaModal from './MediaModal';
+import DropletLoader from './DropletLoader';
 import assetFiles from '../assetsData.json';
 import { defaultAssetTags } from '../defaultTags';
 import { useAuth } from './AuthContext';
@@ -118,7 +119,11 @@ const isEditableTarget = (target) => (
   Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
 );
 
-const imageFilesFromList = (files) => Array.from(files || []).filter((file) => file?.type?.startsWith('image/'));
+const isSvgFile = (file) => file?.type === 'image/svg+xml' || /\.svg$/i.test(file?.name || '');
+
+const imageFilesFromList = (files) => Array.from(files || []).filter((file) => (
+  file?.type?.startsWith('image/') || isSvgFile(file)
+));
 
 const estimatedJsonBytes = (value) => new Blob([JSON.stringify(value)]).size;
 
@@ -163,87 +168,6 @@ const escapeSvgText = (value) => String(value || '').replace(/[&<>"']/g, (char) 
   '"': '&quot;',
   "'": '&#39;'
 }[char]));
-
-const generationReferenceUrl = (value) => {
-  const raw = String(value || '').trim();
-  if (!raw || raw.startsWith('data:') || typeof window === 'undefined') return raw;
-  try {
-    return new URL(raw, window.location.origin).toString();
-  } catch {
-    return raw;
-  }
-};
-
-const uniqueGenerationRefs = (refs, excludedRefs = []) => {
-  const excluded = new Set(excludedRefs.map(generationReferenceUrl).filter(Boolean));
-  return Array.from(new Set(refs.map(generationReferenceUrl).filter(Boolean)))
-    .filter((ref) => !excluded.has(ref));
-};
-
-const isGenerationPolicyRefusal = (message) => (
-  /\b3030\b|flagged|moderation|content policy|safety filter|safety system|blocked by policy|safety reasons/i.test(String(message || ''))
-);
-
-const loadCanvasImage = (src) => new Promise((resolve, reject) => {
-  const image = new Image();
-  if (!String(src || '').startsWith('data:')) image.crossOrigin = 'anonymous';
-  image.onload = () => resolve(image);
-  image.onerror = () => reject(new Error('Could not load reference image for local fallback.'));
-  image.src = src;
-});
-
-const compositeReferenceArtwork = async ({ targetImage, referenceImage }) => {
-  const [target, reference] = await Promise.all([
-    loadCanvasImage(targetImage),
-    loadCanvasImage(referenceImage)
-  ]);
-  const width = Math.min(1400, Math.max(640, target.naturalWidth || target.width || 1024));
-  const height = Math.round(width * ((target.naturalHeight || target.height || width) / (target.naturalWidth || target.width || width)));
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Could not create local reference render.');
-
-  ctx.drawImage(target, 0, 0, width, height);
-  const artworkSize = Math.min(width, height) * 0.24;
-  const refRatio = (reference.naturalWidth || reference.width || 1) / (reference.naturalHeight || reference.height || 1);
-  const refWidth = refRatio >= 1 ? artworkSize : artworkSize * refRatio;
-  const refHeight = refRatio >= 1 ? artworkSize / refRatio : artworkSize;
-  const x = (width - refWidth) / 2;
-  const y = height * 0.34 - refHeight / 2;
-
-  ctx.save();
-  ctx.globalAlpha = 0.96;
-  ctx.shadowColor = 'rgba(0,0,0,0.32)';
-  ctx.shadowBlur = Math.max(8, width * 0.012);
-  ctx.shadowOffsetY = Math.max(2, width * 0.004);
-  ctx.drawImage(reference, x, y, refWidth, refHeight);
-  ctx.restore();
-
-  return canvas.toDataURL('image/png', 0.92);
-};
-
-const rasterizeReferenceForGeneration = async (src, maxDimension = 1024) => {
-  const value = String(src || '').trim();
-  if (!value) return '';
-  if (!/^data:image\/svg\+xml/i.test(value) && !/\.svg($|\?)/i.test(value)) return value;
-
-  const image = await loadCanvasImage(value);
-  const sourceWidth = image.naturalWidth || image.width || maxDimension;
-  const sourceHeight = image.naturalHeight || image.height || maxDimension;
-  const scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
-  const width = Math.max(64, Math.round(sourceWidth * scale));
-  const height = Math.max(64, Math.round(sourceHeight * scale));
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return value;
-  ctx.clearRect(0, 0, width, height);
-  ctx.drawImage(image, 0, 0, width, height);
-  return canvas.toDataURL('image/png', 0.92);
-};
 
 const makeConciergeGeneratedPlaceholder = ({ isVideo, title, prompt, providerLabel = '' }) => {
   const escapedTitle = escapeSvgText(title).slice(0, 80);
@@ -3402,6 +3326,8 @@ export default function HeroCanvas() {
   
   const [interactionMode, setInteractionMode] = useState('pan');
   const [isImportDragActive, setIsImportDragActive] = useState(false);
+  const [isImportProcessing, setIsImportProcessing] = useState(false);
+  const [importProcessingLabel, setImportProcessingLabel] = useState('Importing images');
   const [isPlacingLabel, setIsPlacingLabel] = useState(false);
   const [isPlacingNote, setIsPlacingNote] = useState(false);
   const [activeDropLabelId, setActiveDropLabelId] = useState(null);
@@ -3695,40 +3621,14 @@ export default function HeroCanvas() {
     }
   }, [containerCenterCanvasPoint, loadUsageSummary, selectedCardIds, setPersistentEdges, setPersistentNodes, showCanvasActionToast, user]);
 
-  const createReferenceRenderBranch = useCallback(async ({ sourceId, targetId, edge }) => {
+  const createReferenceLink = useCallback(({ sourceId, targetId, edge }) => {
     if (!sourceId || !targetId || sourceId === targetId) return;
-    if (!user) {
-      setCanvasStatus('Login is required before rendering reference links.');
-      showCanvasActionToast('Login is required before rendering reference links.');
-      return;
-    }
 
     const sourceNodes = nodesRef.current;
     const referenceNode = sourceNodes.find((node) => node.id === sourceId && node.type === 'brandCard');
     const targetNode = sourceNodes.find((node) => node.id === targetId && node.type === 'brandCard');
     if (!referenceNode || !targetNode) return;
 
-    let referenceImage = generationReferenceUrl(referenceNode.data?.image || '');
-    let targetImage = generationReferenceUrl(targetNode.data?.image || '');
-    if (!referenceImage || !targetImage) {
-      const message = 'Reference render needs two image cards.';
-      setCanvasStatus(message);
-      showCanvasActionToast(message);
-      return;
-    }
-    try {
-      [referenceImage, targetImage] = await Promise.all([
-        rasterizeReferenceForGeneration(referenceImage),
-        rasterizeReferenceForGeneration(targetImage)
-      ]);
-    } catch {
-      const message = 'Could not prepare those reference images for rendering.';
-      setCanvasStatus(message);
-      showCanvasActionToast(message);
-      return;
-    }
-
-    const provider = CONCIERGE_GENERATION_PROVIDERS.image;
     const edgeId = edge?.id || `reference-${sourceId}-${targetId}`;
     const referenceEdge = {
       id: edgeId,
@@ -3750,197 +3650,13 @@ export default function HeroCanvas() {
       }
     };
 
-    setPersistentEdges((eds) => (
-      eds.some((candidate) => candidate.id === edgeId)
-        ? eds
-        : [...eds, referenceEdge]
-    ));
-
-    const brandGuideNodes = brandGuideNodesForAssets([targetNode, referenceNode], sourceNodes);
-    const brandGuideRefs = brandGuideNodes
-      .map((node) => node.data?.image)
-      .filter(Boolean);
-    const refs = uniqueGenerationRefs([referenceImage, ...brandGuideRefs], [targetImage]);
-    const brandGuide = {
-      nodes: brandGuideNodes.map(brandGuidePayloadFromNode)
-    };
-    const prompt = [
-      `Create a clean merchandise mockup using "${targetNode.data?.title || 'the target product'}" as the base product and "${referenceNode.data?.title || 'the reference artwork'}" as the decoration artwork.`,
-      'Keep the base product shape, camera angle, lighting, background, material texture, color, and composition stable.',
-      'Place the decoration artwork naturally on the visible front area, scaled like professional product decoration, with crisp edges.'
-    ].join(' ');
-    const branchIndex = sourceNodes.filter((node) => node.data?.generatedFromNodeId === targetNode.id).length;
-    const offsetY = branchIndex === 0 ? 0 : Math.ceil(branchIndex / 2) * 330 * (branchIndex % 2 === 0 ? -1 : 1);
-    const newNodeId = `reference-render-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const originPoint = {
-      x: Number(targetNode.position?.x || 0) + 430,
-      y: Number(targetNode.position?.y || 0) + offsetY
-    };
-
-    setCanvasStatus(`Rendering ${referenceNode.data?.title || 'reference'} onto ${targetNode.data?.title || 'target asset'}...`);
-    showCanvasActionToast('Reference link connected. Rendering a new card...');
-
-    try {
-      const result = await generationApi.createBranch({
-        provider: provider.provider,
-        pipeline: provider.pipeline,
-        prompt,
-        refs,
-        brandGuide,
-        parent: {
-          id: targetNode.id,
-          title: targetNode.data?.title || '',
-          subtitle: targetNode.data?.subtitle || '',
-          description: targetNode.data?.description || '',
-          image: targetImage
-        }
-      });
-
-      const title = result?.branch?.title || `${targetNode.data?.title || 'Product'} + ${referenceNode.data?.title || 'Reference'}`;
-      const mediaUrl = result?.branch?.imageDataUrl || result?.branch?.imageUrl || result?.branch?.posterUrl || '';
-      const newNode = {
-        id: newNodeId,
-        type: 'brandCard',
-        position: originPoint,
-        selected: true,
-        data: {
-          title,
-          subtitle: result?.branch?.subtitle || `Reference render from ${referenceNode.data?.title || 'linked card'}`,
-          description: result?.branch?.description || prompt,
-          image: mediaUrl || makeConciergeGeneratedPlaceholder({
-            isVideo: false,
-            title,
-            prompt,
-            providerLabel: provider.shortLabel
-          }),
-          isGenerated: true,
-          generatedFromNodeId: targetNode.id,
-          generationPipeline: provider.pipeline,
-          generationProvider: provider.provider,
-          generationProviderLabel: provider.label,
-          generationModel: result?.branch?.model || '',
-          generationPrompt: prompt,
-          generationRefs: refs,
-          generationBrandGuideNodeIds: brandGuide.nodes.map((node) => node.id),
-          generationStatus: result?.branch?.status || (result?.mock ? 'mock' : 'ready'),
-          generationMock: result?.mock === true || result?.branch?.mock === true,
-          generationUsage: result?.usage || result?.branch?.usage || null,
-          referenceSourceNodeId: referenceNode.id,
-          referenceSourceTitle: referenceNode.data?.title || '',
-          nodeGroup: `generated-${targetNode.id}`,
-          labelGroupId: targetNode.data?.labelGroupId || undefined,
-          labelTitle: targetNode.data?.labelTitle || undefined,
-          sourceFolderName: targetNode.data?.sourceFolderName || undefined
-        }
-      };
-      const generatedEdge = {
-        id: `e-${targetNode.id}-${newNodeId}`,
-        source: String(targetNode.id),
-        target: String(newNodeId),
-        type: 'smoothstep',
-        animated: true,
-        style: { stroke: provider.accent, strokeWidth: 4 }
-      };
-      const labelEdge = targetNode.data?.labelGroupId ? {
-        id: `label-${targetNode.data.labelGroupId}-${newNodeId}`,
-        source: String(targetNode.data.labelGroupId),
-        target: String(newNodeId),
-        type: 'smoothstep',
-        animated: true,
-        data: { isLabelLink: true, labelId: targetNode.data.labelGroupId },
-        style: { stroke: 'rgba(0,255,204,0.72)', strokeWidth: 3 }
-      } : null;
-
-      setPersistentNodes((nds) => [...nds.map((node) => ({ ...node, selected: false })), newNode]);
-      setPersistentEdges((eds) => [...eds, ...[generatedEdge, labelEdge].filter(Boolean)]);
-      setSelectedNodeIds([newNodeId]);
-      setIsEditMode(true);
-      loadUsageSummary();
-      window.requestAnimationFrame(() => {
-        reactFlowInstanceRef.current?.setCenter?.(newNode.position.x + 160, newNode.position.y + 180, { zoom: 0.9, duration: 700 });
-      });
-
-      const message = `Rendered ${referenceNode.data?.title || 'reference'} onto ${targetNode.data?.title || 'target asset'}.`;
-      setCanvasStatus(message);
-      showCanvasActionToast(message);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Reference render failed.';
-      if (isGenerationPolicyRefusal(message)) {
-        try {
-          const fallbackImage = await compositeReferenceArtwork({ targetImage, referenceImage });
-          const title = `${targetNode.data?.title || 'Product'} + ${referenceNode.data?.title || 'Reference'}`;
-          const fallbackNodeId = `reference-composite-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-          const fallbackNode = {
-            id: fallbackNodeId,
-            type: 'brandCard',
-            position: originPoint,
-            selected: true,
-            data: {
-              title,
-              subtitle: `Local reference composite from ${referenceNode.data?.title || 'linked card'}`,
-              description: `${prompt}\n\nAI provider refused this reference edit, so Droplet created a local composite fallback.`,
-              image: fallbackImage,
-              isGenerated: true,
-              generatedFromNodeId: targetNode.id,
-              generationPipeline: provider.pipeline,
-              generationProvider: 'local_reference_composite',
-              generationProviderLabel: 'Local Reference Composite',
-              generationModel: 'browser-canvas',
-              generationPrompt: prompt,
-              generationRefs: refs,
-              generationBrandGuideNodeIds: brandGuide.nodes.map((node) => node.id),
-              generationStatus: 'fallback',
-              generationMock: true,
-              generationUsage: null,
-              referenceSourceNodeId: referenceNode.id,
-              referenceSourceTitle: referenceNode.data?.title || '',
-              nodeGroup: `generated-${targetNode.id}`,
-              labelGroupId: targetNode.data?.labelGroupId || undefined,
-              labelTitle: targetNode.data?.labelTitle || undefined,
-              sourceFolderName: targetNode.data?.sourceFolderName || undefined
-            }
-          };
-          const fallbackEdge = {
-            id: `e-${targetNode.id}-${fallbackNodeId}`,
-            source: String(targetNode.id),
-            target: String(fallbackNodeId),
-            type: 'smoothstep',
-            animated: true,
-            style: { stroke: provider.accent, strokeWidth: 4 }
-          };
-          const labelEdge = targetNode.data?.labelGroupId ? {
-            id: `label-${targetNode.data.labelGroupId}-${fallbackNodeId}`,
-            source: String(targetNode.data.labelGroupId),
-            target: String(fallbackNodeId),
-            type: 'smoothstep',
-            animated: true,
-            data: { isLabelLink: true, labelId: targetNode.data.labelGroupId },
-            style: { stroke: 'rgba(0,255,204,0.72)', strokeWidth: 3 }
-          } : null;
-
-          setPersistentNodes((nds) => [...nds.map((node) => ({ ...node, selected: false })), fallbackNode]);
-          setPersistentEdges((eds) => [...eds, ...[fallbackEdge, labelEdge].filter(Boolean)]);
-          setSelectedNodeIds([fallbackNodeId]);
-          setIsEditMode(true);
-          window.requestAnimationFrame(() => {
-            reactFlowInstanceRef.current?.setCenter?.(fallbackNode.position.x + 160, fallbackNode.position.y + 180, { zoom: 0.9, duration: 700 });
-          });
-
-          const fallbackMessage = 'AI safety refused the edit, so Droplet created a local composite card.';
-          setCanvasStatus(fallbackMessage);
-          showCanvasActionToast(fallbackMessage);
-          return;
-        } catch (fallbackError) {
-          const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : 'Local reference fallback failed.';
-          setCanvasStatus(fallbackMessage);
-          showCanvasActionToast(fallbackMessage);
-          return;
-        }
-      }
-      setCanvasStatus(message);
-      showCanvasActionToast(message);
-    }
-  }, [loadUsageSummary, setPersistentEdges, setPersistentNodes, showCanvasActionToast, user]);
+    setPersistentEdges((eds) => {
+      const withoutDuplicate = eds.filter((candidate) => candidate.id !== edgeId);
+      return [...withoutDuplicate, referenceEdge];
+    });
+    setCanvasStatus(`${referenceNode.data?.title || 'Reference'} linked to ${targetNode.data?.title || 'target card'}.`);
+    showCanvasActionToast('Reference connected. Prompt the target card to use it.');
+  }, [setPersistentEdges, showCanvasActionToast]);
 
   const organizeCanvasForConcierge = useCallback(async () => {
     const sourceNodes = nodesRef.current;
@@ -4023,56 +3739,69 @@ export default function HeroCanvas() {
     if (imageFiles.length === 0) return { nodeIds: [], count: 0 };
 
     const skippedCount = imageFilesFromList(files).length - imageFiles.length;
-    setCanvasStatus(`Importing ${imageFiles.length} image${imageFiles.length === 1 ? '' : 's'}...`);
+    const svgCount = imageFiles.filter(isSvgFile).length;
+    const importingText = `Importing ${imageFiles.length} image${imageFiles.length === 1 ? '' : 's'}...`;
+    setCanvasStatus(svgCount > 0 ? `Converting ${svgCount} SVG${svgCount === 1 ? '' : 's'} to WebP...` : importingText);
+    setImportProcessingLabel(svgCount > 0 ? `Converting ${svgCount} SVG${svgCount === 1 ? '' : 's'} to WebP` : 'Importing images');
+    setIsImportProcessing(true);
 
-    const importedNodes = [];
-    const failedNames = [];
-    for (let index = 0; index < imageFiles.length; index += 1) {
-      const file = imageFiles[index];
-      try {
-        const image = await readImageFileAsDataUrl(file, CANVAS_IMPORT_IMAGE_OPTIONS);
-        const column = index % 3;
-        const row = Math.floor(index / 3);
-        importedNodes.push({
-          id: `import-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
-          type: 'brandCard',
-          position: {
-            x: originPoint.x + column * IMPORT_GRID_X,
-            y: originPoint.y + row * IMPORT_GRID_Y
-          },
-          data: {
-            title: titleFromFileName(file.name),
-            subtitle: source === 'paste' ? 'Pasted Image' : 'Imported Asset',
-            image,
-            description: source === 'paste'
-              ? 'Pasted into the Fluid Node Canvas. Use it as a reference, branch from it, or fold it into the brand system.'
-              : `Uploaded from ${file.name || 'device'}. Use it as a reference, branch from it, or fold it into the brand system.`,
-            nodeGroup: 'imports',
-            isImported: true,
-            importedAt: new Date().toISOString()
-          }
-        });
-      } catch (error) {
-        failedNames.push(file.name || `image ${index + 1}`);
-        console.warn('Image import failed:', error);
+    try {
+      const importedNodes = [];
+      const failedNames = [];
+      for (let index = 0; index < imageFiles.length; index += 1) {
+        const file = imageFiles[index];
+        try {
+          const image = await readImageFileAsDataUrl(file, CANVAS_IMPORT_IMAGE_OPTIONS);
+          const column = index % 3;
+          const row = Math.floor(index / 3);
+          importedNodes.push({
+            id: `import-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+            type: 'brandCard',
+            position: {
+              x: originPoint.x + column * IMPORT_GRID_X,
+              y: originPoint.y + row * IMPORT_GRID_Y
+            },
+            data: {
+              title: titleFromFileName(file.name),
+              subtitle: source === 'paste' ? 'Pasted Image' : 'Imported Asset',
+              image,
+              description: source === 'paste'
+                ? 'Pasted into the Fluid Node Canvas. Use it as a reference, branch from it, or fold it into the brand system.'
+                : `Uploaded from ${file.name || 'device'}. Use it as a reference, branch from it, or fold it into the brand system.`,
+              nodeGroup: 'imports',
+              isImported: true,
+              importedAt: new Date().toISOString()
+            }
+          });
+        } catch (error) {
+          failedNames.push(file.name || `image ${index + 1}`);
+          console.warn('Image import failed:', error);
+        }
       }
-    }
 
-    if (importedNodes.length > 0) {
-      setNodes((nds) => [...nds, ...importedNodes]);
-      setIsCanvasDirty(true);
-      setIsEditMode(true);
-    }
+      if (importedNodes.length > 0) {
+        setNodes((nds) => [...nds, ...importedNodes]);
+        setIsCanvasDirty(true);
+        setIsEditMode(true);
+      }
 
-    const importedText = importedNodes.length === 1 ? 'Imported 1 image.' : `Imported ${importedNodes.length} images.`;
-    const skippedText = skippedCount > 0 ? ` Skipped ${skippedCount} over the ${MAX_IMPORT_FILES}-file limit.` : '';
-    const failedText = failedNames.length > 0 ? ` ${failedNames.length} could not be imported.` : '';
-    setCanvasStatus(importedNodes.length > 0 ? `${importedText}${skippedText}${failedText}` : `No images imported.${failedText}`);
-    if (importedNodes.length > 0 && source !== 'folder') showCanvasActionToast(importedText);
-    return {
-      nodeIds: importedNodes.map((node) => node.id),
-      count: importedNodes.length
-    };
+      const importedText = importedNodes.length === 1 ? 'Imported 1 image.' : `Imported ${importedNodes.length} images.`;
+      const convertedText = svgCount > 0 ? ` Converted ${svgCount} SVG${svgCount === 1 ? '' : 's'} to WebP.` : '';
+      const skippedText = skippedCount > 0 ? ` Skipped ${skippedCount} over the ${MAX_IMPORT_FILES}-file limit.` : '';
+      const failedText = failedNames.length > 0 ? ` ${failedNames.length} could not be imported.` : '';
+      setCanvasStatus(importedNodes.length > 0 ? `${importedText}${convertedText}${skippedText}${failedText}` : `No images imported.${failedText}`);
+      if (svgCount > 0 && importedNodes.length > 0) {
+        showCanvasActionToast(`Converted ${svgCount} SVG${svgCount === 1 ? '' : 's'} to WebP and added ${importedNodes.length} card${importedNodes.length === 1 ? '' : 's'}.`);
+      } else if (importedNodes.length > 0 && source !== 'folder') {
+        showCanvasActionToast(importedText);
+      }
+      return {
+        nodeIds: importedNodes.map((node) => node.id),
+        count: importedNodes.length
+      };
+    } finally {
+      setIsImportProcessing(false);
+    }
   }, [setNodes, showCanvasActionToast]);
 
   const createLabelForImportedCards = useCallback((title, cardIds, originPoint, folderIndex = 0) => {
@@ -5026,7 +4755,7 @@ export default function HeroCanvas() {
   const onConnect = useCallback(
     (params) => {
       if (params.sourceHandle === REFERENCE_SOURCE_HANDLE && params.targetHandle === REFERENCE_TARGET_HANDLE) {
-        createReferenceRenderBranch({
+        createReferenceLink({
           sourceId: params.source,
           targetId: params.target,
           edge: params
@@ -5037,7 +4766,7 @@ export default function HeroCanvas() {
       setIsCanvasDirty(true);
       setEdges((eds) => addEdge({ ...params, animated: true, style: { stroke: 'rgba(255,255,255,0.5)', strokeWidth: 2 } }, eds));
     },
-    [createReferenceRenderBranch, setEdges]
+    [createReferenceLink, setEdges]
   );
 
   const handleNodesChange = useCallback((changes) => {
@@ -5249,6 +4978,39 @@ export default function HeroCanvas() {
           zoomable={true}
         />
       </ReactFlow>
+
+      {isImportProcessing && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: '18px',
+            zIndex: 32,
+            pointerEvents: 'none',
+            border: '1px solid rgba(0,255,204,0.62)',
+            borderRadius: '18px',
+            background: 'rgba(2, 8, 12, 0.64)',
+            boxShadow: '0 0 0 1px rgba(75,94,250,0.35), 0 24px 90px rgba(0,0,0,0.45), inset 0 0 40px rgba(0,255,204,0.08)',
+            backdropFilter: 'blur(10px)',
+            display: 'grid',
+            placeItems: 'center'
+          }}
+        >
+          <div
+            style={{
+              minWidth: '260px',
+              minHeight: '220px',
+              display: 'grid',
+              placeItems: 'center',
+              borderRadius: '16px',
+              border: '1px solid rgba(255,255,255,0.14)',
+              background: 'rgba(8,8,14,0.82)',
+              boxShadow: '0 18px 48px rgba(0,0,0,0.38)'
+            }}
+          >
+            <DropletLoader label={importProcessingLabel} size={148} compact />
+          </div>
+        </div>
+      )}
 
       {isImportDragActive && (
         <div

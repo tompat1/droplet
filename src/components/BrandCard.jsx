@@ -647,21 +647,38 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       }
 
       const existingNodes = getNodes();
+      const existingEdges = getEdges();
       const branchIndex = existingNodes.filter((node) => node.data?.generatedFromNodeId === id).length;
       const brandGuideNodes = brandGuideNodesForAsset(parentNode, existingNodes);
       const brandGuideRefs = brandGuideNodes
         .map((node) => node.data?.image)
         .map(generationReferenceUrl)
         .filter(Boolean);
+      const connectedReferenceIds = new Set(existingEdges
+        .filter((edge) => (
+          edge.target === id &&
+          (edge.data?.isReferenceRenderLink === true || edge.targetHandle === REFERENCE_TARGET_HANDLE)
+        ))
+        .map((edge) => edge.source)
+        .filter(Boolean));
+      const connectedReferenceNodes = existingNodes.filter((node) => connectedReferenceIds.has(node.id) && node.type === 'brandCard');
+      const connectedReferenceRefs = connectedReferenceNodes
+        .map((node) => node.data?.image)
+        .map(generationReferenceUrl)
+        .filter(Boolean);
+      const connectedReferenceHint = connectedReferenceNodes.length > 0
+        ? `Connected reference cards: ${connectedReferenceNodes.map((node) => `"${node.data?.title || 'Reference'}"`).join(', ')}. Use these connected references when the prompt asks for a connected logo, artwork, mark, or reference.`
+        : '';
+      const generationPrompt = connectedReferenceHint ? `${prompt}\n\n${connectedReferenceHint}` : prompt;
       const parentImageRef = generationReferenceUrl(data.image || '');
-      const mergedRefs = uniqueGenerationRefs([...brandGuideRefs, ...genRefs], [parentImageRef]);
+      const mergedRefs = uniqueGenerationRefs([...connectedReferenceRefs, ...brandGuideRefs, ...genRefs], [parentImageRef]);
       const brandGuide = {
         nodes: brandGuideNodes.map(brandGuidePayloadFromNode)
       };
       const result = await generationApi.createBranch({
         provider: providerKey,
         pipeline: provider.pipeline,
-        prompt,
+        prompt: generationPrompt,
         refs: mergedRefs,
         brandGuide,
         parent: {
@@ -676,7 +693,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         result.branch.refs = mergedRefs;
         result.branch.brandGuideNodeIds = brandGuide.nodes.map((node) => node.id);
       }
-      const newNode = buildGeneratedNode({ providerKey, prompt, branchIndex, parentNode, result });
+      const newNode = buildGeneratedNode({ providerKey, prompt: generationPrompt, branchIndex, parentNode, result });
 
       const newEdge = { 
         id: `e-${id}-${newNode.id}`, source: String(id), target: String(newNode.id), type: 'smoothstep', animated: true, style: { stroke: provider.accent, strokeWidth: 4 } 
