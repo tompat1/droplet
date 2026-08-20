@@ -123,6 +123,12 @@ const generationReferenceUrl = (value) => {
   }
 };
 
+const uniqueGenerationRefs = (refs, excludedRefs = []) => {
+  const excluded = new Set(excludedRefs.map(generationReferenceUrl).filter(Boolean));
+  return Array.from(new Set(refs.map(generationReferenceUrl).filter(Boolean)))
+    .filter((ref) => !excluded.has(ref));
+};
+
 const brandGuideNodesForAsset = (assetNode, nodes) => {
   const allGuideNodes = nodes.filter(isBrandGuideNode);
   if (!assetNode) return allGuideNodes;
@@ -644,7 +650,8 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         .map((node) => node.data?.image)
         .map(generationReferenceUrl)
         .filter(Boolean);
-      const mergedRefs = Array.from(new Set([...brandGuideRefs, ...genRefs]));
+      const parentImageRef = generationReferenceUrl(data.image || '');
+      const mergedRefs = uniqueGenerationRefs([...brandGuideRefs, ...genRefs], [parentImageRef]);
       const brandGuide = {
         nodes: brandGuideNodes.map(brandGuidePayloadFromNode)
       };

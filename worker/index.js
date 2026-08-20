@@ -1167,6 +1167,28 @@ async function generateCloudflareFluxKlein9b(env, input) {
 }
 
 async function generateCloudflareFluxMultipart(env, input, model, titles) {
+  try {
+    return await runCloudflareFluxMultipart(env, input, model, titles);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!isGenerationPolicyRefusal(message) || cloudflareReferenceUrls(input).length <= 1) throw error;
+
+    const parentOnlyInput = {
+      ...input,
+      refs: [],
+      brandGuide: {
+        nodes: Array.isArray(input.brandGuide?.nodes)
+          ? input.brandGuide.nodes.map((node) => ({ ...node, image: '' }))
+          : []
+      }
+    };
+    return runCloudflareFluxMultipart(env, parentOnlyInput, model, titles, {
+      fallbackReason: 'Retried with selected asset only after provider safety refusal on extra references.'
+    });
+  }
+}
+
+async function runCloudflareFluxMultipart(env, input, model, titles, options = {}) {
   const prompt = buildCloudflareImagePrompt(input);
   const form = new FormData();
   form.append('prompt', prompt);
@@ -1201,7 +1223,8 @@ async function generateCloudflareFluxMultipart(env, input, model, titles) {
     imageDataUrl: `data:image/jpeg;base64,${imageBase64}`,
     model,
     referenceCount,
-    status: 'ready'
+    status: 'ready',
+    fallbackReason: options.fallbackReason || ''
   };
 }
 
@@ -1872,7 +1895,7 @@ function withReferenceContext(input) {
   const colorLock = brandColorLockSection(input);
   if (colorLock) sections.push(colorLock);
   if (input.refs.length > 0) {
-    sections.push(`Reference image URLs:\n${input.refs.map((ref, index) => `${index + 1}. ${ref}`).join('\n')}`);
+    sections.push(`Additional visual reference images are attached separately (${input.refs.length}). Use them for brand details only when relevant.`);
   }
 
   return sections.join('\n\n');
