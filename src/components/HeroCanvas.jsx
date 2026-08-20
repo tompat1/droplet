@@ -61,6 +61,8 @@ const CARD_GRID_X = 380;
 const CARD_GRID_Y = 430;
 const CARD_WIDTH = 320;
 const CARD_FALLBACK_HEIGHT = 430;
+const ARRANGE_CARD_FALLBACK_HEIGHT = 620;
+const ARRANGE_ROW_GAP = 120;
 const NOTE_WIDTH = 240;
 const NOTE_HEIGHT = 190;
 const NOTE_SIBLING_GAP = 28;
@@ -4167,15 +4169,18 @@ export default function HeroCanvas() {
     const originX = Math.min(...visibleCards.map((node) => Number(node.position?.x || 0)));
     const originY = Math.min(...visibleCards.map((node) => Number(node.position?.y || 0)));
     const nextPositions = new Map();
-    rows.forEach((row, rowIndex) => {
+    let nextRowY = originY;
+    rows.forEach((row) => {
+      const rowHeight = Math.max(...row.cards.map((card) => nodeBounds(card, CARD_WIDTH, ARRANGE_CARD_FALLBACK_HEIGHT).height));
       row.cards
         .sort((a, b) => Number(a.position?.x || 0) - Number(b.position?.x || 0))
         .forEach((card, columnIndex) => {
           nextPositions.set(card.id, {
             x: originX + columnIndex * CARD_GRID_X,
-            y: originY + rowIndex * CARD_GRID_Y
+            y: nextRowY
           });
         });
+      nextRowY += rowHeight + ARRANGE_ROW_GAP;
     });
 
     setPersistentNodes((nds) => nds.map((node) => nextPositions.has(node.id)
