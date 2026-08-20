@@ -113,6 +113,16 @@ const labelMemberIdsFromNodes = (labelNode, nodes) => {
   return [...memberIds];
 };
 
+const generationReferenceUrl = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw || raw.startsWith('data:') || typeof window === 'undefined') return raw;
+  try {
+    return new URL(raw, window.location.origin).toString();
+  } catch {
+    return raw;
+  }
+};
+
 const brandGuideNodesForAsset = (assetNode, nodes) => {
   const allGuideNodes = nodes.filter(isBrandGuideNode);
   if (!assetNode) return allGuideNodes;
@@ -141,7 +151,7 @@ const brandGuidePayloadFromNode = (node) => ({
   title: node.data?.title || '',
   subtitle: node.data?.subtitle || '',
   description: node.data?.description || '',
-  image: node.data?.image || '',
+  image: generationReferenceUrl(node.data?.image || ''),
   brandName: node.data?.brandName || '',
   colors: Array.isArray(node.data?.colors) ? node.data.colors : [],
   labelGroupId: node.data?.labelGroupId || '',
@@ -354,7 +364,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       const brandGuide = {
         nodes: brandGuideNodes.map(brandGuidePayloadFromNode)
       };
-      const refs = Array.from(new Set(Array.isArray(deletedData.generationRefs) ? deletedData.generationRefs : []));
+      const refs = Array.from(new Set((Array.isArray(deletedData.generationRefs) ? deletedData.generationRefs : []).map(generationReferenceUrl).filter(Boolean)));
       const result = await generationApi.createBranch({
         provider: providerKey,
         pipeline: provider.pipeline,
@@ -366,7 +376,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           title: parentNode.data?.title || '',
           subtitle: parentNode.data?.subtitle || '',
           description: parentNode.data?.description || '',
-          image: parentNode.data?.image || ''
+          image: generationReferenceUrl(parentNode.data?.image || '')
         } : {
           id: deletedData.generatedFromNodeId || 'rerender',
           title: deletedData.title || 'Deleted render',
@@ -632,6 +642,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       const brandGuideNodes = brandGuideNodesForAsset(parentNode, existingNodes);
       const brandGuideRefs = brandGuideNodes
         .map((node) => node.data?.image)
+        .map(generationReferenceUrl)
         .filter(Boolean);
       const mergedRefs = Array.from(new Set([...brandGuideRefs, ...genRefs]));
       const brandGuide = {
@@ -648,7 +659,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           title: data.title || '',
           subtitle: data.subtitle || '',
           description: data.description || '',
-          image: data.image || ''
+          image: generationReferenceUrl(data.image || '')
         }
       });
       if (result?.branch) {
