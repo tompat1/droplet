@@ -2778,6 +2778,8 @@ const CanvasToolbox = ({
     onStartNotePlacement();
     notify(isPlacingNote ? 'Sticky note placement cancelled.' : 'Sticky note placement on. Click the canvas to place it.');
   };
+  const canUndo = undoStack.length > 0;
+  const undoTitle = undoStack[0]?.label || 'Nothing to revert';
 
   const toolboxStyle = {
     width: isMinimized ? '58px' : 'min(332px, calc(100vw - 32px))',
@@ -2832,6 +2834,15 @@ const CanvasToolbox = ({
     background: 'linear-gradient(135deg, rgba(255, 106, 0, 0.24), rgba(255, 179, 71, 0.08))',
     color: '#ffb347',
     boxShadow: '0 0 16px rgba(255, 106, 0, 0.18), inset 0 1px 0 rgba(255,255,255,0.1)'
+  };
+
+  const undoButtonStyle = {
+    ...iconButtonStyle,
+    borderColor: canUndo ? 'rgba(255, 106, 0, 0.52)' : 'rgba(255,255,255,0.1)',
+    background: canUndo ? 'rgba(255, 106, 0, 0.16)' : 'rgba(255,255,255,0.045)',
+    color: canUndo ? '#ffb347' : 'rgba(255,255,255,0.32)',
+    cursor: canUndo ? 'pointer' : 'not-allowed',
+    opacity: canUndo ? 1 : 0.62
   };
 
   const dragHandleStyle = {
@@ -3005,6 +3016,7 @@ const CanvasToolbox = ({
                 <path d="M20 15v5h-5" />
               </svg>
             </button>
+            <button type="button" onClick={undoLastAction} disabled={!canUndo} style={undoButtonStyle} title={undoTitle} aria-label={undoTitle}>↶</button>
             {(user || isEditMode) && (
               <button type="button" onClick={handleUploadImagesClick} style={iconButtonStyle} title="Upload images to canvas" aria-label="Upload images to canvas">
                 <UploadIcon />
@@ -3064,7 +3076,7 @@ const CanvasToolbox = ({
                 </svg>
               </button>
             </div>
-            <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '5px', alignItems: 'center', flexWrap: 'wrap' }}>
               <button type="button" onClick={() => zoomOut({ duration: 250 })} style={iconButtonStyle} title="Zoom out" aria-label="Zoom out">−</button>
               <div style={zoomChipStyle}>{zoomPercent}%</div>
               <button type="button" onClick={() => zoomIn({ duration: 250 })} style={iconButtonStyle} title="Zoom in" aria-label="Zoom in">+</button>
@@ -3076,6 +3088,7 @@ const CanvasToolbox = ({
                   <path d="M20 15v5h-5" />
                 </svg>
               </button>
+              <button type="button" onClick={undoLastAction} disabled={!canUndo} style={undoButtonStyle} title={undoTitle} aria-label={undoTitle}>↶</button>
               {(user || isEditMode) && (
                 <button type="button" onClick={handleUploadImagesClick} style={iconButtonStyle} title="Upload images to canvas" aria-label="Upload images to canvas">
                   <UploadIcon />
@@ -3267,8 +3280,8 @@ const CanvasToolbox = ({
                   type="button"
                   onClick={undoLastAction}
                   disabled={undoStack.length === 0}
-                  title={undoStack[0]?.label || 'Nothing to restore'}
-                  aria-label={undoStack[0]?.label || 'Nothing to restore'}
+                  title={undoTitle}
+                  aria-label={undoTitle}
                   style={{
                     minHeight: '36px',
                     width: '100%',
@@ -3283,7 +3296,7 @@ const CanvasToolbox = ({
                     letterSpacing: '0.06em'
                   }}
                 >
-                  ↶ {undoStack[0]?.label || 'Undo Delete'}
+                  ↶ {undoTitle}
                 </button>
                   </>
                 )}
@@ -3387,6 +3400,7 @@ export default function HeroCanvas() {
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
   const labelDragGroupRef = useRef(null);
+  const dragPositionUndoRef = useRef(null);
   const boardSvgConversionRef = useRef({ running: false, failedKeys: new Set() });
 
   const graphChangeTypes = useMemo(() => new Set(['position', 'dimensions', 'add', 'remove', 'replace']), []);
@@ -4133,15 +4147,23 @@ export default function HeroCanvas() {
         : { x: anchorX, y: anchorY + index * CARD_GRID_Y }
     ]));
 
-    setNodes((nds) => nds.map((node) => nextPositions.has(node.id) ? {
+    pushUndoAction({
+      type: 'move-nodes',
+      label: direction === 'row' ? 'Revert row alignment' : 'Revert column alignment',
+      positions: selectedCards.map((node) => ({
+        id: node.id,
+        position: { x: Number(node.position?.x || 0), y: Number(node.position?.y || 0) }
+      }))
+    });
+
+    setPersistentNodes((nds) => nds.map((node) => nextPositions.has(node.id) ? {
       ...node,
       position: nextPositions.get(node.id)
     } : node));
-    setIsCanvasDirty(true);
     const message = direction === 'row' ? 'Selected cards aligned in a row.' : 'Selected cards aligned in a column.';
     setCanvasStatus(message);
     showCanvasActionToast(message);
-  }, [nodes, selectedCardIds, setNodes, showCanvasActionToast]);
+  }, [nodes, pushUndoAction, selectedCardIds, setPersistentNodes, showCanvasActionToast]);
 
   const arrangeAllCards = useCallback(() => {
     const visibleCards = nodes
@@ -4183,6 +4205,15 @@ export default function HeroCanvas() {
       nextRowY += rowHeight + ARRANGE_ROW_GAP;
     });
 
+    pushUndoAction({
+      type: 'move-nodes',
+      label: 'Revert card arrangement',
+      positions: visibleCards.map((node) => ({
+        id: node.id,
+        position: { x: Number(node.position?.x || 0), y: Number(node.position?.y || 0) }
+      }))
+    });
+
     setPersistentNodes((nds) => nds.map((node) => nextPositions.has(node.id)
       ? { ...node, position: nextPositions.get(node.id) }
       : node));
@@ -4193,7 +4224,7 @@ export default function HeroCanvas() {
       count: visibleCards.length,
       rows: rows.length
     };
-  }, [nodes, setPersistentNodes, showCanvasActionToast]);
+  }, [nodes, pushUndoAction, setPersistentNodes, showCanvasActionToast]);
 
   useEffect(() => {
     setCanvasActions({
@@ -4549,6 +4580,28 @@ export default function HeroCanvas() {
   }, [getDraggedCardDropContext, isEditMode, setNodes]);
 
   const handleNodeDragStart = useCallback((event, node) => {
+    dragPositionUndoRef.current = null;
+    if (isEditMode && node.type === 'brandCard') {
+      const cardIds = selectedCardIds.includes(node.id) ? selectedCardIds : [node.id];
+      const cardIdSet = new Set(cardIds);
+      const positions = nodesRef.current
+        .filter((candidate) => cardIdSet.has(candidate.id) && candidate.type === 'brandCard')
+        .map((candidate) => ({
+          id: candidate.id,
+          position: {
+            x: Number(candidate.position?.x || 0),
+            y: Number(candidate.position?.y || 0)
+          }
+        }));
+      if (positions.length > 0) {
+        dragPositionUndoRef.current = {
+          type: 'move-nodes',
+          label: positions.length === 1 ? 'Revert card move' : 'Revert card moves',
+          positions
+        };
+      }
+    }
+
     if (!isEditMode || node.type !== 'labelNode') {
       labelDragGroupRef.current = null;
       return;
@@ -4579,11 +4632,37 @@ export default function HeroCanvas() {
       },
       memberStartPositions
     };
-  }, [isEditMode]);
+  }, [isEditMode, selectedCardIds]);
 
   const handleNodeDragStop = useCallback((event, node, draggedNodes) => {
     if (node.type === 'labelNode') {
-      const draggedCount = labelDragGroupRef.current?.memberStartPositions?.size || 0;
+      const dragState = labelDragGroupRef.current;
+      const draggedCount = dragState?.memberStartPositions?.size || 0;
+      if (dragState) {
+        const positions = [
+          {
+            id: dragState.labelId,
+            position: { ...dragState.labelStart }
+          },
+          ...[...dragState.memberStartPositions.entries()].map(([id, position]) => ({
+            id,
+            position: { ...position }
+          }))
+        ];
+        const moved = positions.some(({ id, position }) => {
+          const currentNode = nodesRef.current.find((candidate) => candidate.id === id);
+          return currentNode &&
+            (Number(currentNode.position?.x || 0) !== Number(position.x || 0) ||
+              Number(currentNode.position?.y || 0) !== Number(position.y || 0));
+        });
+        if (moved) {
+          pushUndoAction({
+            type: 'move-nodes',
+            label: 'Revert label move',
+            positions
+          });
+        }
+      }
       labelDragGroupRef.current = null;
       if (draggedCount > 0) {
         setIsCanvasDirty(true);
@@ -4596,11 +4675,25 @@ export default function HeroCanvas() {
     setActiveDropLabelId(null);
     if (!isEditMode) return;
 
+    const dragUndoAction = dragPositionUndoRef.current;
+    dragPositionUndoRef.current = null;
+    if (node.type === 'brandCard' && dragUndoAction) {
+      const finalNodes = new Map([...(Array.isArray(draggedNodes) ? draggedNodes : []), node]
+        .map((candidate) => [candidate.id, candidate]));
+      const moved = dragUndoAction.positions.some(({ id, position }) => {
+        const currentNode = finalNodes.get(id) || nodesRef.current.find((candidate) => candidate.id === id);
+        return currentNode &&
+          (Number(currentNode.position?.x || 0) !== Number(position.x || 0) ||
+            Number(currentNode.position?.y || 0) !== Number(position.y || 0));
+      });
+      if (moved) pushUndoAction(dragUndoAction);
+    }
+
     const { cardIds, cards, labels } = getDraggedCardDropContext(node, draggedNodes);
     const targetLabel = findLabelDropTarget(cards, labels);
     if (!targetLabel) return;
     connectCardsToLabel(targetLabel.id, cardIds, targetLabel.data?.title);
-  }, [connectCardsToLabel, getDraggedCardDropContext, isEditMode, showCanvasActionToast]);
+  }, [connectCardsToLabel, getDraggedCardDropContext, isEditMode, pushUndoAction, showCanvasActionToast]);
 
   const undoLastAction = useCallback(() => {
     setUndoStack((stack) => {
@@ -4646,6 +4739,17 @@ export default function HeroCanvas() {
         setIsCanvasDirty(true);
         setCanvasStatus('Restored reference connection.');
         showCanvasActionToast('Restored reference connection.');
+      }
+
+      if (action.type === 'move-nodes') {
+        const positions = new Map((Array.isArray(action.positions) ? action.positions : [])
+          .map((item) => [item.id, item.position]));
+        setNodes((nds) => nds.map((node) => positions.has(node.id)
+          ? { ...node, position: positions.get(node.id) }
+          : node));
+        setIsCanvasDirty(true);
+        setCanvasStatus('Reverted card positions.');
+        showCanvasActionToast('Reverted card positions.');
       }
 
       return rest;
