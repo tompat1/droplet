@@ -2602,6 +2602,7 @@ const CanvasToolbox = ({
   toggleFullscreen,
   onImportImagesClick,
   selectedCardCount,
+  onArrangeAllCards,
   onAlignSelectedRow,
   onAlignSelectedColumn,
   onCreateLabelGroup,
@@ -3193,6 +3194,28 @@ const CanvasToolbox = ({
                   aria-label={isPlacingNote ? 'Click the canvas to place a sticky note' : 'Create a sticky note anywhere on the canvas'}
                 >
                   {isPlacingNote ? 'Click Canvas To Place Note' : '+ Sticky Note'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onArrangeAllCards}
+                  style={{
+                    minHeight: '36px',
+                    width: '100%',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(75,94,250,0.34)',
+                    background: 'rgba(75,94,250,0.12)',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '0.7rem',
+                    fontWeight: 900,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em'
+                  }}
+                  title="Arrange all visible cards into tidy rows and columns"
+                  aria-label="Arrange all visible cards into tidy rows and columns"
+                >
+                  Arrange All Cards
                 </button>
 
                 {selectedCardCount > 0 && (
@@ -3830,14 +3853,6 @@ export default function HeroCanvas() {
     };
   }, [containerCenterCanvasPoint, setPersistentNodes, showCanvasActionToast]);
 
-  useEffect(() => {
-    setCanvasActions({
-      createAssetBranch: createConciergeAssetBranch,
-      organizeCanvas: organizeCanvasForConcierge
-    });
-    return () => setCanvasActions({});
-  }, [createConciergeAssetBranch, organizeCanvasForConcierge, setCanvasActions]);
-
   const createImportedImageCards = useCallback(async (files, originPoint, source = 'upload') => {
     const imageFiles = imageFilesFromList(files).slice(0, MAX_IMPORT_FILES);
     if (imageFiles.length === 0) return { nodeIds: [], count: 0 };
@@ -4125,6 +4140,64 @@ export default function HeroCanvas() {
     setCanvasStatus(message);
     showCanvasActionToast(message);
   }, [nodes, selectedCardIds, setNodes, showCanvasActionToast]);
+
+  const arrangeAllCards = useCallback(() => {
+    const visibleCards = nodes
+      .filter((node) => node.id !== 'padding-node' && node.hidden !== true && node.type === 'brandCard')
+      .sort((a, b) => Number(a.position?.y || 0) - Number(b.position?.y || 0) || Number(a.position?.x || 0) - Number(b.position?.x || 0));
+
+    if (visibleCards.length < 2) {
+      setCanvasStatus('Add at least two cards before arranging the canvas.');
+      return;
+    }
+
+    const rowThreshold = CARD_GRID_Y * 0.52;
+    const rows = [];
+    visibleCards.forEach((card) => {
+      const cardY = Number(card.position?.y || 0);
+      const currentRow = rows[rows.length - 1];
+      if (currentRow && Math.abs(cardY - currentRow.averageY) <= rowThreshold) {
+        currentRow.cards.push(card);
+        currentRow.averageY = currentRow.cards.reduce((total, node) => total + Number(node.position?.y || 0), 0) / currentRow.cards.length;
+        return;
+      }
+      rows.push({ averageY: cardY, cards: [card] });
+    });
+
+    const originX = Math.min(...visibleCards.map((node) => Number(node.position?.x || 0)));
+    const originY = Math.min(...visibleCards.map((node) => Number(node.position?.y || 0)));
+    const nextPositions = new Map();
+    rows.forEach((row, rowIndex) => {
+      row.cards
+        .sort((a, b) => Number(a.position?.x || 0) - Number(b.position?.x || 0))
+        .forEach((card, columnIndex) => {
+          nextPositions.set(card.id, {
+            x: originX + columnIndex * CARD_GRID_X,
+            y: originY + rowIndex * CARD_GRID_Y
+          });
+        });
+    });
+
+    setPersistentNodes((nds) => nds.map((node) => nextPositions.has(node.id)
+      ? { ...node, position: nextPositions.get(node.id) }
+      : node));
+    const message = `Arranged ${visibleCards.length} cards into ${rows.length} tidy row${rows.length === 1 ? '' : 's'}.`;
+    setCanvasStatus(message);
+    showCanvasActionToast(message);
+    return {
+      count: visibleCards.length,
+      rows: rows.length
+    };
+  }, [nodes, setPersistentNodes, showCanvasActionToast]);
+
+  useEffect(() => {
+    setCanvasActions({
+      createAssetBranch: createConciergeAssetBranch,
+      organizeCanvas: organizeCanvasForConcierge,
+      arrangeAllCards
+    });
+    return () => setCanvasActions({});
+  }, [arrangeAllCards, createConciergeAssetBranch, organizeCanvasForConcierge, setCanvasActions]);
 
   const connectCardsToLabel = useCallback((labelId, cardIds, fallbackTitle = '') => {
     const uniqueCardIds = [...new Set(cardIds)].filter(Boolean);
@@ -5083,6 +5156,7 @@ export default function HeroCanvas() {
           toggleFullscreen={toggleFullscreen}
           onImportImagesClick={openCanvasUploadPicker}
           selectedCardCount={selectedCardIds.length}
+          onArrangeAllCards={arrangeAllCards}
           onAlignSelectedRow={() => alignSelectedCards('row')}
           onAlignSelectedColumn={() => alignSelectedCards('column')}
           onCreateLabelGroup={createLabelGroup}

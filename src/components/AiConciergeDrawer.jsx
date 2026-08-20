@@ -288,6 +288,43 @@ function AiConciergeDrawerInner({ user }) {
     }
   }, [canvasActionLoading, canvasActions]);
 
+  const runArrangeAllAction = useCallback(async () => {
+    if (canvasActionLoading) return;
+    if (!canvasActions?.arrangeAllCards) {
+      setHistory((items) => [
+        ...items,
+        { role: 'assistant', text: 'The canvas is still loading. Try again once the Fluid Node Canvas is visible.' }
+      ]);
+      return;
+    }
+
+    setCanvasActionLoading(true);
+    setHistory((items) => [
+      ...items,
+      { role: 'assistant', text: 'Arranging all canvas cards into tidy rows and columns...' }
+    ]);
+
+    try {
+      const result = await canvasActions.arrangeAllCards();
+      setHistory((items) => [
+        ...items,
+        {
+          role: 'assistant',
+          text: result?.count
+            ? `Done. Arranged ${result.count} card${result.count === 1 ? '' : 's'} into ${result.rows} tidy row${result.rows === 1 ? '' : 's'}.`
+            : 'Done. The canvas did not have enough cards to arrange.'
+        }
+      ]);
+    } catch (error) {
+      setHistory((items) => [
+        ...items,
+        { role: 'assistant', text: error instanceof Error ? error.message : 'I could not arrange the canvas.' }
+      ]);
+    } finally {
+      setCanvasActionLoading(false);
+    }
+  }, [canvasActionLoading, canvasActions]);
+
   const runPlannerAction = useCallback((action) => {
     if (action?.type === 'create_asset' || action?.type === 'edit_asset') {
       return runAssetAction(action.prompt, action.pipeline === 'video' ? 'video' : 'image');
@@ -467,6 +504,23 @@ function AiConciergeDrawerInner({ user }) {
           </div>
 
           <div className="ai-chip-row">
+            <button
+              type="button"
+              className="ai-chip-btn"
+              onClick={runArrangeAllAction}
+              disabled={loading || canvasActionLoading || !canvasActions?.arrangeAllCards}
+              title="Arrange all canvas cards into tidy rows and columns"
+              style={{
+                '--chip-color': '#7dd3fc',
+                '--chip-bg': 'rgba(125, 211, 252, 0.14)',
+                '--chip-border': 'rgba(125, 211, 252, 0.38)'
+              }}
+            >
+              <span className="ai-chip-icon-badge" style={{ color: '#7dd3fc', background: 'rgba(125, 211, 252, 0.14)', borderColor: 'rgba(125, 211, 252, 0.38)' }}>
+                <Grid3X3 size={13} strokeWidth={2.4} />
+              </span>
+              <span className="ai-chip-label">Arrange All Cards</span>
+            </button>
             {PROMPT_CHIPS.map((chip) => {
               const IconComponent = chip.icon;
               return (
