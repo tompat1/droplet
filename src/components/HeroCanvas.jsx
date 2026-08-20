@@ -77,6 +77,8 @@ const MAX_SAVE_PAYLOAD_BYTES = 7_500_000;
 const CANVAS_STORAGE_WARNING_BYTES = 5_000_000;
 const CANVAS_MEDIA_WARNING_BYTES = 3_000_000;
 const CANVAS_IMPORT_IMAGE_OPTIONS = { maxBytes: 180000, maxDimension: 960 };
+const CANVAS_SVG_IMAGE_OPTIONS = { maxBytes: 480000, maxDimension: 2200, minDimension: 1600, allowUpscale: true };
+const CANVAS_SVG_RASTER_VERSION = 2;
 const DISPLAY_CURRENCIES = {
   USD: { label: 'USD', symbol: '$', rate: 1 },
   EUR: { label: 'EUR', symbol: '€', rate: 0.92 },
@@ -131,6 +133,19 @@ const isSvgFile = (file) => file?.type === 'image/svg+xml' || /\.svg$/i.test(fil
 const imageFilesFromList = (files) => Array.from(files || []).filter((file) => (
   file?.type?.startsWith('image/') || isSvgFile(file)
 ));
+
+const svgConversionSourceForNode = (node) => {
+  const image = node?.data?.image;
+  if (isSvgImageSource(image)) return String(image || '');
+  const originalSource = node?.data?.convertedFromSvgSource;
+  if (
+    isSvgImageSource(originalSource) &&
+    node?.data?.svgRasterVersion !== CANVAS_SVG_RASTER_VERSION
+  ) {
+    return String(originalSource || '');
+  }
+  return '';
+};
 
 const estimatedJsonBytes = (value) => new Blob([JSON.stringify(value)]).size;
 
@@ -3352,8 +3367,8 @@ export default function HeroCanvas() {
   const graphChangeTypes = useMemo(() => new Set(['position', 'dimensions', 'add', 'remove', 'replace']), []);
   const edgeChangeTypes = useMemo(() => new Set(['add', 'remove', 'replace']), []);
   const boardSvgAssetSignature = useMemo(() => nodes
-    .filter((node) => node.type === 'brandCard' && isSvgImageSource(node.data?.image))
-    .map((node) => `${node.id}:${node.data?.image}`)
+    .filter((node) => node.type === 'brandCard' && svgConversionSourceForNode(node))
+    .map((node) => `${node.id}:${svgConversionSourceForNode(node)}:${node.data?.svgRasterVersion || 0}`)
     .join('|'), [nodes]);
   const setPersistentNodes = useCallback((updater) => {
     setIsCanvasDirty(true);
@@ -3390,8 +3405,9 @@ export default function HeroCanvas() {
     if (!boardSvgAssetSignature || boardSvgConversionRef.current.running) return undefined;
 
     const candidates = nodesRef.current.filter((node) => {
-      if (node.type !== 'brandCard' || !isSvgImageSource(node.data?.image)) return false;
-      const failureKey = `${node.id}:${node.data.image}`;
+      const source = svgConversionSourceForNode(node);
+      if (node.type !== 'brandCard' || !source) return false;
+      const failureKey = `${node.id}:${source}`;
       return !boardSvgConversionRef.current.failedKeys.has(failureKey);
     });
     if (candidates.length === 0) return undefined;
@@ -3409,10 +3425,10 @@ export default function HeroCanvas() {
       const failed = [];
 
       for (const node of candidates) {
-        const source = String(node.data?.image || '');
+        const source = svgConversionSourceForNode(node);
         sourceById.set(node.id, source);
         try {
-          const webp = await convertSvgImageSourceToWebp(source, CANVAS_IMPORT_IMAGE_OPTIONS);
+          const webp = await convertSvgImageSourceToWebp(source, CANVAS_SVG_IMAGE_OPTIONS);
           converted.set(node.id, webp);
         } catch (error) {
           failed.push(node);
@@ -3427,12 +3443,15 @@ export default function HeroCanvas() {
         const convertedAt = new Date().toISOString();
         setNodes((nds) => nds.map((node) => {
           const image = converted.get(node.id);
-          if (!image || node.data?.image !== sourceById.get(node.id)) return node;
+          const source = sourceById.get(node.id);
+          if (!image || svgConversionSourceForNode(node) !== source) return node;
           return {
             ...node,
             data: {
               ...node.data,
               image,
+              convertedFromSvgSource: source,
+              svgRasterVersion: CANVAS_SVG_RASTER_VERSION,
               convertedFromSvgAt: convertedAt
             }
           };
@@ -3836,7 +3855,15 @@ export default function HeroCanvas() {
       for (let index = 0; index < imageFiles.length; index += 1) {
         const file = imageFiles[index];
         try {
-          const image = await readImageFileAsDataUrl(file, CANVAS_IMPORT_IMAGE_OPTIONS);
+          const isSvgAsset = isSvgFile(file);
+          const image = await readImageFileAsDataUrl(file, isSvgAsset ? CANVAS_SVG_IMAGE_OPTIONS : CANVAS_IMPORT_IMAGE_OPTIONS);
+          let convertedFromSvgSource = '';
+          if (isSvgAsset) {
+            const svgText = await file.text();
+            if (svgText.length <= 250000) {
+              convertedFromSvgSource = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgText)}`;
+            }
+          }
           const column = index % 3;
           const row = Math.floor(index / 3);
           importedNodes.push({
@@ -3855,6 +3882,8 @@ export default function HeroCanvas() {
                 : `Uploaded from ${file.name || 'device'}. Use it as a reference, branch from it, or fold it into the brand system.`,
               nodeGroup: 'imports',
               isImported: true,
+              convertedFromSvgSource: convertedFromSvgSource || undefined,
+              svgRasterVersion: isSvgAsset ? CANVAS_SVG_RASTER_VERSION : undefined,
               importedAt: new Date().toISOString()
             }
           });

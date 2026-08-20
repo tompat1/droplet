@@ -93,6 +93,9 @@ const API_KEY_PROVIDER_KEYS = [
 
 const REFERENCE_SOURCE_HANDLE = 'reference-source';
 const REFERENCE_TARGET_HANDLE = 'reference-target';
+const CURRENT_SVG_RASTER_VERSION = 2;
+const LOW_RES_LONG_SIDE = 900;
+const LOW_RES_SHORT_SIDE = 360;
 
 const generatedNodeId = (prefix = 'generated') => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -216,6 +219,35 @@ const brandGuidePayloadFromNode = (node) => ({
   labelTitle: node.data?.labelTitle || ''
 });
 
+const lowResolutionAssetReason = (data = {}, imageResolution = {}) => {
+  if (!data.image || data.video || data.isGenerated === true) return '';
+
+  const hasOldSvgRaster = data.convertedFromSvgAt && !data.convertedFromSvgSource;
+  if (hasOldSvgRaster) {
+    return 'This asset was converted from SVG before the high-resolution rasterizer was available. Re-upload the original SVG.';
+  }
+
+  const staleSvgRaster = data.convertedFromSvgAt &&
+    Number(data.svgRasterVersion || 0) < CURRENT_SVG_RASTER_VERSION &&
+    !data.convertedFromSvgSource;
+  if (staleSvgRaster) {
+    return 'This SVG-derived asset needs the original SVG re-uploaded for a sharper WebP.';
+  }
+
+  if (imageResolution.status !== 'loaded') return '';
+  const width = Number(imageResolution.width || 0);
+  const height = Number(imageResolution.height || 0);
+  if (!width || !height) return '';
+
+  const longestSide = Math.max(width, height);
+  const shortestSide = Math.min(width, height);
+  if (longestSide < LOW_RES_LONG_SIDE || shortestSide < LOW_RES_SHORT_SIDE) {
+    return `This asset is ${width}x${height}px. Re-upload a sharper source for better renders.`;
+  }
+
+  return '';
+};
+
 const PROMPT_HELP_SECTIONS = [
   {
     title: 'Creative brief',
@@ -262,6 +294,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
   const [isHoveringImage, setIsHoveringImage] = useState(false);
   const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
+  const [imageResolution, setImageResolution] = useState({ src: '', width: 0, height: 0, status: 'idle' });
 
   // Generative UI State
   const [genState, setGenState] = useState('idle'); // idle | pipeline | prompt | generating
@@ -293,6 +326,10 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
   const [isPromptHelpOpen, setIsPromptHelpOpen] = useState(false);
   const [copiedCardPrompt, setCopiedCardPrompt] = useState(false);
   const [copiedCardDesc, setCopiedCardDesc] = useState(false);
+
+  useEffect(() => {
+    setImageResolution({ src: data.image || '', width: 0, height: 0, status: data.image ? 'loading' : 'idle' });
+  }, [data.image]);
 
   const handleCopyCardPrompt = async (e) => {
     e?.stopPropagation();
@@ -791,6 +828,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
     setTilt({ x: 0, y: 0 });
   };
   const handlePointerLeave = () => setIsHoveringHandle(false);
+  const lowResReason = lowResolutionAssetReason(data, imageResolution);
 
   return (
     <div 
@@ -953,7 +991,21 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           onClick={isEditMode ? openImagePreview : undefined}
           style={{ width: '100%', height: '180px', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px', position: 'relative', cursor: isEditMode ? 'zoom-in' : 'default' }}
         >
-          <img src={data.image} alt={data.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img
+            src={data.image}
+            alt={data.title}
+            onLoad={(event) => {
+              const image = event.currentTarget;
+              setImageResolution({
+                src: data.image || '',
+                width: image.naturalWidth || image.width || 0,
+                height: image.naturalHeight || image.height || 0,
+                status: 'loaded'
+              });
+            }}
+            onError={() => setImageResolution({ src: data.image || '', width: 0, height: 0, status: 'error' })}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
           {(data.generationProviderLabel || data.generationProvider || GENERATION_PROVIDERS[data.generationProvider]) && (
             <div
               style={{
@@ -1005,6 +1057,40 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           >
             ↓
           </button>
+          {lowResReason && (
+            <div
+              title={lowResReason}
+              aria-label="Low resolution asset. Re-upload needed."
+              style={{
+                position: 'absolute',
+                left: '8px',
+                bottom: '8px',
+                zIndex: 3,
+                maxWidth: 'calc(100% - 16px)',
+                padding: '4px 8px',
+                borderRadius: '999px',
+                border: '1px solid rgba(255,184,77,0.58)',
+                background: 'rgba(28, 18, 4, 0.82)',
+                color: '#ffd89a',
+                fontSize: '0.66rem',
+                fontWeight: 900,
+                letterSpacing: '0.03em',
+                textTransform: 'uppercase',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                pointerEvents: 'none',
+                boxShadow: '0 8px 18px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.12)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)'
+              }}
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ffb84d', boxShadow: '0 0 8px rgba(255,184,77,0.72)', flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                Lo-res: re-upload
+              </span>
+            </div>
+          )}
           {isEditMode && (
             <div
               style={{ position: 'absolute', inset: 0, zIndex: 2, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: isHoveringImage ? 1 : 0, transition: 'opacity 0.2s', color: 'white', fontWeight: 'bold', backdropFilter: 'blur(2px)' }}

@@ -1,4 +1,5 @@
 const DEFAULT_MAX_IMAGE_BYTES = 720000;
+const DEFAULT_SVG_MIN_DIMENSION = 1600;
 
 export function mediaFilename(title = 'droplet-media', extension = 'webp') {
   const safeTitle = String(title || 'droplet-media')
@@ -33,7 +34,12 @@ export function readImageFileAsDataUrl(file, options = {}) {
   }
 
   if (isSvg) {
-    return readSvgImageFileAsWebp(file, { maxDimension, maxBytes });
+    return readSvgImageFileAsWebp(file, {
+      maxDimension: options.svgMaxDimension || maxDimension,
+      maxBytes: options.svgMaxBytes || maxBytes,
+      minDimension: options.svgMinDimension,
+      allowUpscale: options.svgAllowUpscale
+    });
   }
 
   if (file.type === 'image/gif') {
@@ -151,6 +157,8 @@ function readSvgImageFileAsWebp(file, options = {}) {
 function renderSvgTextAsWebp(svgText, options = {}) {
   const maxDimension = options.maxDimension || 1400;
   const maxBytes = options.maxBytes || DEFAULT_MAX_IMAGE_BYTES;
+  const minDimension = options.minDimension || DEFAULT_SVG_MIN_DIMENSION;
+  const allowUpscale = options.allowUpscale !== false;
 
   return new Promise((resolve, reject) => {
     const svgBlob = new Blob([svgText], { type: 'image/svg+xml' });
@@ -166,7 +174,11 @@ function renderSvgTextAsWebp(svgText, options = {}) {
         const dimensions = svgDimensions(svgText);
         const sourceWidth = image.naturalWidth || image.width || dimensions.width || maxDimension;
         const sourceHeight = image.naturalHeight || image.height || dimensions.height || maxDimension;
-        let scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
+        const longestSide = Math.max(sourceWidth, sourceHeight);
+        const targetLongestSide = allowUpscale
+          ? Math.min(maxDimension, Math.max(longestSide, minDimension))
+          : Math.min(maxDimension, longestSide);
+        let scale = targetLongestSide / longestSide;
         let best = '';
 
         for (let attempt = 0; attempt < 8; attempt += 1) {
