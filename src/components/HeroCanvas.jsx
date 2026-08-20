@@ -4130,8 +4130,18 @@ export default function HeroCanvas() {
   const createSiblingNote = useCallback((sourceId) => {
     const sourceNode = nodesRef.current.find((node) => node.id === sourceId);
     if (!sourceNode) return;
+    const sourceBounds = nodeBounds(sourceNode, NOTE_WIDTH, NOTE_HEIGHT);
+    const sourceCenterY = sourceBounds.top + sourceBounds.height / 2;
+    const rowNotes = nodesRef.current.filter((node) => {
+      if (node.type !== 'noteNode') return false;
+      const bounds = nodeBounds(node, NOTE_WIDTH, NOTE_HEIGHT);
+      const centerY = bounds.top + bounds.height / 2;
+      return Math.abs(centerY - sourceCenterY) <= Math.max(sourceBounds.height, bounds.height) * 0.72;
+    });
+    const rightEdge = Math.max(sourceBounds.right, ...rowNotes.map((node) => nodeBounds(node, NOTE_WIDTH, NOTE_HEIGHT).right));
+
     createStickyNoteAt({
-      x: Number(sourceNode.position?.x || 0) + NOTE_WIDTH + NOTE_SIBLING_GAP,
+      x: rightEdge + NOTE_SIBLING_GAP,
       y: Number(sourceNode.position?.y || 0)
     });
     setCanvasStatus('Sticky note added next to the current note.');
@@ -4472,7 +4482,7 @@ export default function HeroCanvas() {
         }
       };
     }));
-  }, [activeDropLabelId, collapsedBranches, createSiblingNote, deleteCanvasNode, handleGenerationError, setNodes, setEdges, isEditMode, loadUsageSummary, pushUndoAction, setPersistentEdges, setPersistentNodes]);
+  }, [activeDropLabelId, collapsedBranches, createSiblingNote, deleteCanvasNode, handleGenerationError, nodes.length, setNodes, setEdges, isEditMode, loadUsageSummary, pushUndoAction, setPersistentEdges, setPersistentNodes]);
 
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
