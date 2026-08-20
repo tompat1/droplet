@@ -64,6 +64,8 @@ const NOTE_WIDTH = 240;
 const NOTE_HEIGHT = 190;
 const NOTE_SIBLING_GAP = 28;
 const DEFAULT_CANVAS_NAME = 'Droplet merch';
+const REFERENCE_SOURCE_HANDLE = 'reference-source';
+const REFERENCE_TARGET_HANDLE = 'reference-target';
 const LABEL_WIDTH = 230;
 const LABEL_HEIGHT = 86;
 const LABEL_CARD_GAP = 150;
@@ -161,6 +163,22 @@ const escapeSvgText = (value) => String(value || '').replace(/[&<>"']/g, (char) 
   '"': '&quot;',
   "'": '&#39;'
 }[char]));
+
+const generationReferenceUrl = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw || raw.startsWith('data:') || typeof window === 'undefined') return raw;
+  try {
+    return new URL(raw, window.location.origin).toString();
+  } catch {
+    return raw;
+  }
+};
+
+const uniqueGenerationRefs = (refs, excludedRefs = []) => {
+  const excluded = new Set(excludedRefs.map(generationReferenceUrl).filter(Boolean));
+  return Array.from(new Set(refs.map(generationReferenceUrl).filter(Boolean)))
+    .filter((ref) => !excluded.has(ref));
+};
 
 const makeConciergeGeneratedPlaceholder = ({ isVideo, title, prompt, providerLabel = '' }) => {
   const escapedTitle = escapeSvgText(title).slice(0, 80);
@@ -3612,6 +3630,171 @@ export default function HeroCanvas() {
     }
   }, [containerCenterCanvasPoint, loadUsageSummary, selectedCardIds, setPersistentEdges, setPersistentNodes, showCanvasActionToast, user]);
 
+  const createReferenceRenderBranch = useCallback(async ({ sourceId, targetId, edge }) => {
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    if (!user) {
+      setCanvasStatus('Login is required before rendering reference links.');
+      showCanvasActionToast('Login is required before rendering reference links.');
+      return;
+    }
+
+    const sourceNodes = nodesRef.current;
+    const referenceNode = sourceNodes.find((node) => node.id === sourceId && node.type === 'brandCard');
+    const targetNode = sourceNodes.find((node) => node.id === targetId && node.type === 'brandCard');
+    if (!referenceNode || !targetNode) return;
+
+    const referenceImage = generationReferenceUrl(referenceNode.data?.image || '');
+    const targetImage = generationReferenceUrl(targetNode.data?.image || '');
+    if (!referenceImage || !targetImage) {
+      const message = 'Reference render needs two image cards.';
+      setCanvasStatus(message);
+      showCanvasActionToast(message);
+      return;
+    }
+
+    const provider = CONCIERGE_GENERATION_PROVIDERS.image;
+    const edgeId = edge?.id || `reference-${sourceId}-${targetId}`;
+    const referenceEdge = {
+      id: edgeId,
+      source: String(sourceId),
+      target: String(targetId),
+      sourceHandle: REFERENCE_SOURCE_HANDLE,
+      targetHandle: REFERENCE_TARGET_HANDLE,
+      type: 'smoothstep',
+      animated: true,
+      data: {
+        isReferenceRenderLink: true,
+        referenceNodeId: sourceId,
+        targetNodeId: targetId
+      },
+      style: {
+        stroke: 'rgba(0,255,204,0.78)',
+        strokeWidth: 3,
+        strokeDasharray: '8 8'
+      }
+    };
+
+    setPersistentEdges((eds) => (
+      eds.some((candidate) => candidate.id === edgeId)
+        ? eds
+        : [...eds, referenceEdge]
+    ));
+
+    const brandGuideNodes = brandGuideNodesForAssets([targetNode, referenceNode], sourceNodes);
+    const brandGuideRefs = brandGuideNodes
+      .map((node) => node.data?.image)
+      .filter(Boolean);
+    const refs = uniqueGenerationRefs([referenceImage, ...brandGuideRefs], [targetImage]);
+    const brandGuide = {
+      nodes: brandGuideNodes.map(brandGuidePayloadFromNode)
+    };
+    const prompt = [
+      `Apply the logo or artwork from "${referenceNode.data?.title || 'the reference card'}" to "${targetNode.data?.title || 'the target product'}".`,
+      'Use the target product image as the base image. Preserve its product shape, camera angle, lighting, background, material texture, color, and overall composition.',
+      'Place the reference logo or artwork naturally on the visible front area like professional merchandise decoration. Scale it proportionally and keep it crisp.',
+      'Do not replace the product, do not invent a new logo, and do not change anything except adding the reference artwork.'
+    ].join(' ');
+    const branchIndex = sourceNodes.filter((node) => node.data?.generatedFromNodeId === targetNode.id).length;
+    const offsetY = branchIndex === 0 ? 0 : Math.ceil(branchIndex / 2) * 330 * (branchIndex % 2 === 0 ? -1 : 1);
+    const newNodeId = `reference-render-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const originPoint = {
+      x: Number(targetNode.position?.x || 0) + 430,
+      y: Number(targetNode.position?.y || 0) + offsetY
+    };
+
+    setCanvasStatus(`Rendering ${referenceNode.data?.title || 'reference'} onto ${targetNode.data?.title || 'target asset'}...`);
+    showCanvasActionToast('Reference link connected. Rendering a new card...');
+
+    try {
+      const result = await generationApi.createBranch({
+        provider: provider.provider,
+        pipeline: provider.pipeline,
+        prompt,
+        refs,
+        brandGuide,
+        parent: {
+          id: targetNode.id,
+          title: targetNode.data?.title || '',
+          subtitle: targetNode.data?.subtitle || '',
+          description: targetNode.data?.description || '',
+          image: targetImage
+        }
+      });
+
+      const title = result?.branch?.title || `${targetNode.data?.title || 'Product'} + ${referenceNode.data?.title || 'Reference'}`;
+      const mediaUrl = result?.branch?.imageDataUrl || result?.branch?.imageUrl || result?.branch?.posterUrl || '';
+      const newNode = {
+        id: newNodeId,
+        type: 'brandCard',
+        position: originPoint,
+        selected: true,
+        data: {
+          title,
+          subtitle: result?.branch?.subtitle || `Reference render from ${referenceNode.data?.title || 'linked card'}`,
+          description: result?.branch?.description || prompt,
+          image: mediaUrl || makeConciergeGeneratedPlaceholder({
+            isVideo: false,
+            title,
+            prompt,
+            providerLabel: provider.shortLabel
+          }),
+          isGenerated: true,
+          generatedFromNodeId: targetNode.id,
+          generationPipeline: provider.pipeline,
+          generationProvider: provider.provider,
+          generationProviderLabel: provider.label,
+          generationModel: result?.branch?.model || '',
+          generationPrompt: prompt,
+          generationRefs: refs,
+          generationBrandGuideNodeIds: brandGuide.nodes.map((node) => node.id),
+          generationStatus: result?.branch?.status || (result?.mock ? 'mock' : 'ready'),
+          generationMock: result?.mock === true || result?.branch?.mock === true,
+          generationUsage: result?.usage || result?.branch?.usage || null,
+          referenceSourceNodeId: referenceNode.id,
+          referenceSourceTitle: referenceNode.data?.title || '',
+          nodeGroup: `generated-${targetNode.id}`,
+          labelGroupId: targetNode.data?.labelGroupId || undefined,
+          labelTitle: targetNode.data?.labelTitle || undefined,
+          sourceFolderName: targetNode.data?.sourceFolderName || undefined
+        }
+      };
+      const generatedEdge = {
+        id: `e-${targetNode.id}-${newNodeId}`,
+        source: String(targetNode.id),
+        target: String(newNodeId),
+        type: 'smoothstep',
+        animated: true,
+        style: { stroke: provider.accent, strokeWidth: 4 }
+      };
+      const labelEdge = targetNode.data?.labelGroupId ? {
+        id: `label-${targetNode.data.labelGroupId}-${newNodeId}`,
+        source: String(targetNode.data.labelGroupId),
+        target: String(newNodeId),
+        type: 'smoothstep',
+        animated: true,
+        data: { isLabelLink: true, labelId: targetNode.data.labelGroupId },
+        style: { stroke: 'rgba(0,255,204,0.72)', strokeWidth: 3 }
+      } : null;
+
+      setPersistentNodes((nds) => [...nds.map((node) => ({ ...node, selected: false })), newNode]);
+      setPersistentEdges((eds) => [...eds, ...[generatedEdge, labelEdge].filter(Boolean)]);
+      setSelectedNodeIds([newNodeId]);
+      setIsEditMode(true);
+      loadUsageSummary();
+      window.requestAnimationFrame(() => {
+        reactFlowInstanceRef.current?.setCenter?.(newNode.position.x + 160, newNode.position.y + 180, { zoom: 0.9, duration: 700 });
+      });
+
+      const message = `Rendered ${referenceNode.data?.title || 'reference'} onto ${targetNode.data?.title || 'target asset'}.`;
+      setCanvasStatus(message);
+      showCanvasActionToast(message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Reference render failed.';
+      setCanvasStatus(message);
+      showCanvasActionToast(message);
+    }
+  }, [loadUsageSummary, setPersistentEdges, setPersistentNodes, showCanvasActionToast, user]);
+
   const organizeCanvasForConcierge = useCallback(async () => {
     const sourceNodes = nodesRef.current;
     const visibleCards = sourceNodes
@@ -4695,10 +4878,19 @@ export default function HeroCanvas() {
 
   const onConnect = useCallback(
     (params) => {
+      if (params.sourceHandle === REFERENCE_SOURCE_HANDLE && params.targetHandle === REFERENCE_TARGET_HANDLE) {
+        createReferenceRenderBranch({
+          sourceId: params.source,
+          targetId: params.target,
+          edge: params
+        });
+        return;
+      }
+
       setIsCanvasDirty(true);
       setEdges((eds) => addEdge({ ...params, animated: true, style: { stroke: 'rgba(255,255,255,0.5)', strokeWidth: 2 } }, eds));
     },
-    [setEdges]
+    [createReferenceRenderBranch, setEdges]
   );
 
   const handleNodesChange = useCallback((changes) => {

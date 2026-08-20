@@ -91,6 +91,9 @@ const API_KEY_PROVIDER_KEYS = [
   'google_veo'
 ];
 
+const REFERENCE_SOURCE_HANDLE = 'reference-source';
+const REFERENCE_TARGET_HANDLE = 'reference-target';
+
 const generatedNodeId = (prefix = 'generated') => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const isBrandGuideNode = (node) => {
@@ -706,6 +709,26 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
     }
   };
   const isParentCollapsed = data.isParentCollapsed === true;
+  const referenceHandleBaseStyle = {
+    width: '28px',
+    height: '28px',
+    borderRadius: '10px',
+    border: '1px solid rgba(0,255,204,0.72)',
+    background: 'linear-gradient(135deg, rgba(0,255,204,0.95), rgba(75,94,250,0.78))',
+    color: '#061014',
+    boxShadow: '0 0 18px rgba(0,255,204,0.34), inset 0 1px 0 rgba(255,255,255,0.42)',
+    display: 'grid',
+    placeItems: 'center',
+    fontSize: '1.05rem',
+    fontWeight: 950,
+    lineHeight: 1,
+    zIndex: 6
+  };
+  const handlePointerEnter = () => {
+    setIsHoveringHandle(true);
+    setTilt({ x: 0, y: 0 });
+  };
+  const handlePointerLeave = () => setIsHoveringHandle(false);
 
   return (
     <div 
@@ -730,7 +753,22 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           : (tilt.x === 0 && tilt.y === 0 ? 'all 0.5s ease' : 'transform 0.1s ease-out, box-shadow 0.5s ease, border-color 0.5s ease, opacity 0.5s ease')
       }}
     >
-      <Handle type="target" position={Position.Left} isConnectable={isConnectable} style={{ background: 'var(--bg-color)', border: '2px solid var(--accent-neon)' }} />
+      <Handle
+        id={REFERENCE_TARGET_HANDLE}
+        type="target"
+        position={Position.Left}
+        isConnectable={isConnectable}
+        title="Drop a reference link here to render onto this card"
+        aria-label="Reference target"
+        onMouseEnter={handlePointerEnter}
+        onMouseLeave={handlePointerLeave}
+        style={{
+          ...referenceHandleBaseStyle,
+          left: '-15px'
+        }}
+      >
+        +
+      </Handle>
       <input
         ref={imageInputRef}
         type="file"
@@ -1313,7 +1351,22 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         </div>
       )}
 
-      <Handle type="source" position={Position.Right} isConnectable={isConnectable} style={{ background: 'var(--bg-color)', border: '2px solid var(--accent-neon)' }} />
+      <Handle
+        id={REFERENCE_SOURCE_HANDLE}
+        type="source"
+        position={Position.Right}
+        isConnectable={isConnectable}
+        title="Drag to another card to use this card as a reference"
+        aria-label="Reference source"
+        onMouseEnter={handlePointerEnter}
+        onMouseLeave={handlePointerLeave}
+        style={{
+          ...referenceHandleBaseStyle,
+          right: '-15px'
+        }}
+      >
+        +
+      </Handle>
 
       {isDeleting && (
         <div style={{
