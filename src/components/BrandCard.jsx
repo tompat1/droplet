@@ -132,6 +132,55 @@ const uniqueGenerationRefs = (refs, excludedRefs = []) => {
     .filter((ref) => !excluded.has(ref));
 };
 
+const nodeIdString = (value) => String(value || '');
+
+const isManualReferenceEdge = (edge) => (
+  edge?.data?.isReferenceRenderLink === true ||
+  edge?.sourceHandle === REFERENCE_SOURCE_HANDLE ||
+  edge?.targetHandle === REFERENCE_TARGET_HANDLE ||
+  String(edge?.id || '').startsWith(`reference-${edge?.source}-${edge?.target}`)
+);
+
+const lineageIdsForNode = (nodeId, nodes, maxDepth = 8) => {
+  const nodesById = new Map(nodes.map((node) => [nodeIdString(node.id), node]));
+  const lineageIds = [];
+  const visited = new Set();
+  let currentId = nodeIdString(nodeId);
+
+  for (let depth = 0; currentId && depth < maxDepth; depth += 1) {
+    if (visited.has(currentId)) break;
+    visited.add(currentId);
+    lineageIds.push(currentId);
+    const currentNode = nodesById.get(currentId);
+    currentId = nodeIdString(currentNode?.data?.generatedFromNodeId);
+  }
+
+  return lineageIds;
+};
+
+const connectedReferenceNodesForCard = (cardId, nodes, edges) => {
+  const nodesById = new Map(nodes.map((node) => [nodeIdString(node.id), node]));
+  const targetIds = new Set(lineageIdsForNode(cardId, nodes));
+  const referenceIds = new Set();
+
+  edges.forEach((edge) => {
+    if (!isManualReferenceEdge(edge)) return;
+    if (targetIds.has(nodeIdString(edge.target))) referenceIds.add(nodeIdString(edge.source));
+  });
+
+  return [...referenceIds]
+    .map((referenceId) => nodesById.get(referenceId))
+    .filter((node) => node?.type === 'brandCard');
+};
+
+const generationRefsForLineage = (cardId, nodes) => {
+  const nodesById = new Map(nodes.map((node) => [nodeIdString(node.id), node]));
+  return lineageIdsForNode(cardId, nodes).flatMap((lineageId) => {
+    const node = nodesById.get(lineageId);
+    return Array.isArray(node?.data?.generationRefs) ? node.data.generationRefs : [];
+  });
+};
+
 const brandGuideNodesForAsset = (assetNode, nodes) => {
   const allGuideNodes = nodes.filter(isBrandGuideNode);
   if (!assetNode) return allGuideNodes;
@@ -654,24 +703,20 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         .map((node) => node.data?.image)
         .map(generationReferenceUrl)
         .filter(Boolean);
-      const connectedReferenceIds = new Set(existingEdges
-        .filter((edge) => (
-          edge.target === id &&
-          (edge.data?.isReferenceRenderLink === true || edge.targetHandle === REFERENCE_TARGET_HANDLE)
-        ))
-        .map((edge) => edge.source)
-        .filter(Boolean));
-      const connectedReferenceNodes = existingNodes.filter((node) => connectedReferenceIds.has(node.id) && node.type === 'brandCard');
+      const connectedReferenceNodes = connectedReferenceNodesForCard(id, existingNodes, existingEdges);
       const connectedReferenceRefs = connectedReferenceNodes
         .map((node) => node.data?.image)
         .map(generationReferenceUrl)
         .filter(Boolean);
+      const inheritedGenerationRefs = generationRefsForLineage(id, existingNodes)
+        .map(generationReferenceUrl)
+        .filter(Boolean);
       const connectedReferenceHint = connectedReferenceNodes.length > 0
-        ? `Connected reference cards: ${connectedReferenceNodes.map((node) => `"${node.data?.title || 'Reference'}"`).join(', ')}. Use these connected references when the prompt asks for a connected logo, artwork, mark, or reference.`
+        ? `Connected reference cards in this branch: ${connectedReferenceNodes.map((node) => `"${node.data?.title || 'Reference'}"`).join(', ')}. Use these connected references when the prompt asks for a connected logo, artwork, mark, or reference.`
         : '';
       const generationPrompt = connectedReferenceHint ? `${prompt}\n\n${connectedReferenceHint}` : prompt;
       const parentImageRef = generationReferenceUrl(data.image || '');
-      const mergedRefs = uniqueGenerationRefs([...connectedReferenceRefs, ...brandGuideRefs, ...genRefs], [parentImageRef]);
+      const mergedRefs = uniqueGenerationRefs([...connectedReferenceRefs, ...inheritedGenerationRefs, ...brandGuideRefs, ...genRefs], [parentImageRef]);
       const brandGuide = {
         nodes: brandGuideNodes.map(brandGuidePayloadFromNode)
       };
