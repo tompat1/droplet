@@ -127,66 +127,102 @@ export function compressImageDataUrl(dataUrl, options = {}) {
   });
 }
 
-function readSvgImageFileAsWebp(file, options = {}) {
-  const maxDimension = options.maxDimension || 1400;
-  const maxBytes = options.maxBytes || DEFAULT_MAX_IMAGE_BYTES;
+export function isSvgImageSource(source) {
+  const raw = String(source || '').trim();
+  return /^data:image\/svg\+xml[;,]/i.test(raw) || /\.svg(?:[?#].*)?$/i.test(raw);
+}
 
+export async function convertSvgImageSourceToWebp(source, options = {}) {
+  const svgText = await svgTextFromSource(source);
+  return renderSvgTextAsWebp(svgText, options);
+}
+
+function readSvgImageFileAsWebp(file, options = {}) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('Could not read that SVG.'));
     reader.onload = () => {
-      const svgText = String(reader.result || '');
-      const svgBlob = new Blob([svgText], { type: 'image/svg+xml' });
-      const objectUrl = URL.createObjectURL(svgBlob);
-      const image = new Image();
-
-      image.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
-        reject(new Error('Could not convert that SVG to WebP.'));
-      };
-      image.onload = () => {
-        try {
-          const dimensions = svgDimensions(svgText);
-          const sourceWidth = image.naturalWidth || image.width || dimensions.width || maxDimension;
-          const sourceHeight = image.naturalHeight || image.height || dimensions.height || maxDimension;
-          let scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
-          let best = '';
-
-          for (let attempt = 0; attempt < 8; attempt += 1) {
-            const width = Math.max(96, Math.round(sourceWidth * scale));
-            const height = Math.max(96, Math.round(sourceHeight * scale));
-            const quality = Math.max(0.5, 0.9 - attempt * 0.06);
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = width;
-            canvas.height = height;
-            context.clearRect(0, 0, width, height);
-            context.drawImage(image, 0, 0, width, height);
-            best = canvas.toDataURL('image/webp', quality);
-            if (estimatedDataUrlBytes(best) <= maxBytes) {
-              URL.revokeObjectURL(objectUrl);
-              resolve(best);
-              return;
-            }
-            scale *= 0.82;
-          }
-
-          URL.revokeObjectURL(objectUrl);
-          if (estimatedDataUrlBytes(best) <= maxBytes * 1.25) {
-            resolve(best);
-            return;
-          }
-          reject(new Error('That SVG is too large after WebP conversion. Try a simpler export.'));
-        } catch {
-          URL.revokeObjectURL(objectUrl);
-          reject(new Error('Could not convert that SVG to WebP.'));
-        }
-      };
-
-      image.src = objectUrl;
+      renderSvgTextAsWebp(String(reader.result || ''), options).then(resolve, reject);
     };
     reader.readAsText(file);
   });
+}
+
+function renderSvgTextAsWebp(svgText, options = {}) {
+  const maxDimension = options.maxDimension || 1400;
+  const maxBytes = options.maxBytes || DEFAULT_MAX_IMAGE_BYTES;
+
+  return new Promise((resolve, reject) => {
+    const svgBlob = new Blob([svgText], { type: 'image/svg+xml' });
+    const objectUrl = URL.createObjectURL(svgBlob);
+    const image = new Image();
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Could not convert that SVG to WebP.'));
+    };
+    image.onload = () => {
+      try {
+        const dimensions = svgDimensions(svgText);
+        const sourceWidth = image.naturalWidth || image.width || dimensions.width || maxDimension;
+        const sourceHeight = image.naturalHeight || image.height || dimensions.height || maxDimension;
+        let scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
+        let best = '';
+
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+          const width = Math.max(96, Math.round(sourceWidth * scale));
+          const height = Math.max(96, Math.round(sourceHeight * scale));
+          const quality = Math.max(0.5, 0.9 - attempt * 0.06);
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.width = width;
+          canvas.height = height;
+          context.clearRect(0, 0, width, height);
+          context.drawImage(image, 0, 0, width, height);
+          best = canvas.toDataURL('image/webp', quality);
+          if (estimatedDataUrlBytes(best) <= maxBytes) {
+            URL.revokeObjectURL(objectUrl);
+            resolve(best);
+            return;
+          }
+          scale *= 0.82;
+        }
+
+        URL.revokeObjectURL(objectUrl);
+        if (estimatedDataUrlBytes(best) <= maxBytes * 1.25) {
+          resolve(best);
+          return;
+        }
+        reject(new Error('That SVG is too large after WebP conversion. Try a simpler export.'));
+      } catch {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('Could not convert that SVG to WebP.'));
+      }
+    };
+
+    image.src = objectUrl;
+  });
+}
+
+async function svgTextFromSource(source) {
+  const raw = String(source || '').trim();
+  if (!raw) throw new Error('No SVG source provided.');
+
+  if (/^data:image\/svg\+xml[,;]/i.test(raw)) {
+    const commaIndex = raw.indexOf(',');
+    const meta = commaIndex >= 0 ? raw.slice(0, commaIndex).toLowerCase() : '';
+    const payload = commaIndex >= 0 ? raw.slice(commaIndex + 1) : '';
+    if (meta.includes(';base64')) {
+      const binary = window.atob(payload);
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      return new TextDecoder().decode(bytes);
+    }
+    return decodeURIComponent(payload);
+  }
+
+  const response = await fetch(raw);
+  if (!response.ok) throw new Error('Could not fetch that SVG.');
+  return response.text();
 }
 
 function svgDimensions(svgText) {

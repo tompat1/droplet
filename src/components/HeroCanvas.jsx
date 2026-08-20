@@ -24,7 +24,7 @@ import { useAuth } from './AuthContext';
 import EditableText from './EditableText';
 import { useCanvasAssets } from './CanvasAssetsState';
 import { canvasApi, generationApi, usageApi } from '../lib/apiClient';
-import { compressImageDataUrl, readImageFileAsDataUrl } from '../lib/mediaFiles';
+import { compressImageDataUrl, convertSvgImageSourceToWebp, isSvgImageSource, readImageFileAsDataUrl } from '../lib/mediaFiles';
 
 const FullscreenIcon = () => (
   <svg viewBox="2 2 20 20" width="18" height="18" fill="currentColor" aria-hidden="true">
@@ -117,6 +117,13 @@ const titleFromFileName = (fileName = 'Imported Image') => {
 const isEditableTarget = (target) => (
   target instanceof HTMLElement &&
   Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
+);
+
+const isManualReferenceEdge = (edge) => (
+  edge?.data?.isReferenceRenderLink === true ||
+  edge?.sourceHandle === REFERENCE_SOURCE_HANDLE ||
+  edge?.targetHandle === REFERENCE_TARGET_HANDLE ||
+  String(edge?.id || '').startsWith(`reference-${edge?.source}-${edge?.target}`)
 );
 
 const isSvgFile = (file) => file?.type === 'image/svg+xml' || /\.svg$/i.test(file?.name || '');
@@ -1736,7 +1743,8 @@ const sanitizeEdgeForSave = (edge) => ({
   type: edge.type,
   animated: edge.animated === true,
   data: edge.data || {},
-  style: edge.style || {}
+  style: edge.style || {},
+  interactionWidth: edge.interactionWidth
 });
 
 const buildCanvasPayload = ({ name, nodes, edges, viewport, collapsedBranches, interactionMode }) => ({
@@ -3339,9 +3347,14 @@ export default function HeroCanvas() {
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
   const labelDragGroupRef = useRef(null);
+  const boardSvgConversionRef = useRef({ running: false, failedKeys: new Set() });
 
   const graphChangeTypes = useMemo(() => new Set(['position', 'dimensions', 'add', 'remove', 'replace']), []);
   const edgeChangeTypes = useMemo(() => new Set(['add', 'remove', 'replace']), []);
+  const boardSvgAssetSignature = useMemo(() => nodes
+    .filter((node) => node.type === 'brandCard' && isSvgImageSource(node.data?.image))
+    .map((node) => `${node.id}:${node.data?.image}`)
+    .join('|'), [nodes]);
   const setPersistentNodes = useCallback((updater) => {
     setIsCanvasDirty(true);
     setNodes(updater);
@@ -3372,6 +3385,77 @@ export default function HeroCanvas() {
     setCanvasActionToast('');
     window.requestAnimationFrame(() => setCanvasActionToast(message));
   }, []);
+
+  useEffect(() => {
+    if (!boardSvgAssetSignature || boardSvgConversionRef.current.running) return undefined;
+
+    const candidates = nodesRef.current.filter((node) => {
+      if (node.type !== 'brandCard' || !isSvgImageSource(node.data?.image)) return false;
+      const failureKey = `${node.id}:${node.data.image}`;
+      return !boardSvgConversionRef.current.failedKeys.has(failureKey);
+    });
+    if (candidates.length === 0) return undefined;
+
+    let cancelled = false;
+    const conversionState = boardSvgConversionRef.current;
+    conversionState.running = true;
+    setImportProcessingLabel(`Converting ${candidates.length} board SVG${candidates.length === 1 ? '' : 's'} to WebP`);
+    setIsImportProcessing(true);
+    setCanvasStatus(`Converting ${candidates.length} board SVG${candidates.length === 1 ? '' : 's'} to WebP...`);
+
+    (async () => {
+      const converted = new Map();
+      const sourceById = new Map();
+      const failed = [];
+
+      for (const node of candidates) {
+        const source = String(node.data?.image || '');
+        sourceById.set(node.id, source);
+        try {
+          const webp = await convertSvgImageSourceToWebp(source, CANVAS_IMPORT_IMAGE_OPTIONS);
+          converted.set(node.id, webp);
+        } catch (error) {
+          failed.push(node);
+          conversionState.failedKeys.add(`${node.id}:${source}`);
+          console.warn('Board SVG conversion failed:', error);
+        }
+      }
+
+      if (cancelled) return;
+
+      if (converted.size > 0) {
+        const convertedAt = new Date().toISOString();
+        setNodes((nds) => nds.map((node) => {
+          const image = converted.get(node.id);
+          if (!image || node.data?.image !== sourceById.get(node.id)) return node;
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              image,
+              convertedFromSvgAt: convertedAt
+            }
+          };
+        }));
+        setIsCanvasDirty(true);
+      }
+
+      const convertedText = converted.size === 1 ? 'Converted 1 board SVG to WebP.' : `Converted ${converted.size} board SVGs to WebP.`;
+      const failedText = failed.length > 0 ? ` ${failed.length} could not be converted.` : '';
+      setCanvasStatus(converted.size > 0 ? `${convertedText}${failedText}` : `No board SVGs converted.${failedText}`);
+      if (converted.size > 0) showCanvasActionToast(convertedText);
+    })().finally(() => {
+      if (!cancelled) {
+        setIsImportProcessing(false);
+        conversionState.running = false;
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      conversionState.running = false;
+    };
+  }, [boardSvgAssetSignature, setNodes, showCanvasActionToast]);
 
   useEffect(() => {
     setCanvasSnapshot({
@@ -3643,6 +3727,7 @@ export default function HeroCanvas() {
         referenceNodeId: sourceId,
         targetNodeId: targetId
       },
+      interactionWidth: 28,
       style: {
         stroke: 'rgba(0,255,204,0.78)',
         strokeWidth: 3,
@@ -4446,6 +4531,16 @@ export default function HeroCanvas() {
         showCanvasActionToast(`Restored ${action.nodes.length} cards.`);
       }
 
+      if (action.type === 'delete-edge') {
+        setEdges((eds) => {
+          const withoutDuplicate = eds.filter((edge) => edge.id !== action.edge.id);
+          return [...withoutDuplicate, action.edge];
+        });
+        setIsCanvasDirty(true);
+        setCanvasStatus('Restored reference connection.');
+        showCanvasActionToast('Restored reference connection.');
+      }
+
       return rest;
     });
   }, [setEdges, setNodes, showCanvasActionToast]);
@@ -4783,6 +4878,24 @@ export default function HeroCanvas() {
     onEdgesChange(changes);
   }, [edgeChangeTypes, onEdgesChange]);
 
+  const handleEdgeClick = useCallback((event, edge) => {
+    if (!isManualReferenceEdge(edge)) return;
+    event?.stopPropagation();
+
+    const edgeToDelete = edgesRef.current.find((candidate) => candidate.id === edge.id) || edge;
+    const sourceNode = nodesRef.current.find((node) => node.id === edgeToDelete.source);
+    const targetNode = nodesRef.current.find((node) => node.id === edgeToDelete.target);
+    pushUndoAction({
+      type: 'delete-edge',
+      label: 'Restore reference connection',
+      edge: edgeToDelete
+    });
+    setPersistentEdges((eds) => eds.filter((candidate) => candidate.id !== edgeToDelete.id));
+    const message = `${sourceNode?.data?.title || 'Reference'} disconnected from ${targetNode?.data?.title || 'card'}.`;
+    setCanvasStatus(message);
+    showCanvasActionToast('Reference connection removed.');
+  }, [pushUndoAction, setPersistentEdges, showCanvasActionToast]);
+
   const onNodeClick = useCallback((event, node) => {
     if (isEditMode) return;
 
@@ -4893,6 +5006,7 @@ export default function HeroCanvas() {
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
+        onEdgeClick={handleEdgeClick}
         onNodeClick={onNodeClick}
         onPaneClick={handlePaneClick}
         onSelectionChange={handleSelectionChange}
