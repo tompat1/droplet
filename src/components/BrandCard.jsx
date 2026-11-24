@@ -42,12 +42,6 @@ const GENERATION_PROVIDERS = {
     pipeline: 'image',
     accent: '#00ffcc'
   },
-  cloudflare_sd_img2img: {
-    label: 'Cloudflare SD Img2Img',
-    shortLabel: 'Img2Img',
-    pipeline: 'image',
-    accent: '#92ffb8'
-  },
   cloudflare_video_storyboard: {
     label: 'Cloudflare Workers Video Concept',
     shortLabel: 'Workers Video',
@@ -87,7 +81,6 @@ const FREE_PROVIDER_KEYS = [
   'cloudflare_phoenix',
   'cloudflare_flux_klein',
   'cloudflare_flux_schnell',
-  'cloudflare_sd_img2img',
   'cloudflare_video_storyboard'
 ];
 

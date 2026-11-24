@@ -39,11 +39,6 @@ const GENERATION_PROVIDERS = {
     pipeline: 'image',
     defaultModel: '@cf/black-forest-labs/flux-1-schnell'
   },
-  cloudflare_sd_img2img: {
-    label: 'Cloudflare SD Img2Img',
-    pipeline: 'image',
-    defaultModel: '@cf/runwayml/stable-diffusion-v1-5-img2img'
-  },
   cloudflare_video_storyboard: {
     label: 'Cloudflare Workers AI Video Concept',
     pipeline: 'video',
@@ -107,7 +102,8 @@ const DEFAULT_IMAGE_QUALITY = 'high';
 const DEFAULT_VEO_SECONDS = 8;
 const DEPRECATED_PROVIDER_FALLBACKS = {
   cloudflare_sdxl: 'cloudflare_flux_klein_9b',
-  cloudflare_sdxl_lightning: 'cloudflare_flux_klein_9b'
+  cloudflare_sdxl_lightning: 'cloudflare_flux_klein_9b',
+  cloudflare_sd_img2img: 'cloudflare_flux_klein_9b'
 };
 const CLOUDFLARE_AI_USAGE_PROVIDERS = new Set([
   'cloudflare_flux_klein_9b',
@@ -606,8 +602,6 @@ async function createGenerationBranch(request, env, userId) {
       branch = await generateCloudflarePhoenix(env, input);
     } else if (input.provider === 'cloudflare_flux_schnell') {
       branch = await generateCloudflareFluxSchnell(env, input);
-    } else if (input.provider === 'cloudflare_sd_img2img') {
-      branch = await generateCloudflareSdImg2Img(env, input);
     } else if (input.provider === 'cloudflare_video_storyboard' || input.provider === 'concierge_free_image' || input.provider === 'concierge_free_video') {
       branch = await generateConciergeFreeBranch(request, env, input);
     } else if (input.provider === 'openai_image') {
@@ -1264,10 +1258,7 @@ async function generateCloudflareFluxSchnell(env, input) {
   const model = cleanText(env.CLOUDFLARE_FLUX_SCHNELL_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_flux_schnell.defaultModel;
   const payload = await env.AI.run(model, {
     prompt: buildCloudflareImagePrompt(input),
-    num_steps: Math.max(cloudflareFluxSteps(input.quality), 8),
-    width: cloudflareImageDimension(input.size, 'width'),
-    height: cloudflareImageDimension(input.size, 'height'),
-    seed: Math.floor(Math.random() * 1000000000)
+    steps: Math.min(Math.max(cloudflareFluxSteps(input.quality), 4), 8)
   });
   const imageBase64 = extractCloudflareImageBase64(payload);
   if (!imageBase64) throw new Error('Cloudflare FLUX did not return image data');
@@ -1322,33 +1313,6 @@ async function generateCloudflarePhoenix(env, input) {
 
   return {
     title: 'Phoenix 1.0 Image Branch',
-    subtitle: `Generated with ${model}`,
-    description: input.prompt,
-    imageDataUrl,
-    model,
-    status: 'ready'
-  };
-}
-
-async function generateCloudflareSdImg2Img(env, input) {
-  if (!env.AI) throw new Error('Workers AI binding AI is not configured');
-  const model = cleanText(env.CLOUDFLARE_SD_IMG2IMG_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_sd_img2img.defaultModel;
-  const reference = await firstReferenceImageBase64(input);
-  if (!reference) throw new Error('Cloudflare SD Img2Img requires a source image or uploaded reference');
-  const payload = await env.AI.run(model, {
-    prompt: buildCloudflareImagePrompt(input),
-    image_b64: reference,
-    width: cloudflareImageDimension(input.size, 'width'),
-    height: cloudflareImageDimension(input.size, 'height'),
-    num_steps: 20,
-    strength: input.quality === 'low' ? 0.48 : input.quality === 'high' ? 0.78 : 0.62,
-    guidance: cloudflareGuidance(input.quality) + 2,
-    seed: Math.floor(Math.random() * 1000000000)
-  });
-  const imageDataUrl = await cloudflareImagePayloadDataUrl(payload);
-
-  return {
-    title: 'SD Img2Img Branch',
     subtitle: `Generated with ${model}`,
     description: input.prompt,
     imageDataUrl,
@@ -2102,14 +2066,6 @@ async function cloudflareImagePayloadDataUrl(payload, fallbackMime = 'image/png'
     return `data:${contentType};base64,${arrayBufferToBase64(await response.arrayBuffer())}`;
   }
   throw new Error('Cloudflare image model did not return image data');
-}
-
-async function firstReferenceImageBase64(input) {
-  const url = cloudflareReferenceUrls(input)[0];
-  if (!url) return '';
-  const blob = await referenceUrlToBlob(url);
-  if (!blob) return '';
-  return arrayBufferToBase64(await blob.arrayBuffer());
 }
 
 function arrayBufferToBase64(buffer) {
