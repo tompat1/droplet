@@ -6,35 +6,41 @@ import DropletLoader from './DropletLoader';
 import MediaModal from './MediaModal';
 
 const GENERATION_PROVIDERS = {
-  cloudflare_flux_klein: {
-    label: 'Cloudflare FLUX.2 Klein',
-    shortLabel: 'FLUX Klein',
-    pipeline: 'image',
-    accent: '#f5d76e'
-  },
   cloudflare_flux_klein_9b: {
     label: 'Cloudflare FLUX.2 Klein 9B',
     shortLabel: 'FLUX 9B',
     pipeline: 'image',
     accent: '#ffb84d'
   },
+  cloudflare_flux_dev: {
+    label: 'Cloudflare FLUX.2 Dev',
+    shortLabel: 'FLUX.2 Dev',
+    pipeline: 'image',
+    accent: '#ff8a5b'
+  },
+  cloudflare_lucid_origin: {
+    label: 'Cloudflare Lucid Origin',
+    shortLabel: 'Lucid',
+    pipeline: 'image',
+    accent: '#8fd3ff'
+  },
+  cloudflare_phoenix: {
+    label: 'Cloudflare Phoenix 1.0',
+    shortLabel: 'Phoenix',
+    pipeline: 'image',
+    accent: '#ffe66d'
+  },
+  cloudflare_flux_klein: {
+    label: 'Cloudflare FLUX.2 Klein 4B',
+    shortLabel: 'FLUX 4B',
+    pipeline: 'image',
+    accent: '#f5d76e'
+  },
   cloudflare_flux_schnell: {
     label: 'Cloudflare FLUX Schnell',
     shortLabel: 'FLUX',
     pipeline: 'image',
     accent: '#00ffcc'
-  },
-  cloudflare_sdxl: {
-    label: 'Cloudflare SDXL',
-    shortLabel: 'SDXL',
-    pipeline: 'image',
-    accent: '#8fd3ff'
-  },
-  cloudflare_sdxl_lightning: {
-    label: 'Cloudflare SDXL Lightning',
-    shortLabel: 'Lightning',
-    pipeline: 'image',
-    accent: '#ffe66d'
   },
   cloudflare_sd_img2img: {
     label: 'Cloudflare SD Img2Img',
@@ -75,11 +81,12 @@ const GENERATION_PROVIDERS = {
 };
 
 const FREE_PROVIDER_KEYS = [
-  'cloudflare_flux_klein',
   'cloudflare_flux_klein_9b',
+  'cloudflare_flux_dev',
+  'cloudflare_lucid_origin',
+  'cloudflare_phoenix',
+  'cloudflare_flux_klein',
   'cloudflare_flux_schnell',
-  'cloudflare_sdxl',
-  'cloudflare_sdxl_lightning',
   'cloudflare_sd_img2img',
   'cloudflare_video_storyboard'
 ];
@@ -381,8 +388,9 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
   const handleInitiateTweak = (e) => {
     e?.stopPropagation();
-    const sameProviderKey = data.generationProvider || (data.generationPipeline === 'video' ? 'google_veo' : 'cloudflare_flux_klein');
-    const providerObj = GENERATION_PROVIDERS[sameProviderKey] || GENERATION_PROVIDERS.cloudflare_flux_klein;
+    const rawProviderKey = data.generationProvider || (data.generationPipeline === 'video' ? 'google_veo' : 'cloudflare_flux_klein_9b');
+    const sameProviderKey = GENERATION_PROVIDERS[rawProviderKey] ? rawProviderKey : 'cloudflare_flux_klein_9b';
+    const providerObj = GENERATION_PROVIDERS[sameProviderKey] || GENERATION_PROVIDERS.cloudflare_flux_klein_9b;
 
     setGenProvider(sameProviderKey);
     setGenPipeline(providerObj.pipeline);
@@ -714,7 +722,8 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
   };
 
   const handleGenerateRun = async () => {
-    const providerKey = genProvider || (genPipeline === 'video' ? 'google_veo' : 'cloudflare_flux_klein');
+    const rawProviderKey = genProvider || (genPipeline === 'video' ? 'google_veo' : 'cloudflare_flux_klein_9b');
+    const providerKey = GENERATION_PROVIDERS[rawProviderKey] ? rawProviderKey : 'cloudflare_flux_klein_9b';
     try {
       localStorage.setItem('droplet-last-generation-renderer', providerKey);
     } catch {

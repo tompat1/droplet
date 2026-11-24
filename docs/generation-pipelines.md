@@ -1,8 +1,12 @@
 # Generation Pipelines
 
-Droplet can create Fluid Node Canvas branches through five provider paths:
+Droplet can create Fluid Node Canvas branches through these provider paths:
 
-- Cloudflare FLUX.2 Klein through Workers AI, default model `@cf/black-forest-labs/flux-2-klein-4b`
+- Cloudflare FLUX.2 Klein 9B through Workers AI, default model `@cf/black-forest-labs/flux-2-klein-9b` (default fast & Concierge renderer)
+- Cloudflare FLUX.2 Dev through Workers AI, default model `@cf/black-forest-labs/flux-2-dev` (flagship high-fidelity + up to 4 reference images)
+- Cloudflare Lucid Origin through Workers AI, default model `@cf/leonardo/lucid-origin` (graphic design, product mockups, crisp text)
+- Cloudflare Phoenix 1.0 through Workers AI, default model `@cf/leonardo/phoenix-1.0` (coherent typography & strict prompt adherence)
+- Cloudflare FLUX.2 Klein 4B through Workers AI, default model `@cf/black-forest-labs/flux-2-klein-4b`
 - Cloudflare FLUX Schnell through Workers AI, default model `@cf/black-forest-labs/flux-1-schnell`
 - ChatGPT Images through OpenAI Images API, default model `gpt-image-2`
 - Gemini Banana Pro through Google Gemini Interactions API, default model `gemini-3-pro-image`
@@ -22,6 +26,10 @@ npx wrangler secret put GEMINI_API_KEY
 Optional model overrides:
 
 ```bash
+CLOUDFLARE_FLUX_KLEIN_9B_MODEL=@cf/black-forest-labs/flux-2-klein-9b
+CLOUDFLARE_FLUX_DEV_MODEL=@cf/black-forest-labs/flux-2-dev
+CLOUDFLARE_LUCID_ORIGIN_MODEL=@cf/leonardo/lucid-origin
+CLOUDFLARE_PHOENIX_MODEL=@cf/leonardo/phoenix-1.0
 CLOUDFLARE_FLUX_KLEIN_MODEL=@cf/black-forest-labs/flux-2-klein-4b
 CLOUDFLARE_FLUX_SCHNELL_MODEL=@cf/black-forest-labs/flux-1-schnell
 OPENAI_IMAGE_MODEL=gpt-image-2

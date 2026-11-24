@@ -9,30 +9,35 @@ const MAX_CONCIERGE_ASSETS = 36;
 const MAX_CONCIERGE_HISTORY = 8;
 const MAX_GENERATION_REFERENCE_CHARS = 8000000;
 const GENERATION_PROVIDERS = {
-  cloudflare_flux_klein: {
-    label: 'Cloudflare FLUX.2 Klein',
-    pipeline: 'image',
-    defaultModel: '@cf/black-forest-labs/flux-2-klein-4b'
-  },
   cloudflare_flux_klein_9b: {
     label: 'Cloudflare FLUX.2 Klein 9B',
     pipeline: 'image',
     defaultModel: '@cf/black-forest-labs/flux-2-klein-9b'
   },
+  cloudflare_flux_dev: {
+    label: 'Cloudflare FLUX.2 Dev',
+    pipeline: 'image',
+    defaultModel: '@cf/black-forest-labs/flux-2-dev'
+  },
+  cloudflare_lucid_origin: {
+    label: 'Cloudflare Lucid Origin',
+    pipeline: 'image',
+    defaultModel: '@cf/leonardo/lucid-origin'
+  },
+  cloudflare_phoenix: {
+    label: 'Cloudflare Phoenix 1.0',
+    pipeline: 'image',
+    defaultModel: '@cf/leonardo/phoenix-1.0'
+  },
+  cloudflare_flux_klein: {
+    label: 'Cloudflare FLUX.2 Klein 4B',
+    pipeline: 'image',
+    defaultModel: '@cf/black-forest-labs/flux-2-klein-4b'
+  },
   cloudflare_flux_schnell: {
     label: 'Cloudflare FLUX Schnell',
     pipeline: 'image',
     defaultModel: '@cf/black-forest-labs/flux-1-schnell'
-  },
-  cloudflare_sdxl: {
-    label: 'Cloudflare SDXL',
-    pipeline: 'image',
-    defaultModel: '@cf/stabilityai/stable-diffusion-xl-base-1.0'
-  },
-  cloudflare_sdxl_lightning: {
-    label: 'Cloudflare SDXL Lightning',
-    pipeline: 'image',
-    defaultModel: '@cf/bytedance/stable-diffusion-xl-lightning'
   },
   cloudflare_sd_img2img: {
     label: 'Cloudflare SD Img2Img',
@@ -100,12 +105,17 @@ const OPENAI_IMAGE_PRICE_ESTIMATES_USD = {
 const DEFAULT_IMAGE_SIZE = '1024x1024';
 const DEFAULT_IMAGE_QUALITY = 'high';
 const DEFAULT_VEO_SECONDS = 8;
+const DEPRECATED_PROVIDER_FALLBACKS = {
+  cloudflare_sdxl: 'cloudflare_flux_klein_9b',
+  cloudflare_sdxl_lightning: 'cloudflare_flux_klein_9b'
+};
 const CLOUDFLARE_AI_USAGE_PROVIDERS = new Set([
-  'cloudflare_flux_klein',
   'cloudflare_flux_klein_9b',
+  'cloudflare_flux_dev',
+  'cloudflare_lucid_origin',
+  'cloudflare_phoenix',
+  'cloudflare_flux_klein',
   'cloudflare_flux_schnell',
-  'cloudflare_sdxl',
-  'cloudflare_sdxl_lightning',
   'cloudflare_sd_img2img',
   'concierge_free_image',
   'concierge_free_video',
@@ -588,12 +598,14 @@ async function createGenerationBranch(request, env, userId) {
       branch = await generateCloudflareFluxKlein(env, input);
     } else if (input.provider === 'cloudflare_flux_klein_9b') {
       branch = await generateCloudflareFluxKlein9b(env, input);
+    } else if (input.provider === 'cloudflare_flux_dev') {
+      branch = await generateCloudflareFluxDev(env, input);
+    } else if (input.provider === 'cloudflare_lucid_origin') {
+      branch = await generateCloudflareLucidOrigin(env, input);
+    } else if (input.provider === 'cloudflare_phoenix') {
+      branch = await generateCloudflarePhoenix(env, input);
     } else if (input.provider === 'cloudflare_flux_schnell') {
       branch = await generateCloudflareFluxSchnell(env, input);
-    } else if (input.provider === 'cloudflare_sdxl') {
-      branch = await generateCloudflareSdxl(env, input);
-    } else if (input.provider === 'cloudflare_sdxl_lightning') {
-      branch = await generateCloudflareSdxlLightning(env, input);
     } else if (input.provider === 'cloudflare_sd_img2img') {
       branch = await generateCloudflareSdImg2Img(env, input);
     } else if (input.provider === 'cloudflare_video_storyboard' || input.provider === 'concierge_free_image' || input.provider === 'concierge_free_video') {
@@ -1166,9 +1178,24 @@ async function generateCloudflareFluxKlein9b(env, input) {
   });
 }
 
-async function generateCloudflareFluxMultipart(env, input, model, titles) {
+async function generateCloudflareFluxDev(env, input) {
+  if (!env.AI) throw new Error('Workers AI binding AI is not configured');
+  const model = cleanText(env.CLOUDFLARE_FLUX_DEV_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_flux_dev.defaultModel;
+  return generateCloudflareFluxMultipart(
+    env,
+    input,
+    model,
+    {
+      titleWithRefs: 'FLUX.2 Dev Reference Branch',
+      title: 'FLUX.2 Dev Image Branch'
+    },
+    { includeSteps: true }
+  );
+}
+
+async function generateCloudflareFluxMultipart(env, input, model, titles, config = {}) {
   try {
-    return await runCloudflareFluxMultipart(env, input, model, titles);
+    return await runCloudflareFluxMultipart(env, input, model, titles, config);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!isGenerationPolicyRefusal(message) || cloudflareReferenceUrls(input).length <= 1) throw error;
@@ -1183,6 +1210,7 @@ async function generateCloudflareFluxMultipart(env, input, model, titles) {
       }
     };
     return runCloudflareFluxMultipart(env, parentOnlyInput, model, titles, {
+      ...config,
       fallbackReason: 'Retried with selected asset only after provider safety refusal on extra references.'
     });
   }
@@ -1195,6 +1223,9 @@ async function runCloudflareFluxMultipart(env, input, model, titles, options = {
   form.append('width', String(cloudflareImageDimension(input.size, 'width')));
   form.append('height', String(cloudflareImageDimension(input.size, 'height')));
   form.append('guidance', String(cloudflareGuidance(input.quality)));
+  if (options.includeSteps) {
+    form.append('steps', String(cloudflareFluxDevSteps(input.quality)));
+  }
 
   const referenceUrls = cloudflareReferenceUrls(input);
   let referenceCount = 0;
@@ -1251,21 +1282,22 @@ async function generateCloudflareFluxSchnell(env, input) {
   };
 }
 
-async function generateCloudflareSdxl(env, input) {
+async function generateCloudflareLucidOrigin(env, input) {
   if (!env.AI) throw new Error('Workers AI binding AI is not configured');
-  const model = cleanText(env.CLOUDFLARE_SDXL_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_sdxl.defaultModel;
+  const model = cleanText(env.CLOUDFLARE_LUCID_ORIGIN_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_lucid_origin.defaultModel;
+  const steps = cloudflareLeonardoSteps(input.quality);
   const payload = await env.AI.run(model, {
     prompt: buildCloudflareImagePrompt(input),
     width: cloudflareImageDimension(input.size, 'width'),
     height: cloudflareImageDimension(input.size, 'height'),
-    guidance: cloudflareGuidance(input.quality),
-    num_steps: cloudflareFluxSteps(input.quality) + 8,
+    guidance: input.quality === 'low' ? 3.5 : input.quality === 'medium' ? 4.5 : 6.0,
+    num_steps: steps,
     seed: Math.floor(Math.random() * 1000000000)
   });
-  const imageDataUrl = await cloudflareImagePayloadDataUrl(payload);
+  const imageDataUrl = await cloudflareImagePayloadDataUrl(payload, 'image/jpeg');
 
   return {
-    title: 'SDXL Image Branch',
+    title: 'Lucid Origin Image Branch',
     subtitle: `Generated with ${model}`,
     description: input.prompt,
     imageDataUrl,
@@ -1274,19 +1306,22 @@ async function generateCloudflareSdxl(env, input) {
   };
 }
 
-async function generateCloudflareSdxlLightning(env, input) {
+async function generateCloudflarePhoenix(env, input) {
   if (!env.AI) throw new Error('Workers AI binding AI is not configured');
-  const model = cleanText(env.CLOUDFLARE_SDXL_LIGHTNING_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_sdxl_lightning.defaultModel;
+  const model = cleanText(env.CLOUDFLARE_PHOENIX_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_phoenix.defaultModel;
+  const steps = cloudflareLeonardoSteps(input.quality);
   const payload = await env.AI.run(model, {
     prompt: buildCloudflareImagePrompt(input),
     width: cloudflareImageDimension(input.size, 'width'),
     height: cloudflareImageDimension(input.size, 'height'),
+    guidance: input.quality === 'low' ? 3.0 : input.quality === 'medium' ? 4.5 : 6.5,
+    num_steps: steps,
     seed: Math.floor(Math.random() * 1000000000)
   });
-  const imageDataUrl = await cloudflareImagePayloadDataUrl(payload);
+  const imageDataUrl = await cloudflareImagePayloadDataUrl(payload, 'image/jpeg');
 
   return {
-    title: 'SDXL Lightning Branch',
+    title: 'Phoenix 1.0 Image Branch',
     subtitle: `Generated with ${model}`,
     description: input.prompt,
     imageDataUrl,
@@ -1468,7 +1503,8 @@ async function generateGoogleVeo(env, input) {
 }
 
 function normalizeGenerationPayload(body) {
-  const provider = cleanText(body.provider, 80);
+  const rawProvider = cleanText(body.provider, 80);
+  const provider = DEPRECATED_PROVIDER_FALLBACKS[rawProvider] || rawProvider;
   const prompt = cleanText(body.prompt, 4000);
   const parent = body.parent && typeof body.parent === 'object' ? body.parent : {};
   if (!prompt) throw new Error('Generation prompt is required');
@@ -1529,6 +1565,61 @@ function estimateGenerationUsage(input, branch, provider) {
       estimateBasis: 'Cloudflare Workers AI FLUX.2 Klein estimate using 512px output tiles plus reference image tiles; may be covered by Workers AI free allocation.'
     };
   }
+  if (input.provider === 'cloudflare_flux_dev') {
+    const outputTiles = cloudflareTileCount(input.size);
+    const referenceTiles = Math.min(4, input.refs.length + (input.parent?.image ? 1 : 0));
+    const steps = cloudflareFluxDevSteps(input.quality);
+    const estimatedUsd = roundMoney(((outputTiles * 0.00041) + (referenceTiles * 0.00021)) * steps);
+    return {
+      provider: input.provider,
+      providerLabel: provider.label,
+      pipeline: provider.pipeline,
+      model,
+      estimatedUsd,
+      currency: 'USD',
+      status: 'estimated',
+      outputCount: 1,
+      size: input.size,
+      quality: input.quality,
+      estimateBasis: 'Cloudflare Workers AI FLUX.2 Dev estimate using 512px output/reference tiles and diffusion steps; may be covered by Workers AI free allocation.'
+    };
+  }
+  if (input.provider === 'cloudflare_lucid_origin') {
+    const outputTiles = cloudflareTileCount(input.size);
+    const steps = cloudflareLeonardoSteps(input.quality);
+    const estimatedUsd = roundMoney((outputTiles * 0.006996) + (steps * 0.000132));
+    return {
+      provider: input.provider,
+      providerLabel: provider.label,
+      pipeline: provider.pipeline,
+      model,
+      estimatedUsd,
+      currency: 'USD',
+      status: 'estimated',
+      outputCount: 1,
+      size: input.size,
+      quality: input.quality,
+      estimateBasis: 'Cloudflare Workers AI Leonardo Lucid Origin estimate using 512px tiles and diffusion steps; may be covered by Workers AI free allocation.'
+    };
+  }
+  if (input.provider === 'cloudflare_phoenix') {
+    const outputTiles = cloudflareTileCount(input.size);
+    const steps = cloudflareLeonardoSteps(input.quality);
+    const estimatedUsd = roundMoney((outputTiles * 0.00583) + (steps * 0.00011));
+    return {
+      provider: input.provider,
+      providerLabel: provider.label,
+      pipeline: provider.pipeline,
+      model,
+      estimatedUsd,
+      currency: 'USD',
+      status: 'estimated',
+      outputCount: 1,
+      size: input.size,
+      quality: input.quality,
+      estimateBasis: 'Cloudflare Workers AI Leonardo Phoenix 1.0 estimate using 512px tiles and diffusion steps; may be covered by Workers AI free allocation.'
+    };
+  }
   if (input.provider === 'cloudflare_flux_schnell') {
     const outputTiles = cloudflareTileCount(input.size);
     const steps = cloudflareFluxSteps(input.quality);
@@ -1549,8 +1640,6 @@ function estimateGenerationUsage(input, branch, provider) {
   }
   if ([
     'cloudflare_flux_klein_9b',
-    'cloudflare_sdxl',
-    'cloudflare_sdxl_lightning',
     'cloudflare_sd_img2img'
   ].includes(input.provider)) {
     return {
@@ -1946,6 +2035,18 @@ function cloudflareFluxSteps(quality) {
   if (quality === 'low') return 6;
   if (quality === 'medium') return 10;
   return 12;
+}
+
+function cloudflareFluxDevSteps(quality) {
+  if (quality === 'low') return 16;
+  if (quality === 'medium') return 22;
+  return 28;
+}
+
+function cloudflareLeonardoSteps(quality) {
+  if (quality === 'low') return 15;
+  if (quality === 'medium') return 22;
+  return 28;
 }
 
 function cloudflareGuidance(quality) {

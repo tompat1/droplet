@@ -91,11 +91,11 @@ const DISPLAY_CURRENCIES = {
 };
 const CONCIERGE_GENERATION_PROVIDERS = {
   image: {
-    provider: 'cloudflare_flux_klein',
-    label: 'Cloudflare FLUX.2 Klein',
-    shortLabel: 'FLUX Klein',
+    provider: 'cloudflare_flux_klein_9b',
+    label: 'Cloudflare FLUX.2 Klein 9B',
+    shortLabel: 'FLUX 9B',
     pipeline: 'image',
-    accent: '#f5d76e'
+    accent: '#ffb84d'
   },
   video: {
     provider: 'concierge_free_video',
