@@ -1,5 +1,19 @@
 const DEFAULT_MAX_IMAGE_BYTES = 720000;
 const DEFAULT_SVG_MIN_DIMENSION = 1600;
+const GENERATION_REF_IMAGE_OPTIONS = {
+  maxDimension: 1024,
+  maxBytes: 220000
+};
+const MAX_GENERATION_REFS = 3;
+const MAX_BRAND_GUIDE_NODES = 5;
+
+function encodeCanvasDataUrl(canvas, quality, preferredMime = 'image/webp') {
+  const encoded = canvas.toDataURL(preferredMime, quality);
+  if (preferredMime === 'image/webp' && !encoded.startsWith('data:image/webp')) {
+    return canvas.toDataURL('image/jpeg', quality);
+  }
+  return encoded;
+}
 
 export function mediaFilename(title = 'droplet-media', extension = 'webp') {
   const safeTitle = String(title || 'droplet-media')
@@ -67,7 +81,7 @@ export function readImageFileAsDataUrl(file, options = {}) {
           canvas.width = width;
           canvas.height = height;
           context.drawImage(image, 0, 0, width, height);
-          best = canvas.toDataURL('image/webp', quality);
+          best = encodeCanvasDataUrl(canvas, quality, 'image/webp');
           if (estimatedDataUrlBytes(best) <= maxBytes) {
             resolve(best);
             return;
@@ -110,22 +124,22 @@ export function compressImageDataUrl(dataUrl, options = {}) {
       let scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
       let best = source;
 
-      for (let attempt = 0; attempt < 9; attempt += 1) {
-        const width = Math.max(120, Math.round(sourceWidth * scale));
-        const height = Math.max(120, Math.round(sourceHeight * scale));
-        const quality = Math.max(0.42, 0.82 - attempt * 0.065);
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = width;
-        canvas.height = height;
-        context.drawImage(image, 0, 0, width, height);
-        best = canvas.toDataURL('image/webp', quality);
-        if (estimatedDataUrlBytes(best) <= maxBytes) {
-          resolve(best);
-          return;
+        for (let attempt = 0; attempt < 9; attempt += 1) {
+          const width = Math.max(120, Math.round(sourceWidth * scale));
+          const height = Math.max(120, Math.round(sourceHeight * scale));
+          const quality = Math.max(0.42, 0.82 - attempt * 0.065);
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.width = width;
+          canvas.height = height;
+          context.drawImage(image, 0, 0, width, height);
+          best = encodeCanvasDataUrl(canvas, quality, options.mimeType || 'image/webp');
+          if (estimatedDataUrlBytes(best) <= maxBytes) {
+            resolve(best);
+            return;
+          }
+          scale *= 0.78;
         }
-        scale *= 0.78;
-      }
 
       resolve(best);
     };
@@ -278,4 +292,58 @@ function readRawImageFile(file, maxBytes) {
 
 function estimatedDataUrlBytes(dataUrl) {
   return Math.ceil(String(dataUrl || '').length * 0.75);
+}
+
+async function optimizeGenerationReference(value, cache) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (cache.has(raw)) return cache.get(raw);
+
+  let optimized = raw;
+  if (raw.startsWith('data:image/') && !/^data:image\/(svg\+xml|gif)/i.test(raw)) {
+    try {
+      optimized = await compressImageDataUrl(raw, GENERATION_REF_IMAGE_OPTIONS);
+    } catch {
+      optimized = raw;
+    }
+  }
+  cache.set(raw, optimized);
+  return optimized;
+}
+
+export async function prepareGenerationBranchPayload(payload = {}) {
+  const cache = new Map();
+  const parent = payload.parent && typeof payload.parent === 'object' ? { ...payload.parent } : {};
+  const parentImage = await optimizeGenerationReference(parent.image || '', cache);
+  parent.image = parentImage;
+
+  const seenImages = new Set(parentImage ? [parentImage] : []);
+  const rawRefs = Array.isArray(payload.refs) ? payload.refs : [];
+  const compactRefs = [];
+  for (const ref of rawRefs) {
+    if (compactRefs.length >= MAX_GENERATION_REFS) break;
+    const optimized = await optimizeGenerationReference(ref, cache);
+    if (!optimized || seenImages.has(optimized)) continue;
+    seenImages.add(optimized);
+    compactRefs.push(optimized);
+  }
+
+  const rawGuideNodes = Array.isArray(payload.brandGuide?.nodes) ? payload.brandGuide.nodes.slice(0, MAX_BRAND_GUIDE_NODES) : [];
+  const compactGuideNodes = [];
+  for (const node of rawGuideNodes) {
+    const optimizedImage = await optimizeGenerationReference(node?.image || '', cache);
+    const keepImage = Boolean(optimizedImage) && !seenImages.has(optimizedImage) && seenImages.size < 4;
+    if (keepImage) seenImages.add(optimizedImage);
+    compactGuideNodes.push({
+      ...node,
+      image: keepImage ? optimizedImage : ''
+    });
+  }
+
+  return {
+    ...payload,
+    refs: compactRefs,
+    brandGuide: { nodes: compactGuideNodes },
+    parent
+  };
 }

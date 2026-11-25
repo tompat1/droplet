@@ -1,23 +1,52 @@
 const API_BASE = '/api';
 
 export async function apiRequest(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
-    },
-    ...options,
-    body: options.body && typeof options.body !== 'string'
-      ? JSON.stringify(options.body)
-      : options.body
-  });
+  const { headers: optionHeaders, body: optionBody, retryOnTimeout = false, ...restOptions } = options;
+  const serializedBody = optionBody && typeof optionBody !== 'string'
+    ? JSON.stringify(optionBody)
+    : optionBody;
+  const mergedHeaders = {
+    'Content-Type': 'application/json',
+    ...(optionHeaders || {})
+  };
+  const maxAttempts = retryOnTimeout ? 2 : 1;
 
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.error || `Request failed with ${response.status}`);
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(`${API_BASE}${path}`, {
+        credentials: 'include',
+        cache: 'no-store',
+        ...restOptions,
+        headers: mergedHeaders,
+        body: serializedBody
+      });
+
+      if (response.status === 408 && attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        continue;
+      }
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === 408) {
+          throw new Error(payload.error || 'Request timed out (408). Try fewer or smaller reference images and run again.');
+        }
+        throw new Error(payload.error || `Request failed with ${response.status}`);
+      }
+      return payload;
+    } catch (error) {
+      lastError = error;
+      const isNetworkDrop = error instanceof TypeError;
+      if (isNetworkDrop && attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        continue;
+      }
+      throw error;
+    }
   }
-  return payload;
+
+  throw lastError;
 }
 
 export const authApi = {
@@ -41,7 +70,8 @@ export const generationApi = {
   createBranch: (input, options = {}) => apiRequest('/generate/branch', {
     method: 'POST',
     body: input,
-    headers: options.headers || {}
+    headers: options.headers || {},
+    retryOnTimeout: true
   })
 };
 

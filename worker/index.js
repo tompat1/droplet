@@ -591,11 +591,11 @@ async function createGenerationBranch(request, env, userId) {
 
     let branch;
     if (input.provider === 'cloudflare_flux_klein') {
-      branch = await generateCloudflareFluxKlein(env, input);
+      branch = await generateCloudflareFluxKlein(request, env, input);
     } else if (input.provider === 'cloudflare_flux_klein_9b') {
-      branch = await generateCloudflareFluxKlein9b(env, input);
+      branch = await generateCloudflareFluxKlein9b(request, env, input);
     } else if (input.provider === 'cloudflare_flux_dev') {
-      branch = await generateCloudflareFluxDev(env, input);
+      branch = await generateCloudflareFluxDev(request, env, input);
     } else if (input.provider === 'cloudflare_lucid_origin') {
       branch = await generateCloudflareLucidOrigin(env, input);
     } else if (input.provider === 'cloudflare_phoenix') {
@@ -1154,28 +1154,29 @@ function isGenerationPolicyRefusal(message) {
   return /\b3030\b|flagged|moderation|content policy|safety filter|safety system|blocked by policy/i.test(String(message || ''));
 }
 
-async function generateCloudflareFluxKlein(env, input) {
+async function generateCloudflareFluxKlein(request, env, input) {
   if (!env.AI) throw new Error('Workers AI binding AI is not configured');
   const model = cleanText(env.CLOUDFLARE_FLUX_KLEIN_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_flux_klein.defaultModel;
-  return generateCloudflareFluxMultipart(env, input, model, {
+  return generateCloudflareFluxMultipart(request, env, input, model, {
     titleWithRefs: 'FLUX Reference Image Branch',
     title: 'FLUX Image Branch'
   });
 }
 
-async function generateCloudflareFluxKlein9b(env, input) {
+async function generateCloudflareFluxKlein9b(request, env, input) {
   if (!env.AI) throw new Error('Workers AI binding AI is not configured');
   const model = cleanText(env.CLOUDFLARE_FLUX_KLEIN_9B_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_flux_klein_9b.defaultModel;
-  return generateCloudflareFluxMultipart(env, input, model, {
+  return generateCloudflareFluxMultipart(request, env, input, model, {
     titleWithRefs: 'FLUX 9B Reference Image Branch',
     title: 'FLUX 9B Image Branch'
   });
 }
 
-async function generateCloudflareFluxDev(env, input) {
+async function generateCloudflareFluxDev(request, env, input) {
   if (!env.AI) throw new Error('Workers AI binding AI is not configured');
   const model = cleanText(env.CLOUDFLARE_FLUX_DEV_MODEL, 160) || GENERATION_PROVIDERS.cloudflare_flux_dev.defaultModel;
   return generateCloudflareFluxMultipart(
+    request,
     env,
     input,
     model,
@@ -1187,9 +1188,9 @@ async function generateCloudflareFluxDev(env, input) {
   );
 }
 
-async function generateCloudflareFluxMultipart(env, input, model, titles, config = {}) {
+async function generateCloudflareFluxMultipart(request, env, input, model, titles, config = {}) {
   try {
-    return await runCloudflareFluxMultipart(env, input, model, titles, config);
+    return await runCloudflareFluxMultipart(request, env, input, model, titles, config);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!isGenerationPolicyRefusal(message) || cloudflareReferenceUrls(input).length <= 1) throw error;
@@ -1203,14 +1204,14 @@ async function generateCloudflareFluxMultipart(env, input, model, titles, config
           : []
       }
     };
-    return runCloudflareFluxMultipart(env, parentOnlyInput, model, titles, {
+    return runCloudflareFluxMultipart(request, env, parentOnlyInput, model, titles, {
       ...config,
       fallbackReason: 'Retried with selected asset only after provider safety refusal on extra references.'
     });
   }
 }
 
-async function runCloudflareFluxMultipart(env, input, model, titles, options = {}) {
+async function runCloudflareFluxMultipart(request, env, input, model, titles, options = {}) {
   const prompt = buildCloudflareImagePrompt(input);
   const form = new FormData();
   form.append('prompt', prompt);
@@ -1221,12 +1222,13 @@ async function runCloudflareFluxMultipart(env, input, model, titles, options = {
     form.append('steps', String(cloudflareFluxDevSteps(input.quality)));
   }
 
-  const referenceUrls = cloudflareReferenceUrls(input);
+  const referenceUrls = cloudflareReferenceUrls(input).slice(0, 4);
+  const resolvedBlobs = await Promise.all(
+    referenceUrls.map((url) => referenceUrlToBlob(url, request, env).catch(() => null))
+  );
   let referenceCount = 0;
-  for (const url of referenceUrls) {
-    if (referenceCount >= 4) break;
-    const blob = await referenceUrlToBlob(url);
-    if (!blob) continue;
+  for (const blob of resolvedBlobs) {
+    if (!blob || referenceCount >= 4) continue;
     form.append(`input_image_${referenceCount}`, blob, `reference-${referenceCount}.${blobExtension(blob.type)}`);
     referenceCount += 1;
   }
@@ -2019,18 +2021,38 @@ function cloudflareGuidance(quality) {
   return 7.0;
 }
 
-async function referenceUrlToBlob(url) {
+async function referenceUrlToBlob(url, request, env) {
   const value = String(url || '').trim();
   if (value.length > MAX_GENERATION_REFERENCE_CHARS) return null;
   const dataMatch = value.match(/^data:(image\/(?:png|jpe?g|webp|gif));base64,([a-z0-9+/=]+)$/i);
   if (dataMatch) {
-    const bytes = Uint8Array.from(atob(dataMatch[2]), (char) => char.charCodeAt(0));
+    const binary = atob(dataMatch[2]);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
     return new Blob([bytes], { type: dataMatch[1].toLowerCase() });
   }
 
   if (!/^https?:\/\//i.test(value)) return null;
-  const response = await fetch(value);
-  if (!response.ok) return null;
+
+  let response;
+  try {
+    const parsedTarget = new URL(value);
+    const requestOrigin = request ? new URL(request.url).origin : '';
+    if (env?.ASSETS && requestOrigin && parsedTarget.origin === requestOrigin && !parsedTarget.pathname.startsWith('/api/')) {
+      response = await env.ASSETS.fetch(new Request(parsedTarget.toString()));
+    } else {
+      const fetchInit = typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+        ? { signal: AbortSignal.timeout(10000) }
+        : {};
+      response = await fetch(value, fetchInit);
+    }
+  } catch {
+    return null;
+  }
+
+  if (!response?.ok) return null;
   const contentType = response.headers.get('content-type') || inferImageMimeType(value);
   if (!/^image\/(png|jpe?g|webp|gif)/i.test(contentType)) return null;
   const buffer = await response.arrayBuffer();

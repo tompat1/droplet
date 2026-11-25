@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
 import { generationApi } from '../lib/apiClient';
-import { downloadMediaSource, mediaFilename, readImageFileAsDataUrl } from '../lib/mediaFiles';
+import { downloadMediaSource, mediaFilename, prepareGenerationBranchPayload, readImageFileAsDataUrl } from '../lib/mediaFiles';
 import DropletLoader from './DropletLoader';
 import MediaModal from './MediaModal';
 
@@ -461,7 +461,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         nodes: brandGuideNodes.map(brandGuidePayloadFromNode)
       };
       const refs = Array.from(new Set((Array.isArray(deletedData.generationRefs) ? deletedData.generationRefs : []).map(generationReferenceUrl).filter(Boolean)));
-      const result = await generationApi.createBranch({
+      const requestPayload = await prepareGenerationBranchPayload({
         provider: providerKey,
         pipeline: provider.pipeline,
         prompt,
@@ -481,6 +481,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           image: ''
         }
       });
+      const result = await generationApi.createBranch(requestPayload);
 
       const isVideo = provider.pipeline === 'video';
       const title = result?.branch?.title || `${isVideo ? 'Video' : 'Image'} Rerender`;
@@ -759,7 +760,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       const brandGuide = {
         nodes: brandGuideNodes.map(brandGuidePayloadFromNode)
       };
-      const result = await generationApi.createBranch({
+      const requestPayload = await prepareGenerationBranchPayload({
         provider: providerKey,
         pipeline: provider.pipeline,
         prompt: generationPrompt,
@@ -773,6 +774,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           image: generationReferenceUrl(data.image || '')
         }
       });
+      const result = await generationApi.createBranch(requestPayload);
       if (result?.branch) {
         result.branch.refs = mergedRefs;
         result.branch.brandGuideNodeIds = brandGuide.nodes.map((node) => node.id);

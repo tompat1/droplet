@@ -227,3 +227,46 @@ test('UI providers, worker providers, usage sets, and docs stay in sync', () => 
     'HeroCanvas.jsx concierge default image provider should be cloudflare_flux_klein_9b'
   );
 });
+
+test('same-origin reference assets load via env.ASSETS without external fetch', async () => {
+  const assetFetches = [];
+  const db = createMockDb();
+  const env = {
+    DB: db,
+    AI: {
+      async run(_model, input) {
+        const parsedForm = await new Response(input.multipart.body, {
+          headers: { 'content-type': input.multipart.contentType }
+        }).formData();
+        assert.ok(parsedForm.get('input_image_0'), 'should attach same-origin asset as input_image_0');
+        return { image: TINY_JPEG_BASE64 };
+      }
+    },
+    ASSETS: {
+      async fetch(req) {
+        assetFetches.push(req.url);
+        return new Response(Buffer.from(TINY_PNG_BASE64, 'base64'), {
+          status: 200,
+          headers: { 'content-type': 'image/png' }
+        });
+      }
+    }
+  };
+
+  const request = new Request('https://droplet.test/api/generate/branch', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      cookie: 'droplet_session=test-session-token'
+    },
+    body: JSON.stringify({
+      provider: 'cloudflare_flux_klein_9b',
+      prompt: 'Product studio shot',
+      parent: { image: 'https://droplet.test/assets/branding/example.png' }
+    })
+  });
+
+  const response = await worker.fetch(request, env);
+  assert.equal(response.status, 201);
+  assert.deepEqual(assetFetches, ['https://droplet.test/assets/branding/example.png']);
+});

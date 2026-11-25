@@ -24,7 +24,7 @@ import { useAuth } from './AuthContext';
 import EditableText from './EditableText';
 import { useCanvasAssets } from './CanvasAssetsState';
 import { canvasApi, generationApi, usageApi } from '../lib/apiClient';
-import { compressImageDataUrl, convertSvgImageSourceToWebp, isSvgImageSource, readImageFileAsDataUrl } from '../lib/mediaFiles';
+import { compressImageDataUrl, convertSvgImageSourceToWebp, isSvgImageSource, prepareGenerationBranchPayload, readImageFileAsDataUrl } from '../lib/mediaFiles';
 
 const FullscreenIcon = () => (
   <svg viewBox="2 2 20 20" width="18" height="18" fill="currentColor" aria-hidden="true">
@@ -3656,7 +3656,7 @@ export default function HeroCanvas() {
     showCanvasActionToast(parentNode ? 'Concierge is creating an edited branch.' : 'Concierge is rendering a new asset.');
 
     try {
-      const result = await generationApi.createBranch({
+      const requestPayload = await prepareGenerationBranchPayload({
         provider: provider.provider,
         pipeline: provider.pipeline,
         prompt,
@@ -3675,7 +3675,8 @@ export default function HeroCanvas() {
           description: 'Generated from the concierge drawer.',
           image: ''
         }
-      }, { headers: providerHeaders });
+      });
+      const result = await generationApi.createBranch(requestPayload, { headers: providerHeaders });
 
       const isVideo = provider.pipeline === 'video';
       const title = result?.branch?.title || `${parentNode ? 'Edited' : 'Concierge'} ${isVideo ? 'Video' : 'Image'} Branch`;
