@@ -472,7 +472,8 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           title: parentNode.data?.title || '',
           subtitle: parentNode.data?.subtitle || '',
           description: parentNode.data?.description || '',
-          image: generationReferenceUrl(parentNode.data?.image || '')
+          image: generationReferenceUrl(parentNode.data?.image || ''),
+          isBrandGuide: isBrandGuideNode(parentNode)
         } : {
           id: deletedData.generatedFromNodeId || 'rerender',
           title: deletedData.title || 'Deleted render',
@@ -739,10 +740,6 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       const existingEdges = getEdges();
       const branchIndex = existingNodes.filter((node) => node.data?.generatedFromNodeId === id).length;
       const brandGuideNodes = brandGuideNodesForAsset(parentNode, existingNodes);
-      const brandGuideRefs = brandGuideNodes
-        .map((node) => node.data?.image)
-        .map(generationReferenceUrl)
-        .filter(Boolean);
       const connectedReferenceNodes = connectedReferenceNodesForCard(id, existingNodes, existingEdges);
       const connectedReferenceRefs = connectedReferenceNodes
         .map((node) => node.data?.image)
@@ -755,8 +752,9 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         ? `Connected reference cards in this branch: ${connectedReferenceNodes.map((node) => `"${node.data?.title || 'Reference'}"`).join(', ')}. Use these connected references when the prompt asks for a connected logo, artwork, mark, or reference.`
         : '';
       const generationPrompt = connectedReferenceHint ? `${prompt}\n\n${connectedReferenceHint}` : prompt;
+      const parentIsBrandGuide = isBrandGuideNode(parentNode);
       const parentImageRef = generationReferenceUrl(data.image || '');
-      const mergedRefs = uniqueGenerationRefs([...connectedReferenceRefs, ...inheritedGenerationRefs, ...brandGuideRefs, ...genRefs], [parentImageRef]);
+      const mergedRefs = uniqueGenerationRefs([...connectedReferenceRefs, ...inheritedGenerationRefs, ...genRefs], [parentImageRef]);
       const brandGuide = {
         nodes: brandGuideNodes.map(brandGuidePayloadFromNode)
       };
@@ -771,7 +769,8 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           title: data.title || '',
           subtitle: data.subtitle || '',
           description: data.description || '',
-          image: generationReferenceUrl(data.image || '')
+          image: generationReferenceUrl(data.image || ''),
+          isBrandGuide: parentIsBrandGuide
         }
       });
       const result = await generationApi.createBranch(requestPayload);

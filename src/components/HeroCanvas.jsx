@@ -3668,8 +3668,13 @@ export default function HeroCanvas() {
     const selectedCards = sourceNodes.filter((node) => selectedSet.has(node.id) && node.type === 'brandCard');
     const parentNode = selectedCards[0] || null;
     const brandGuideNodes = brandGuideNodesForAssets(parentNode ? [parentNode] : selectedCards, sourceNodes);
-    const referenceNodes = [...selectedCards, ...brandGuideNodes];
-    const refs = Array.from(new Set(referenceNodes.map((node) => node.data?.image).filter(Boolean)));
+    const nonGuideSelectedCards = selectedCards.filter((node) => !isBrandGuideNode(node));
+    const refs = Array.from(new Set(
+      nonGuideSelectedCards
+        .slice(1)
+        .map((node) => node.data?.image)
+        .filter(Boolean)
+    ));
     const originPoint = parentNode
       ? { x: Number(parentNode.position?.x || 0) + 430, y: Number(parentNode.position?.y || 0) }
       : containerCenterCanvasPoint();
@@ -3695,13 +3700,15 @@ export default function HeroCanvas() {
           title: parentNode.data?.title || '',
           subtitle: parentNode.data?.subtitle || '',
           description: parentNode.data?.description || '',
-          image: parentNode.data?.image || ''
+          image: parentNode.data?.image || '',
+          isBrandGuide: isBrandGuideNode(parentNode)
         } : {
           id: 'concierge',
           title: 'Droplet Concierge',
           subtitle: 'Canvas operation',
           description: 'Generated from the concierge drawer.',
-          image: ''
+          image: '',
+          isBrandGuide: false
         }
       });
       const result = await generationApi.createBranch(requestPayload, { headers: providerHeaders });

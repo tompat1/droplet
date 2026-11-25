@@ -270,3 +270,44 @@ test('same-origin reference assets load via env.ASSETS without external fetch', 
   assert.equal(response.status, 201);
   assert.deepEqual(assetFetches, ['https://droplet.test/assets/branding/example.png']);
 });
+
+test('brand guide sheet image is not forced as input_image_0 when generating a new product scene', async () => {
+  const { status, body } = await callGenerateBranch(
+    {
+      provider: 'cloudflare_flux_klein_9b',
+      prompt: 'A orange tote bag with the motkarta logo',
+      size: '1024x1024',
+      quality: 'medium',
+      parent: {
+        id: 'brand-guide-1',
+        title: 'Motkarta Brand Guide',
+        image: TINY_PNG_DATA_URL,
+        isBrandGuide: true
+      },
+      brandGuide: {
+        nodes: [{
+          id: 'brand-guide-1',
+          title: 'Motkarta Brand Guide',
+          brandName: 'Motkarta',
+          image: TINY_PNG_DATA_URL,
+          colors: [{ name: 'Signal Orange', hex: '#FF6A00' }]
+        }]
+      },
+      refs: [TINY_PNG_DATA_URL]
+    },
+    async (_model, input) => {
+      const parsedForm = await new Response(input.multipart.body, {
+        headers: { 'content-type': input.multipart.contentType }
+      }).formData();
+      assert.equal(parsedForm.get('input_image_0'), null, 'brand guide sheet should not be attached as input_image_0');
+      const promptText = String(parsedForm.get('prompt') || '');
+      assert.match(promptText, /Primary subject and scene.*orange tote bag with the motkarta logo/i);
+      assert.match(promptText, /#FF6A00/);
+      assert.doesNotMatch(promptText, /Image 0 is the selected source asset/i);
+      return { image: TINY_JPEG_BASE64 };
+    }
+  );
+
+  assert.equal(status, 201);
+  assert.equal(body.branch.status, 'ready');
+});

@@ -1490,7 +1490,8 @@ function normalizeGenerationPayload(body) {
       title: cleanText(parent.title, 160),
       subtitle: cleanText(parent.subtitle, 160),
       description: cleanText(parent.description, 500),
-      image: normalizeReferenceUrl(parent.image)
+      image: normalizeReferenceUrl(parent.image),
+      isBrandGuide: parent.isBrandGuide === true
     }
   };
 }
@@ -1957,26 +1958,57 @@ function withReferenceContext(input) {
   return sections.join('\n\n');
 }
 
+function isPromptEditingBrandGuide(prompt) {
+  return /\b(brand\s*guide|style\s*guide|brand\s*sheet|brand\s*board|palette\s*sheet|logo\s*usage|brand\s*guidelines)\b/i.test(String(prompt || ''));
+}
+
+function isParentBrandGuideAsset(input) {
+  if (input.parent?.isBrandGuide === true) return true;
+  const parentId = String(input.parent?.id || '');
+  const parentImage = String(input.parent?.image || '');
+  const guideNodes = Array.isArray(input.brandGuide?.nodes) ? input.brandGuide.nodes : [];
+  if (guideNodes.some((node) => (parentId && node.id === parentId) || (parentImage && node.image && node.image === parentImage))) {
+    return true;
+  }
+  return /\b(brand\s*guide|style\s*guide|brand\s*system)\b/i.test(`${input.parent?.title || ''} ${input.parent?.subtitle || ''}`);
+}
+
 function buildCloudflareImagePrompt(input) {
-  const referenceInstruction = input.parent?.image || input.refs.length > 0
-    ? 'Use the supplied reference images as active visual inputs, not inspiration only. Image 0 is the selected source asset and must remain the same subject, product, pose, composition, and overall identity unless the request explicitly changes them. Apply only the requested edit. Image 1 and later images are brand-guide or additional reference images; use them to preserve the correct logo, colors, typography, and brand details.'
-    : 'This request has no reference image; create a new image from the written brief.';
+  const referenceUrls = cloudflareReferenceUrls(input);
+  const hasEditableSource = Boolean(input.parent?.image) && (!isParentBrandGuideAsset(input) || isPromptEditingBrandGuide(input.prompt));
+  let referenceInstruction;
+  if (hasEditableSource) {
+    referenceInstruction = 'Use the supplied reference images as active visual inputs. Image 0 is the selected source asset and should remain the same subject, product, pose, composition, and overall identity unless the request explicitly changes them. Apply only the requested edit. Any later reference images provide logo, color, or brand details.';
+  } else if (referenceUrls.length > 0) {
+    referenceInstruction = 'Create a brand-new product or scene strictly matching the user prompt above. Use the attached reference image(s) ONLY to extract the logo mark, artwork, or brand details—do NOT copy their layout, grid, or document format, and do NOT render a brand guide or style sheet.';
+  } else {
+    referenceInstruction = 'Create a brand-new image from scratch strictly matching the user prompt above. Do NOT render a brand guide, style sheet, color palette chart, or logo usage diagram unless explicitly requested.';
+  }
   return cleanText([
-    withReferenceContext(input),
+    `Primary subject and scene (follow this first): ${input.prompt}`,
     referenceInstruction,
-    'Output a polished, production-ready brand/campaign image. Preserve the source brand identity, keep typography intentional, and avoid distorted logos or unreadable text.'
+    withReferenceContext(input),
+    'Output a polished, production-ready brand/campaign photograph or visual matching the requested subject.'
   ].join('\n\n'), 2048);
 }
 
 function cloudflareReferenceUrls(input) {
-  const guideImages = Array.isArray(input.brandGuide?.nodes)
-    ? input.brandGuide.nodes.map((node) => node.image).filter(Boolean)
-    : [];
-  return Array.from(new Set([
-    input.parent?.image,
-    ...input.refs,
-    ...guideImages
-  ].filter(Boolean))).slice(0, 4);
+  const allowBrandGuideSheet = isPromptEditingBrandGuide(input.prompt);
+  const guideImageSet = new Set(
+    (Array.isArray(input.brandGuide?.nodes) ? input.brandGuide.nodes : [])
+      .map((node) => node.image)
+      .filter(Boolean)
+  );
+  const includeParentImage = Boolean(input.parent?.image) && (!isParentBrandGuideAsset(input) || allowBrandGuideSheet);
+  const explicitRefs = (Array.isArray(input.refs) ? input.refs : []).filter((url) => (
+    allowBrandGuideSheet || !guideImageSet.has(url)
+  ));
+  const urls = [
+    includeParentImage ? input.parent.image : '',
+    ...explicitRefs,
+    ...(allowBrandGuideSheet ? [...guideImageSet] : [])
+  ].filter(Boolean);
+  return Array.from(new Set(urls)).slice(0, 4);
 }
 
 function cloudflareImageDimensions(size) {
