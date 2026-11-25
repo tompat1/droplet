@@ -22,6 +22,7 @@ import assetFiles from '../assetsData.json';
 import { defaultAssetTags } from '../defaultTags';
 import { useAuth } from './AuthContext';
 import EditableText from './EditableText';
+import { useSiteContent } from './SiteContentContext';
 import { useCanvasAssets } from './CanvasAssetsState';
 import { canvasApi, generationApi, usageApi } from '../lib/apiClient';
 import { compressImageDataUrl, convertSvgImageSourceToWebp, isSvgImageSource, prepareGenerationBranchPayload, readImageFileAsDataUrl } from '../lib/mediaFiles';
@@ -556,6 +557,7 @@ const NodeSearch = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const { content: siteContent } = useSiteContent();
   const [assetTags, setAssetTags] = useState(() => {
     try {
       const stored = localStorage.getItem('gallery-asset-tags');
@@ -565,6 +567,20 @@ const NodeSearch = () => {
     }
     return defaultAssetTags;
   });
+
+  useEffect(() => {
+    const remoteAssets = siteContent['gallery.tags.assets']?.value;
+    if (typeof remoteAssets === 'string' && remoteAssets.trim()) {
+      try {
+        const parsed = JSON.parse(remoteAssets);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          setAssetTags(parsed);
+        }
+      } catch (e) {
+        console.warn('Failed to parse D1 asset tags:', e);
+      }
+    }
+  }, [siteContent]);
 
   useEffect(() => {
     const handleTagsUpdate = () => {
@@ -741,8 +757,20 @@ const NodeSearch = () => {
                 </div>
                 <div style={{ padding: '12px 16px', display: 'flex', flexWrap: 'wrap', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                   {(() => {
-                    const stored = localStorage.getItem('gallery-available-tags');
-                    const tags = stored ? JSON.parse(stored) : ['apparel', 'merch', 'video', 'neon', 'mockup', 'social'];
+                    const remoteAvailable = siteContent['gallery.tags.available']?.value;
+                    let tags = null;
+                    if (typeof remoteAvailable === 'string' && remoteAvailable.trim()) {
+                      try {
+                        const parsed = JSON.parse(remoteAvailable);
+                        if (Array.isArray(parsed)) tags = parsed;
+                      } catch {
+                        // ignore malformed remote tags
+                      }
+                    }
+                    if (!tags) {
+                      const stored = localStorage.getItem('gallery-available-tags');
+                      tags = stored ? JSON.parse(stored) : ['apparel', 'merch', 'video', 'neon', 'mockup', 'social'];
+                    }
                     return tags.map(tag => (
                       <span 
                         key={tag}
@@ -5131,7 +5159,7 @@ export default function HeroCanvas() {
       {!isFullscreen && (
         <div style={{ padding: '0 5% 0 5%', marginTop: '-34px', zIndex: 10, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: '16px' }}>
           <h1 style={{ fontSize: '3.5rem', margin: 0, whiteSpace: 'nowrap' }}>
-            <EditableText contentKey="canvas.title.prefix" fallback="Fluid" /> <span className="text-gradient"><EditableText contentKey="canvas.title.accent" fallback="Node Canvas" /></span>
+            <EditableText contentKey="canvas.title.prefix" fallback="Fluid" /> <EditableText contentKey="canvas.title.accent" fallback="Node Canvas" textClassName="text-gradient" />
           </h1>
           <p style={{ margin: 0, fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', lineHeight: '1.48', maxWidth: '1080px', textAlign: 'left' }}>
             <EditableText

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { useSiteContent } from './SiteContentContext';
 
-export default function EditableText({ contentKey, fallback, as: Component = 'span', multiline = false, className = '', style, children }) {
+export default function EditableText({ contentKey, fallback, as: Component = 'span', multiline = false, className = '', textClassName = '', style, children }) {
   const { isAdmin } = useAuth();
   const { getText, updateText } = useSiteContent();
   const text = getText(contentKey, fallback ?? children ?? '');
@@ -41,7 +41,7 @@ export default function EditableText({ contentKey, fallback, as: Component = 'sp
 
   return (
     <span className={`editable-text-wrap ${isAdmin ? 'admin-editable' : ''} ${className}`} style={{ display: 'inline-flex', alignItems: 'baseline', gap: '0.28em', position: 'relative', maxWidth: '100%' }}>
-      <Component style={style}>{renderedText}</Component>
+      <Component className={textClassName || undefined} style={style}>{renderedText}</Component>
       {isAdmin && (
         <>
           <button

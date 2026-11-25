@@ -45,7 +45,7 @@ export default function Overhero() {
 
       <div style={{ padding: '0 5%', zIndex: 10, textAlign: 'center', marginTop: '-10vh' }}>
         <h1 style={{ fontSize: 'clamp(3rem, 6vw, 6rem)', marginBottom: '24px', letterSpacing: '-0.02em' }}>
-          <span className="text-gradient"><EditableText contentKey="overhero.title.brand" fallback="Droplet" /></span>{' '}
+          <EditableText contentKey="overhero.title.brand" fallback="Droplet" textClassName="text-gradient" />{' '}
           <EditableText contentKey="overhero.title.rest" fallback="Brand Space" />
         </h1>
         <div className="glass-panel" style={{ 

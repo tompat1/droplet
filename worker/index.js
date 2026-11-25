@@ -462,7 +462,8 @@ async function updateSiteContent(request, env, rawKey, userId) {
   if (!key) return json({ error: 'Invalid content key' }, 400);
 
   const body = await readJson(request);
-  const value = cleanText(body.value, 5000);
+  const maxChars = key.startsWith('gallery.tags.') ? 100000 : 5000;
+  const value = cleanText(body.value, maxChars);
 
   await env.DB.prepare(
     `INSERT INTO site_content (content_key, content_value, updated_by, updated_at)

@@ -69,7 +69,8 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: -0.02em;
 }
 
-.text-gradient {
+.text-gradient,
+.text-gradient .editable-text-wrap > :first-child {
   background: linear-gradient(135deg, var(--accent-neon), #0070f3);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;

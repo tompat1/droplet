@@ -5,6 +5,8 @@ import MediaModal from './MediaModal';
 import { defaultAvailableTags, defaultAssetTags } from '../defaultTags';
 import EditableText from './EditableText';
 import { useCanvasAssets } from './CanvasAssetsState';
+import { useAuth } from './AuthContext';
+import { useSiteContent } from './SiteContentContext';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -233,13 +235,16 @@ export default function InteractiveGallery() {
   const [selectedAssets, setSelectedAssets] = useState(new Set());
   const [showTaggingToggle, setShowTaggingToggle] = useState(false);
 
+  const { isAdmin } = useAuth();
+  const { content: siteContent, updateText } = useSiteContent();
+
   useEffect(() => {
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const isTagPath = window.location.pathname === '/tag' || window.location.search.includes('tag') || window.location.hash.includes('tag');
-    if (isLocal || isTagPath) {
+    if (isLocal || isTagPath || isAdmin) {
       setShowTaggingToggle(true);
     }
-  }, []);
+  }, [isAdmin]);
   
   const [availableTags, setAvailableTags] = useState(() => {
     try {
@@ -267,13 +272,59 @@ export default function InteractiveGallery() {
   const [newTagInput, setNewTagInput] = useState('');
 
   useEffect(() => {
-    localStorage.setItem('gallery-available-tags', JSON.stringify(availableTags));
-  }, [availableTags]);
+    const remoteAvailable = siteContent['gallery.tags.available']?.value;
+    if (typeof remoteAvailable === 'string' && remoteAvailable.trim()) {
+      try {
+        const parsed = JSON.parse(remoteAvailable);
+        if (Array.isArray(parsed)) {
+          setAvailableTags(parsed);
+          localStorage.setItem('gallery-available-tags', JSON.stringify(parsed));
+        }
+      } catch (e) {
+        console.warn('Failed to parse D1 available tags:', e);
+      }
+    }
+    const remoteAssets = siteContent['gallery.tags.assets']?.value;
+    if (typeof remoteAssets === 'string' && remoteAssets.trim()) {
+      try {
+        const parsed = JSON.parse(remoteAssets);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          setAssetTags(parsed);
+          localStorage.setItem('gallery-asset-tags', JSON.stringify(parsed));
+          window.dispatchEvent(new CustomEvent('customTagsUpdated'));
+        }
+      } catch (e) {
+        console.warn('Failed to parse D1 asset tags:', e);
+      }
+    }
+  }, [siteContent]);
 
-  useEffect(() => {
-    localStorage.setItem('gallery-asset-tags', JSON.stringify(assetTags));
-    window.dispatchEvent(new CustomEvent('customTagsUpdated'));
-  }, [assetTags]);
+  const persistAvailableTags = (updater) => {
+    setAvailableTags((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      localStorage.setItem('gallery-available-tags', JSON.stringify(next));
+      if (isAdmin) {
+        updateText('gallery.tags.available', JSON.stringify(next)).catch((error) => {
+          console.warn('Failed to save available tags to D1:', error);
+        });
+      }
+      return next;
+    });
+  };
+
+  const persistAssetTags = (updater) => {
+    setAssetTags((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      localStorage.setItem('gallery-asset-tags', JSON.stringify(next));
+      window.dispatchEvent(new CustomEvent('customTagsUpdated'));
+      if (isAdmin) {
+        updateText('gallery.tags.assets', JSON.stringify(next)).catch((error) => {
+          console.warn('Failed to save asset tags to D1:', error);
+        });
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!isTaggingMode) {
@@ -327,7 +378,7 @@ export default function InteractiveGallery() {
 
       <div className="glass-panel" style={{ position: 'relative', zIndex: 2, maxWidth: '800px', margin: '0 auto 60px auto', padding: '40px', textAlign: 'center' }}>
         <h2 style={{ fontSize: '3rem', marginBottom: '16px' }}>
-          <EditableText contentKey="gallery.title.prefix" fallback="Asset" /> <span className="text-gradient"><EditableText contentKey="gallery.title.accent" fallback="Gallery" /></span>
+          <EditableText contentKey="gallery.title.prefix" fallback="Asset" /> <EditableText contentKey="gallery.title.accent" fallback="Gallery" textClassName="text-gradient" />
         </h2>
         <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '1.2rem', maxWidth: '700px', margin: '0 auto', lineHeight: '1.6', marginBottom: '30px' }}>
           <EditableText
@@ -407,7 +458,7 @@ export default function InteractiveGallery() {
                 <button
                   onClick={() => {
                     if (selectedAssets.size === 0) return;
-                    setAssetTags(prev => {
+                    persistAssetTags(prev => {
                       const next = { ...prev };
                       selectedAssets.forEach(src => {
                         const current = next[src] || [];
@@ -423,7 +474,7 @@ export default function InteractiveGallery() {
                   {tag}
                 </button>
                 <button
-                  onClick={() => setAvailableTags(prev => prev.filter(t => t !== tag))}
+                  onClick={() => persistAvailableTags(prev => prev.filter(t => t !== tag))}
                   style={{ padding: '8px 10px', background: 'rgba(255,0,0,0.2)', border: 'none', color: '#ff8888', cursor: 'pointer', borderLeft: '1px solid rgba(255,255,255,0.1)' }}
                   title="Delete tag globally"
                 >
@@ -442,7 +493,7 @@ export default function InteractiveGallery() {
               onKeyDown={e => {
                 if (e.key === 'Enter' && newTagInput.trim()) {
                   if (!availableTags.includes(newTagInput.trim())) {
-                    setAvailableTags([...availableTags, newTagInput.trim()]);
+                    persistAvailableTags([...availableTags, newTagInput.trim()]);
                   }
                   setNewTagInput('');
                 }
@@ -452,7 +503,7 @@ export default function InteractiveGallery() {
             <button
               onClick={() => {
                 if (newTagInput.trim() && !availableTags.includes(newTagInput.trim())) {
-                  setAvailableTags([...availableTags, newTagInput.trim()]);
+                  persistAvailableTags([...availableTags, newTagInput.trim()]);
                 }
                 setNewTagInput('');
               }}
@@ -566,7 +617,7 @@ export default function InteractiveGallery() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setAssetTags(prev => {
+                                persistAssetTags(prev => {
                                   const current = prev[tagKey] || [];
                                   return { ...prev, [tagKey]: current.filter(t => t !== tag) };
                                 });
