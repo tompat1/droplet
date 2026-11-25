@@ -10,7 +10,6 @@ const getActivePortalTarget = () => {
     document.webkitFullscreenElement ||
     document.mozFullScreenElement ||
     document.msFullscreenElement ||
-    document.querySelector('#hero-canvas-viewport') ||
     document.body
   );
 };
@@ -230,64 +229,7 @@ export default function MediaModal({ media, onClose, onNext, onPrev }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {media.onTweak && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-                media.onTweak();
-              }}
-              title="Tweak this asset using the same pipeline"
-              aria-label="Tweak this asset"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '7px',
-                padding: '10px 18px',
-                borderRadius: '30px',
-                background: 'rgba(0, 255, 204, 0.22)',
-                border: '1px solid rgba(0, 255, 204, 0.5)',
-                color: '#00ffcc',
-                fontSize: '0.85rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
-              }}
-            >
-              <span>✨</span> Tweak Asset
-            </button>
-          )}
-
-          {promptText && (
-            <button
-              type="button"
-              onClick={handleCopyPrompt}
-              title={copiedPrompt ? "Copied!" : "Copy Prompt"}
-              aria-label="Copy Prompt"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '7px',
-                padding: '10px 18px',
-                borderRadius: '30px',
-                background: copiedPrompt ? 'rgba(0, 255, 204, 0.25)' : 'rgba(255, 255, 255, 0.1)',
-                border: copiedPrompt ? '1px solid rgba(0, 255, 204, 0.6)' : '1px solid rgba(255, 255, 255, 0.2)',
-                color: copiedPrompt ? '#00ffcc' : '#fff',
-                fontSize: '0.85rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
-              }}
-            >
-              {copiedPrompt ? <Check size={16} /> : <Copy size={16} />}
-              <span>{copiedPrompt ? 'Copied!' : 'Copy Prompt'}</span>
-            </button>
-          )}
-
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
           {media.src && (
             <button
               type="button"
