@@ -892,6 +892,9 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         <div style={{ flexGrow: 1, paddingRight: '10px' }}>
           {isEditingTitle ? (
             <input 
+              className="nodrag nopan"
+              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
               autoFocus value={tempTitle} onChange={e => setTempTitle(e.target.value)} onBlur={handleSaveText} onKeyDown={handleKeyDown}
               style={{ fontSize: '20px', marginBottom: '4px', background: 'rgba(0,0,0,0.5)', color: 'white', border: '1px solid var(--accent-neon)', borderRadius: '4px', width: '100%', outline: 'none' }}
             />
@@ -911,6 +914,9 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           
           {isEditingSubtitle ? (
             <input 
+              className="nodrag nopan"
+              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
               autoFocus value={tempSubtitle} onChange={e => setTempSubtitle(e.target.value)} onBlur={handleSaveText} onKeyDown={handleKeyDown}
               style={{ fontSize: '14px', background: 'rgba(0,0,0,0.5)', color: 'white', border: '1px solid var(--accent-neon)', borderRadius: '4px', width: '100%', outline: 'none' }}
             />
@@ -1226,6 +1232,9 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         </div>
         {isEditingDesc ? (
           <textarea 
+            className="nodrag nopan"
+            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
             autoFocus value={tempDesc} onChange={e => setTempDesc(e.target.value)} onBlur={handleSaveText}
             style={{ fontSize: '14px', lineHeight: '1.5', background: 'rgba(0,0,0,0.5)', color: 'white', border: '1px solid var(--accent-neon)', borderRadius: '4px', width: '100%', minHeight: '60px', outline: 'none', resize: 'vertical' }}
           />
@@ -1256,7 +1265,12 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       </div>
 
       {isEditMode && (
-        <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div
+          className="nodrag nopan"
+          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}
+        >
           {genState === 'idle' && (
             <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
               <button
@@ -1317,11 +1331,20 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           )}
 
           {genState === 'pipeline' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
+            <div
+              className="nodrag nopan"
+              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={e => e.stopPropagation()}
+              style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}
+            >
               <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 'bold' }}>Select AI Pipeline:</span>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                 <span style={{ fontSize: '10px', color: 'rgba(0,255,204,0.75)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cloudworker free allocation</span>
                 <select
+                  className="nodrag nopan"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
                   value={FREE_PROVIDER_KEYS.includes(genProvider) ? genProvider : ''}
                   onChange={(e) => {
                     e.stopPropagation();
@@ -1349,6 +1372,9 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               <label style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                 <span style={{ fontSize: '10px', color: 'rgba(255,184,77,0.78)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>API-key renderers</span>
                 <select
+                  className="nodrag nopan"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
                   value={API_KEY_PROVIDER_KEYS.includes(genProvider) ? genProvider : ''}
                   onChange={(e) => {
                     e.stopPropagation();
@@ -1445,6 +1471,9 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
                 </div>
               )}
               <textarea 
+                className="nodrag nopan"
+                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
                 autoFocus
                 placeholder="Describe what you want to generate..."
                 value={genPrompt}
@@ -1521,7 +1550,11 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
       </Handle>
 
       {isDeleting && (
-        <div style={{
+        <div
+          className="nodrag nopan"
+          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{
           position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
           background: 'rgba(20,20,25,0.95)', backdropFilter: 'blur(12px)',
           borderRadius: '16px', zIndex: 10, display: 'flex', flexDirection: 'column',
