@@ -68,9 +68,19 @@ export default function AuthControls() {
     const handleCanvasEditModeChange = (event) => {
       setIsCanvasEditMode(event.detail?.isEditMode === true);
     };
+    const handleOpenAuthModal = (event) => {
+      if (user) return;
+      setAuthMode('login');
+      setStatus(event.detail?.message || 'Log in to edit the canvas.');
+      setActiveDrawer('auth');
+    };
     window.addEventListener('heroCanvasEditModeChanged', handleCanvasEditModeChange);
-    return () => window.removeEventListener('heroCanvasEditModeChanged', handleCanvasEditModeChange);
-  }, []);
+    window.addEventListener('dropletOpenAuthModal', handleOpenAuthModal);
+    return () => {
+      window.removeEventListener('heroCanvasEditModeChanged', handleCanvasEditModeChange);
+      window.removeEventListener('dropletOpenAuthModal', handleOpenAuthModal);
+    };
+  }, [user]);
 
   const handleAuthSubmit = async (event) => {
     event.preventDefault();

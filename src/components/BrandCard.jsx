@@ -4,6 +4,7 @@ import { generationApi } from '../lib/apiClient';
 import { downloadMediaSource, mediaFilename, prepareGenerationBranchPayload, readImageFileAsDataUrl } from '../lib/mediaFiles';
 import DropletLoader from './DropletLoader';
 import MediaModal from './MediaModal';
+import { useAuth } from './AuthContext';
 
 const GENERATION_PROVIDERS = {
   cloudflare_flux_klein_9b: {
@@ -279,9 +280,26 @@ const PROMPT_STARTERS = [
 ];
 
 export default function BrandCard({ id, data, isConnectable, selected }) {
+  const { user } = useAuth();
   const isEditMode = data.isEditMode === true; // defaults to false
 
   const { setNodes, setEdges, getNode, getNodes, getEdges, setCenter } = useReactFlow();
+  const [loginNotice, setLoginNotice] = useState('');
+
+  useEffect(() => {
+    if (user && loginNotice) setLoginNotice('');
+  }, [loginNotice, user]);
+
+  const requireLoginForEdit = useCallback((message = 'Please log in to edit cards and prompt images.') => {
+    if (user) return true;
+    setLoginNotice(message);
+    if (typeof data.onRequireLogin === 'function') {
+      data.onRequireLogin(message);
+    } else if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('dropletOpenAuthModal', { detail: { message } }));
+    }
+    return false;
+  }, [data, user]);
   
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState(data.title || '');
@@ -381,6 +399,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
   const handleInitiateTweak = (e) => {
     e?.stopPropagation();
+    if (!requireLoginForEdit('Please log in to prompt and edit cards on the canvas.')) return;
     const rawProviderKey = data.generationProvider || (data.generationPipeline === 'video' ? 'google_veo' : 'cloudflare_flux_klein_9b');
     const sameProviderKey = GENERATION_PROVIDERS[rawProviderKey] ? rawProviderKey : 'cloudflare_flux_klein_9b';
     const providerObj = GENERATION_PROVIDERS[sameProviderKey] || GENERATION_PROVIDERS.cloudflare_flux_klein_9b;
@@ -575,6 +594,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
   const handleDeleteInitiate = (e) => {
     e.stopPropagation();
+    if (!requireLoginForEdit('Please log in to delete or edit cards on the canvas.')) return;
     setIsDeleting(true);
     setDeleteCountdown(3);
   };
@@ -601,6 +621,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
   const handleChangeImage = (e) => {
     e.stopPropagation();
+    if (!requireLoginForEdit('Please log in to replace card images.')) return;
     imageInputRef.current?.click();
   };
 
@@ -619,6 +640,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
 
   const handleImageUrlChange = (e) => {
     e.stopPropagation();
+    if (!requireLoginForEdit('Please log in to change card images.')) return;
     const newUrl = window.prompt("Enter new image URL:", data.image);
     if (newUrl) updateCardImage(newUrl);
   };
@@ -717,6 +739,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
   };
 
   const handleGenerateRun = async () => {
+    if (!requireLoginForEdit('Please log in to generate images on the canvas.')) return;
     const rawProviderKey = genProvider || (genPipeline === 'video' ? 'google_veo' : 'cloudflare_flux_klein_9b');
     const providerKey = GENERATION_PROVIDERS[rawProviderKey] ? rawProviderKey : 'cloudflare_flux_klein_9b';
     try {
@@ -947,6 +970,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               onClick={(e) => {
                 if (isEditMode || data.isGenerated) {
                   e.stopPropagation();
+                  if (!requireLoginForEdit('Please log in to edit card text.')) return;
                   setIsEditingTitle(true);
                 }
               }} 
@@ -969,6 +993,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
               onClick={(e) => { 
                 if (isEditMode || data.isGenerated) {
                   e.stopPropagation(); 
+                  if (!requireLoginForEdit('Please log in to edit card text.')) return;
                   setIsEditingSubtitle(true); 
                 }
               }}
@@ -1316,6 +1341,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
             onClick={(e) => { 
               if (isEditMode) {
                 e.stopPropagation(); 
+                if (!requireLoginForEdit('Please log in to edit card descriptions.')) return;
                 setIsEditingDesc(true); 
               }
             }}
@@ -1335,6 +1361,48 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           </p>
         )}
       </div>
+
+      {loginNotice && !user && (
+        <div
+          className="nodrag nopan"
+          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            marginTop: '12px',
+            padding: '10px 12px',
+            borderRadius: '10px',
+            border: '1px solid rgba(255, 184, 77, 0.45)',
+            background: 'rgba(255, 184, 77, 0.12)',
+            color: '#ffe3b3',
+            fontSize: '11.5px',
+            lineHeight: 1.4,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '8px'
+          }}
+        >
+          <span>{loginNotice}</span>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('dropletOpenAuthModal', { detail: { message: loginNotice } }))}
+            style={{
+              padding: '5px 10px',
+              borderRadius: '7px',
+              border: '1px solid rgba(255, 184, 77, 0.6)',
+              background: 'rgba(255, 184, 77, 0.22)',
+              color: '#fff',
+              fontSize: '11px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Log in
+          </button>
+        </div>
+      )}
 
       {isEditMode && (
         <div
@@ -1394,7 +1462,11 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
                   whiteSpace: 'nowrap',
                   transition: 'all 0.2s ease'
                 }}
-                onClick={(e) => { e.stopPropagation(); setGenState('pipeline'); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!requireLoginForEdit('Please log in to choose a pipeline and generate images.')) return;
+                  setGenState('pipeline');
+                }}
                 title="Pick a different AI pipeline to generate a branch"
               >
                 Other Pipeline

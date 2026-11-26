@@ -3605,6 +3605,12 @@ export default function HeroCanvas() {
     window.requestAnimationFrame(() => setCanvasActionToast(message));
   }, []);
 
+  const notifyLoginRequired = useCallback((message = 'Please log in to edit the canvas.') => {
+    setCanvasStatus(message);
+    showCanvasActionToast(message);
+    window.dispatchEvent(new CustomEvent('dropletOpenAuthModal', { detail: { message } }));
+  }, [showCanvasActionToast]);
+
   useEffect(() => {
     if (!boardSvgAssetSignature || boardSvgConversionRef.current.running) return undefined;
 
@@ -4996,6 +5002,7 @@ export default function HeroCanvas() {
             setGlobalEdges: setPersistentEdges,
             onGenerationUsageUpdate: loadUsageSummary,
             onGenerationError: handleGenerationError,
+            onRequireLogin: notifyLoginRequired,
             pushUndoAction,
             onCreateSiblingNote: createSiblingNote,
             onDeleteNode: deleteCanvasNode,
@@ -5025,7 +5032,7 @@ export default function HeroCanvas() {
         }
       };
     }));
-  }, [activeDropLabelId, collapsedBranches, createSiblingNote, deleteCanvasNode, handleGenerationError, nodes.length, setNodes, setEdges, isEditMode, loadUsageSummary, pushUndoAction, setPersistentEdges, setPersistentNodes]);
+  }, [activeDropLabelId, collapsedBranches, createSiblingNote, deleteCanvasNode, handleGenerationError, nodes.length, notifyLoginRequired, setNodes, setEdges, isEditMode, loadUsageSummary, pushUndoAction, setPersistentEdges, setPersistentNodes]);
 
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -5044,8 +5051,7 @@ export default function HeroCanvas() {
   useEffect(() => {
     const requireCanvasLogin = () => {
       if (user) return true;
-      setCanvasStatus('Login is required to edit the canvas.');
-      showCanvasActionToast('Login is required to edit the canvas.');
+      notifyLoginRequired('Please log in to edit the canvas.');
       setIsEditMode(false);
       return false;
     };
@@ -5063,7 +5069,7 @@ export default function HeroCanvas() {
       window.removeEventListener('openHeroCanvasEditor', handleOpenEditor);
       window.removeEventListener('toggleHeroCanvasEditor', handleToggleEditor);
     };
-  }, [showCanvasActionToast, user]);
+  }, [notifyLoginRequired, user]);
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('heroCanvasEditModeChanged', { detail: { isEditMode } }));
@@ -5233,6 +5239,10 @@ export default function HeroCanvas() {
 
   const onConnect = useCallback(
     (params) => {
+      if (!user) {
+        notifyLoginRequired('Please log in to connect cards and edit the canvas.');
+        return;
+      }
       if (params.sourceHandle === REFERENCE_SOURCE_HANDLE && params.targetHandle === REFERENCE_TARGET_HANDLE) {
         createReferenceLink({
           sourceId: params.source,
@@ -5245,7 +5255,7 @@ export default function HeroCanvas() {
       setIsCanvasDirty(true);
       setEdges((eds) => addEdge({ ...params, animated: true, style: { stroke: 'rgba(255,255,255,0.5)', strokeWidth: 2 } }, eds));
     },
-    [createReferenceLink, setEdges]
+    [createReferenceLink, notifyLoginRequired, setEdges, user]
   );
 
   const handleConnectEnd = useCallback((event, connectionState) => {
@@ -5257,6 +5267,11 @@ export default function HeroCanvas() {
       fromNode.type !== 'brandCard' ||
       (fromHandleId !== REFERENCE_SOURCE_HANDLE && fromHandleId !== REFERENCE_TARGET_HANDLE)
     ) {
+      return;
+    }
+
+    if (!user) {
+      notifyLoginRequired('Please log in to create prompt cards and edit the canvas.');
       return;
     }
 
@@ -5325,7 +5340,7 @@ export default function HeroCanvas() {
     setIsEditMode(true);
     setCanvasStatus(`Created prompt card using "${baseTitle}" as reference.`);
     showCanvasActionToast(`New prompt card ready with "${baseTitle}" as reference.`);
-  }, [clientPointToCanvasPoint, pushUndoAction, setPersistentEdges, setPersistentNodes, showCanvasActionToast]);
+  }, [clientPointToCanvasPoint, notifyLoginRequired, pushUndoAction, setPersistentEdges, setPersistentNodes, showCanvasActionToast, user]);
 
   const handleNodesChange = useCallback((changes) => {
     if (changes.some((change) => graphChangeTypes.has(change.type))) {
@@ -5344,6 +5359,10 @@ export default function HeroCanvas() {
   const handleEdgeClick = useCallback((event, edge) => {
     if (!isManualReferenceEdge(edge)) return;
     event?.stopPropagation();
+    if (!user) {
+      notifyLoginRequired('Please log in to edit canvas connections.');
+      return;
+    }
 
     const edgeToDelete = edgesRef.current.find((candidate) => candidate.id === edge.id) || edge;
     const sourceNode = nodesRef.current.find((node) => node.id === edgeToDelete.source);
@@ -5357,7 +5376,7 @@ export default function HeroCanvas() {
     const message = `${sourceNode?.data?.title || 'Reference'} disconnected from ${targetNode?.data?.title || 'card'}.`;
     setCanvasStatus(message);
     showCanvasActionToast('Reference connection removed.');
-  }, [pushUndoAction, setPersistentEdges, showCanvasActionToast]);
+  }, [notifyLoginRequired, pushUndoAction, setPersistentEdges, showCanvasActionToast, user]);
 
   const onNodeClick = useCallback((event, node) => {
     if (isEditMode) return;
