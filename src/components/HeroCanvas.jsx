@@ -11,7 +11,8 @@ import {
   MiniMap,
   useReactFlow,
   Handle,
-  Position
+  Position,
+  getSmoothStepPath
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -70,6 +71,142 @@ const NOTE_SIBLING_GAP = 28;
 const DEFAULT_CANVAS_NAME = 'Droplet merch';
 const REFERENCE_SOURCE_HANDLE = 'reference-source';
 const REFERENCE_TARGET_HANDLE = 'reference-target';
+
+const ReferenceConnectionLine = ({
+  fromX,
+  fromY,
+  toX,
+  toY,
+  fromPosition,
+  toPosition,
+  fromNode,
+  fromHandle,
+  connectionStatus
+}) => {
+  const isReferenceDrag =
+    fromNode?.type === 'brandCard' &&
+    (fromHandle?.id === REFERENCE_SOURCE_HANDLE || fromHandle?.id === REFERENCE_TARGET_HANDLE);
+  const [edgePath] = getSmoothStepPath({
+    sourceX: fromX,
+    sourceY: fromY,
+    sourcePosition: fromPosition,
+    targetX: toX,
+    targetY: toY,
+    targetPosition: toPosition,
+    borderRadius: 16
+  });
+
+  const showGhostCard = isReferenceDrag && connectionStatus !== 'valid';
+  const ghostWidth = 276;
+  const ghostHeight = 216;
+  const isDraggingLeft = fromHandle?.id === REFERENCE_TARGET_HANDLE;
+  const ghostX = isDraggingLeft ? toX - ghostWidth : toX;
+  const ghostY = toY - ghostHeight / 2;
+  const sourceTitle = String(fromNode?.data?.title || 'Base card').slice(0, 28);
+
+  return (
+    <g>
+      <path
+        d={edgePath}
+        fill="none"
+        stroke={connectionStatus === 'valid' ? 'rgba(0,255,204,0.95)' : 'rgba(0,255,204,0.72)'}
+        strokeWidth={connectionStatus === 'valid' ? 3.5 : 2.5}
+        strokeDasharray={connectionStatus === 'valid' ? undefined : '8 6'}
+      />
+      <circle
+        cx={toX}
+        cy={toY}
+        r={6}
+        fill="#00ffcc"
+        stroke="#061014"
+        strokeWidth={2}
+      />
+      {showGhostCard && (
+        <g transform={`translate(${ghostX}, ${ghostY})`} style={{ pointerEvents: 'none' }}>
+          <rect
+            x="0"
+            y="0"
+            width={ghostWidth}
+            height={ghostHeight}
+            rx="16"
+            fill="rgba(12, 16, 26, 0.72)"
+            stroke="rgba(0, 255, 204, 0.78)"
+            strokeWidth="2"
+            strokeDasharray="8 6"
+          />
+          <rect
+            x="16"
+            y="16"
+            width="138"
+            height="14"
+            rx="7"
+            fill="rgba(255, 255, 255, 0.24)"
+          />
+          <rect
+            x="16"
+            y="38"
+            width="184"
+            height="9"
+            rx="4.5"
+            fill="rgba(0, 255, 204, 0.3)"
+          />
+          <rect
+            x="16"
+            y="58"
+            width={ghostWidth - 32}
+            height="96"
+            rx="10"
+            fill="rgba(75, 94, 250, 0.12)"
+            stroke="rgba(255, 255, 255, 0.16)"
+            strokeDasharray="5 5"
+          />
+          <text
+            x={ghostWidth / 2}
+            y="102"
+            textAnchor="middle"
+            fill="rgba(0, 255, 204, 0.95)"
+            fontSize="12"
+            fontWeight="800"
+            fontFamily="Inter, system-ui, sans-serif"
+          >
+            + Drop to Create Prompt Card
+          </text>
+          <text
+            x={ghostWidth / 2}
+            y="122"
+            textAnchor="middle"
+            fill="rgba(255, 255, 255, 0.65)"
+            fontSize="10.5"
+            fontWeight="600"
+            fontFamily="Inter, system-ui, sans-serif"
+          >
+            Ref: {sourceTitle}
+          </text>
+          <rect
+            x="16"
+            y="168"
+            width={ghostWidth - 32}
+            height="30"
+            rx="8"
+            fill="rgba(0, 255, 204, 0.16)"
+            stroke="rgba(0, 255, 204, 0.42)"
+          />
+          <text
+            x={ghostWidth / 2}
+            y="187"
+            textAnchor="middle"
+            fill="#00ffcc"
+            fontSize="11"
+            fontWeight="800"
+            fontFamily="Inter, system-ui, sans-serif"
+          >
+            Ready for prompt...
+          </text>
+        </g>
+      )}
+    </g>
+  );
+};
 const LABEL_WIDTH = 230;
 const LABEL_HEIGHT = 86;
 const LABEL_CARD_GAP = 150;
@@ -5111,6 +5248,85 @@ export default function HeroCanvas() {
     [createReferenceLink, setEdges]
   );
 
+  const handleConnectEnd = useCallback((event, connectionState) => {
+    if (connectionState?.isValid) return;
+    const fromNode = connectionState?.fromNode;
+    const fromHandleId = connectionState?.fromHandle?.id;
+    if (
+      !fromNode ||
+      fromNode.type !== 'brandCard' ||
+      (fromHandleId !== REFERENCE_SOURCE_HANDLE && fromHandleId !== REFERENCE_TARGET_HANDLE)
+    ) {
+      return;
+    }
+
+    const pointer = 'changedTouches' in event && event.changedTouches?.length
+      ? event.changedTouches[0]
+      : event;
+    if (!pointer || !Number.isFinite(pointer.clientX) || !Number.isFinite(pointer.clientY)) return;
+
+    const dropPoint = clientPointToCanvasPoint(pointer.clientX, pointer.clientY);
+    const isDraggingLeft = fromHandleId === REFERENCE_TARGET_HANDLE;
+    const newNodePosition = {
+      x: isDraggingLeft ? dropPoint.x - 320 : dropPoint.x,
+      y: dropPoint.y - 160
+    };
+    const baseNode = nodesRef.current.find((node) => node.id === fromNode.id) || fromNode;
+    const baseTitle = baseNode.data?.title || 'Base Card';
+    const newNodeId = `prompt-draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const newNode = {
+      id: newNodeId,
+      type: 'brandCard',
+      position: newNodePosition,
+      selected: true,
+      data: {
+        title: 'New Prompt Card',
+        subtitle: `Reference: ${baseTitle}`,
+        description: `Prompt a new image using "${baseTitle}" as reference.`,
+        image: '',
+        isPromptDraft: true,
+        autoOpenPrompt: true,
+        generatedFromNodeId: baseNode.id,
+        nodeGroup: `generated-${baseNode.id}`,
+        labelGroupId: baseNode.data?.labelGroupId || undefined,
+        labelTitle: baseNode.data?.labelTitle || undefined
+      }
+    };
+    const referenceEdge = {
+      id: `reference-${baseNode.id}-${newNodeId}`,
+      source: String(baseNode.id),
+      target: String(newNodeId),
+      sourceHandle: REFERENCE_SOURCE_HANDLE,
+      targetHandle: REFERENCE_TARGET_HANDLE,
+      type: 'smoothstep',
+      animated: true,
+      data: {
+        isReferenceRenderLink: true,
+        referenceNodeId: baseNode.id,
+        targetNodeId: newNodeId
+      },
+      interactionWidth: 28,
+      style: {
+        stroke: 'rgba(0,255,204,0.78)',
+        strokeWidth: 3,
+        strokeDasharray: '8 8'
+      }
+    };
+
+    pushUndoAction({
+      type: 'add-nodes',
+      label: 'Undo new prompt card',
+      nodeIds: [newNodeId],
+      edgeIds: [referenceEdge.id]
+    });
+    setPersistentNodes((nds) => [...nds.map((node) => ({ ...node, selected: false })), newNode]);
+    setPersistentEdges((eds) => [...eds, referenceEdge]);
+    setSelectedNodeIds([newNodeId]);
+    setIsEditMode(true);
+    setCanvasStatus(`Created prompt card using "${baseTitle}" as reference.`);
+    showCanvasActionToast(`New prompt card ready with "${baseTitle}" as reference.`);
+  }, [clientPointToCanvasPoint, pushUndoAction, setPersistentEdges, setPersistentNodes, showCanvasActionToast]);
+
   const handleNodesChange = useCallback((changes) => {
     if (changes.some((change) => graphChangeTypes.has(change.type))) {
       setIsCanvasDirty(true);
@@ -5253,6 +5469,8 @@ export default function HeroCanvas() {
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
+        onConnectEnd={handleConnectEnd}
+        connectionLineComponent={ReferenceConnectionLine}
         onEdgeClick={handleEdgeClick}
         onNodeClick={onNodeClick}
         onPaneClick={handlePaneClick}

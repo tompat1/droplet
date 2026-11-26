@@ -297,7 +297,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
   const [imageResolution, setImageResolution] = useState({ src: '', width: 0, height: 0, status: 'idle' });
 
   // Generative UI State
-  const [genState, setGenState] = useState('idle'); // idle | pipeline | prompt | generating
+  const [genState, setGenState] = useState(() => (data.autoOpenPrompt ? 'prompt' : 'idle')); // idle | pipeline | prompt | generating
   const [genPipeline, setGenPipeline] = useState(() => {
     try {
       const stored = localStorage.getItem('droplet-last-generation-renderer');
@@ -307,7 +307,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
     } catch {
       // ignore
     }
-    return null;
+    return data.autoOpenPrompt ? 'image' : null;
   });
   const [genProvider, setGenProvider] = useState(() => {
     try {
@@ -318,7 +318,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
     } catch {
       // ignore
     }
-    return null;
+    return data.autoOpenPrompt ? 'cloudflare_flux_klein_9b' : null;
   });
   const [genPrompt, setGenPrompt] = useState('');
   const [genRefs, setGenRefs] = useState([]);
@@ -778,6 +778,53 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         result.branch.refs = mergedRefs;
         result.branch.brandGuideNodeIds = brandGuide.nodes.map((node) => node.id);
       }
+      const nodeUpdater = data.setGlobalNodes || setNodes;
+      const edgeUpdater = data.setGlobalEdges || setEdges;
+      if (data.isPromptDraft && !data.image) {
+        const mediaUrl = result?.branch?.imageDataUrl || result?.branch?.imageUrl || result?.branch?.posterUrl || '';
+        const branchTitle = result?.branch?.title || `${provider.pipeline === 'video' ? 'Video' : 'Image'} Branch`;
+        const filledImage = mediaUrl || makeGeneratedPlaceholder({
+          isVideo: provider.pipeline === 'video',
+          title: branchTitle,
+          prompt: generationPrompt,
+          providerLabel: provider.shortLabel
+        });
+        nodeUpdater((nds) => nds.map((node) => (
+          node.id === id
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  title: branchTitle,
+                  subtitle: result?.branch?.subtitle || `${provider.label} render`,
+                  description: result?.branch?.description || generationPrompt,
+                  image: filledImage,
+                  video: result?.branch?.videoUrl || undefined,
+                  isPromptDraft: false,
+                  autoOpenPrompt: false,
+                  isGenerated: true,
+                  generationPipeline: provider.pipeline,
+                  generationProvider: providerKey,
+                  generationProviderLabel: provider.label,
+                  generationModel: result?.branch?.model || '',
+                  generationPrompt,
+                  generationRefs: mergedRefs,
+                  generationBrandGuideNodeIds: brandGuide.nodes.map((guideNode) => guideNode.id),
+                  generationStatus: result?.branch?.status || (result?.mock ? 'mock' : 'ready'),
+                  generationOperationName: result?.branch?.operationName || '',
+                  generationMock: result?.mock === true || result?.branch?.mock === true,
+                  generationUsage: result?.usage || result?.branch?.usage || null
+                }
+              }
+            : node
+        )));
+        setGenState('idle');
+        setGenPrompt('');
+        setGenRefs([]);
+        data.onGenerationUsageUpdate?.(result?.usage || result?.branch?.usage);
+        return;
+      }
+
       const newNode = buildGeneratedNode({ providerKey, prompt: generationPrompt, branchIndex, parentNode, result });
 
       const newEdge = { 
@@ -793,8 +840,6 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         style: { stroke: 'rgba(0,255,204,0.72)', strokeWidth: 3 }
       } : null;
       
-      const nodeUpdater = data.setGlobalNodes || setNodes;
-      const edgeUpdater = data.setGlobalEdges || setEdges;
       nodeUpdater(nds => [...nds, newNode]);
       edgeUpdater(eds => [...eds, ...[newEdge, labelEdge].filter(Boolean)]);
       
@@ -992,6 +1037,34 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
           )}
         </div>
       </div>
+
+      {data.isPromptDraft && !data.image && (
+        <div
+          style={{
+            width: '100%',
+            height: '132px',
+            borderRadius: '10px',
+            marginBottom: '14px',
+            border: '1.5px dashed rgba(0, 255, 204, 0.42)',
+            background: 'linear-gradient(135deg, rgba(0, 255, 204, 0.08), rgba(75, 94, 250, 0.1))',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            padding: '12px',
+            textAlign: 'center'
+          }}
+        >
+          <span style={{ fontSize: '1.25rem' }}>✨</span>
+          <span style={{ fontSize: '12px', fontWeight: 800, color: '#00ffcc' }}>
+            Empty Prompt Card
+          </span>
+          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.62)', lineHeight: 1.35 }}>
+            Describe your new image below — connected card is attached as reference.
+          </span>
+        </div>
+      )}
 
       {data.image && (
         <div 
@@ -1536,7 +1609,7 @@ export default function BrandCard({ id, data, isConnectable, selected }) {
         type="source"
         position={Position.Right}
         isConnectable={isConnectable}
-        title="Drag to another card to use this card as a reference"
+        title="Drag to another card to link as reference, or drop on empty canvas to create a new prompt card"
         aria-label="Reference source"
         onMouseEnter={handlePointerEnter}
         onMouseLeave={handlePointerLeave}
